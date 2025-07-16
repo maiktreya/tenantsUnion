@@ -25,7 +25,7 @@ CREATE TABLE sindicato_inq.bloques (
     direccion TEXT,
     estado TEXT,
     api TEXT,
-    empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL
+    empresa_id INTEGER REFERENCES sindicato_inq.empresas (id) ON DELETE SET NULL
 );
 
 -- 4. PISOS (Apartments / Units)
@@ -37,7 +37,7 @@ CREATE TABLE sindicato_inq.pisos (
     api TEXT,
     prop_vertical BOOLEAN NOT NULL,
     por_habitaciones BOOLEAN NOT NULL,
-    bloque_id INTEGER REFERENCES bloques (id) ON DELETE SET NULL
+    bloque_id INTEGER REFERENCES sindicato_inq.bloques (id) ON DELETE SET NULL
 );
 
 -- 5. USUARIOS (System Users)
@@ -66,7 +66,7 @@ CREATE TABLE sindicato_inq.afiliadas (
     estado TEXT DEFAULT NULL,
     fecha_alta DATE,
     fecha_baja DATE DEFAULT NULL,
-    piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL
+    piso_id INTEGER REFERENCES sindicato_inq.pisos (id) ON DELETE SET NULL
 );
 
 -- 7. CONFLICTOS (Conflicts / Disputes)
@@ -80,8 +80,8 @@ CREATE TABLE sindicato_inq.conflictos (
     fecha_cierre DATE,
     descripcion TEXT,
     resolucion TEXT,
-    afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
-    usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL
+    afiliada_id INTEGER REFERENCES sindicato_inq.afiliadas (id) ON DELETE SET NULL,
+    usuario_responsable_id INTEGER REFERENCES sindicato_inq.usuarios (id) ON DELETE SET NULL
 );
 
 -- 8. DIARIO_CONFLICTOS (Conflict Logs)
@@ -92,7 +92,7 @@ CREATE TABLE sindicato_inq.diario_conflictos (
     afectada TEXT,
     causa TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    conflicto_id INTEGER REFERENCES conflictos (id) ON DELETE SET NULL
+    conflicto_id INTEGER REFERENCES sindicato_inq.conflictos (id) ON DELETE SET NULL
 );
 
 -- 9. FACTURACION (Billing)
@@ -101,7 +101,7 @@ CREATE TABLE sindicato_inq.facturacion (
     cuota DECIMAL(8, 2) NOT NULL,
     periodicidad SMALLINT NOT NULL,
     iban TEXT NOT NULL,
-    afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL
+    afiliada_id INTEGER REFERENCES sindicato_inq.afiliadas (id) ON DELETE SET NULL
 );
 
 -- 10. SOLICITUDES (Applications / Requests)
