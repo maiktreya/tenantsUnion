@@ -6,3 +6,4 @@ src/modules/__pycache__
 # src/* includes the modular refractored app files
 src
 dev
+tests
