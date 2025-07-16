@@ -1,2 +1,4 @@
 .venv
 .env
+nicegui-starter-main/__pycache__
+nicegui-starter-main/pages/__pycache__

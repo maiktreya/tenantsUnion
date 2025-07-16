@@ -23,19 +23,3 @@ async def fetch_users():
         resp = await client.get(POSTGREST_URL)
         resp.raise_for_status()
         return resp.json()  # Should return a list of dicts
-
-
-table = ui.table(
-    columns=columns,
-    rows=[],  # Filled after fetch
-    row_key="name",
-)
-
-
-@ui.page("/")
-async def main():
-    users = await fetch_users()
-    table.rows = users
-
-
-ui.run()
