@@ -29,3 +29,22 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  nicegui-app:
+    image: python:3.11-slim
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nicegui_app.py:/app/nicegui_app.py:ro
+    working_dir: /app
+    command: >
+      sh -c "
+        pip install nicegui httpx &&
+        python nicegui_app.py
+      "
+    depends_on:
+      - server
+      - db
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
