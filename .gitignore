@@ -4,5 +4,3 @@ src/__pycache__
 src/pages/__pycache__
 src/modules/__pycache__
 # src/* includes the modular refractored app files
-src
-dev
