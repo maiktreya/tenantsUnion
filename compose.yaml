@@ -14,9 +14,7 @@ services:
     restart: unless-stopped
 
   db:
-    build:
-      context: ./build/postgreSQL
-      dockerfile: Dockerfile
+    image: postgres:15
     ports:
       - "5432:5432"
     environment:

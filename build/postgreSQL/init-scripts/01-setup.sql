@@ -1,12 +1,12 @@
 -- 1. ENTRAMADO_EMPRESAS
-CREATE TABLE entramado_empresas (
+CREATE TABLE sindicato_inq.entramado_empresas (
     id SERIAL PRIMARY KEY,
     nombre TEXT,
     descripcion TEXT
 );
 
 -- 2. EMPRESAS (Companies)
-CREATE TABLE empresas (
+CREATE TABLE sindicato_inq.empresas (
     id SERIAL PRIMARY KEY,
     entramado_id TEXT,
     nombre TEXT,
@@ -17,7 +17,7 @@ CREATE TABLE empresas (
 );
 
 -- 3. BLOQUES (Building Blocks / Properties)
-CREATE TABLE bloques (
+CREATE TABLE sindicato_inq.bloques (
     id SERIAL PRIMARY KEY,
     direccion TEXT,
     estado TEXT,
@@ -26,7 +26,7 @@ CREATE TABLE bloques (
 );
 
 -- 4. PISOS (Apartments / Units)
-CREATE TABLE pisos (
+CREATE TABLE sindicato_inq.pisos (
     id SERIAL PRIMARY KEY,
     direccion TEXT NOT NULL,
     municipio TEXT,
@@ -38,7 +38,7 @@ CREATE TABLE pisos (
 );
 
 -- 5. USUARIOS (System Users)
-CREATE TABLE usuarios (
+CREATE TABLE sindicato_inq.usuarios (
     id SERIAL PRIMARY KEY,
     alias TEXT,
     nombre TEXT,
@@ -52,7 +52,7 @@ CREATE TABLE usuarios (
 );
 
 -- 6. AFILIADAS (Union Members / Tenants)
-CREATE TABLE afiliadas (
+CREATE TABLE sindicato_inq.afiliadas (
     id SERIAL PRIMARY KEY,
     num_afiliada TEXT,
     nombre TEXT,
@@ -67,7 +67,7 @@ CREATE TABLE afiliadas (
 );
 
 -- 7. CONFLICTOS (Conflicts / Disputes)
-CREATE TABLE conflictos (
+CREATE TABLE sindicato_inq.conflictos (
     id SERIAL PRIMARY KEY,
     estado TEXT DEFAULT NULL,
     ambito TEXT,
@@ -82,7 +82,7 @@ CREATE TABLE conflictos (
 );
 
 -- 8. DIARIO_CONFLICTOS (Conflict Logs)
-CREATE TABLE diario_conflictos (
+CREATE TABLE sindicato_inq.diario_conflictos (
     id SERIAL PRIMARY KEY,
     estado TEXT DEFAULT NULL,
     ambito TEXT,
@@ -93,7 +93,7 @@ CREATE TABLE diario_conflictos (
 );
 
 -- 9. FACTURACION (Billing)
-CREATE TABLE facturacion (
+CREATE TABLE sindicato_inq.facturacion (
     id SERIAL PRIMARY KEY,
     cuota DECIMAL(8, 2) NOT NULL,
     periodicidad SMALLINT NOT NULL,
@@ -102,4 +102,4 @@ CREATE TABLE facturacion (
 );
 
 -- 10. SOLICITUDES (Applications / Requests)
-CREATE TABLE solicitudes (id SERIAL PRIMARY KEY);
+CREATE TABLE sindicato_inq.solicitudes (id SERIAL PRIMARY KEY);

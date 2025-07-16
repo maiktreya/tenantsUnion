@@ -1,6 +1,6 @@
 -- Entramado Empresarial
 INSERT INTO
-    entramado_empresas (nombre, descripcion)
+    sindicato_inq.entramado_empresas (nombre, descripcion)
 VALUES (
         'Grupo Inmobiliario Sur',
         'Holding de empresas de gestión inmobiliaria'
@@ -8,7 +8,7 @@ VALUES (
 
 -- Empresas
 INSERT INTO
-    empresas (
+    sindicato_inq.empresas (
         entramado_id,
         nombre,
         cif_nif_nie,
@@ -27,7 +27,7 @@ VALUES (
 
 -- Bloques
 INSERT INTO
-    bloques (
+    sindicato_inq.bloques (
         direccion,
         estado,
         api,
@@ -42,7 +42,7 @@ VALUES (
 
 -- Pisos
 INSERT INTO
-    pisos (
+    sindicato_inq.pisos (
         direccion,
         municipio,
         cp,
@@ -63,7 +63,7 @@ VALUES (
 
 -- Usuarios
 INSERT INTO
-    usuarios (
+    sindicato_inq.usuarios (
         alias,
         nombre,
         apellidos,
@@ -88,7 +88,7 @@ VALUES (
 
 -- Afiliadas
 INSERT INTO
-    afiliadas (
+    sindicato_inq.afiliadas (
         num_afiliada,
         nombre,
         apellidos,
@@ -113,7 +113,7 @@ VALUES (
 
 -- Conflictos
 INSERT INTO
-    conflictos (
+    sindicato_inq.conflictos (
         estado,
         ambito,
         afectada,
@@ -140,7 +140,7 @@ VALUES (
 
 -- Diario de Conflictos
 INSERT INTO
-    diario_conflictos (
+    sindicato_inq.diario_conflictos (
         estado,
         ambito,
         afectada,
@@ -157,7 +157,7 @@ VALUES (
 
 -- Facturación
 INSERT INTO
-    facturacion (
+    sindicato_inq.facturacion (
         cuota,
         periodicidad,
         iban,
@@ -169,6 +169,3 @@ VALUES (
         'ES9820385778983000760236',
         1
     );
-
--- Solicitudes
-INSERT INTO solicitudes DEFAULT VALUES;
