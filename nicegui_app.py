@@ -109,7 +109,7 @@ def home_page_content() -> None:
             """
 
         )
-ui.add_body_html('<a href="https://ibb.co/MyMWQzxj"><img src="https://i.ibb.co/mr61gnVY/test-pgerd.png" alt="test-pgerd" border="0"></a>').classes('w-16')
+ui.html('<a href="https://ibb.co/MyMWQzxj"><img src="https://i.ibb.co/mr61gnVY/test-pgerd.png" alt="test-pgerd" border="0"></a>').classes('w-16')
 
 # From table_API.py: Defines the content and interaction logic for the API generator page.
 def api_generator_page_content() -> None:
