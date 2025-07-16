@@ -1,7 +1,7 @@
--- 1. ENTRAMADO_EMPRESAS
 -- Create the schema if it doesn't exist
 CREATE SCHEMA IF NOT EXISTS sindicato_inq;
 
+-- 1. ENTRAMADO_EMPRESAS
 CREATE TABLE sindicato_inq.entramado_empresas (
     id SERIAL PRIMARY KEY,
     nombre TEXT,
