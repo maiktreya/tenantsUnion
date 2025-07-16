@@ -109,7 +109,6 @@ def home_page_content() -> None:
             """
 
         )
-ui.html('<a href="https://ibb.co/MyMWQzxj"><img src="https://i.ibb.co/mr61gnVY/test-pgerd.png" alt="test-pgerd" border="0"></a>').classes('w-16')
 
 # From table_API.py: Defines the content and interaction logic for the API generator page.
 def api_generator_page_content() -> None:
@@ -136,6 +135,7 @@ def index_page() -> None:
 # From all_pages.py (which called table_API.py): Registers the "/api-generator/" URL.
 # In a single file, we directly link the page to its content function.
 ui.page("/api-generator/")(api_generator_page_content)
+ui.page.html('<a href="https://ibb.co/MyMWQzxj"><img src="https://i.ibb.co/mr61gnVY/test-pgerd.png" alt="test-pgerd" border="0"></a>')
 
 
 # --- 4. Application Start (from main.py) ---
