@@ -71,10 +71,29 @@ def home_page_content() -> None:
         ui.markdown(
             """
             # Test de integración
+            Aplicación mínimas dependencias
             ## PostgreSQL
+            Setup through init-scripts. (2 deps, 1 for testing)
             ## PostgREST
+
+            auto-API endpoints. No deps, just compose.
+
             ## niceGUI
+
+            Minimalist only python reactive frontend. 1 single script.
+
+            ---
+
+            So at the end. We only need:
+
+            - docker-compose file
+
+            - 1 python script
+
+            - 1 or 2 sql init files
+
             """
+
         )
 
 # From table_API.py: Defines the content and interaction logic for the API generator page.
