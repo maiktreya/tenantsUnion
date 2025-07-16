@@ -70,15 +70,29 @@ def home_page_content() -> None:
     with ui.column():
         ui.markdown(
             """
-            # Test de integración
-            Aplicación mínimas dependencias
-            ## PostgreSQL
+            ### Test de integración
+
+            Aplicación mínima para test app CRUD Restful. 3 servicios docker sin imagenes custom. Fully composable.
+
+            **PostgreSQL (DB) + PostgREST (API) + niceGUI (frontend)**
+
+            Pending:
+
+            1. Implement Nginx reverse server
+            2. Interfaz toma de actas
+            3. Histórico comflicto
+            4. Revisión de tablas
+
+
+            #### PostgreSQL
+
             Setup through init-scripts. (2 deps, 1 for testing)
-            ## PostgREST
+
+            #### PostgREST
 
             auto-API endpoints. No deps, just compose.
 
-            ## niceGUI
+            #### niceGUI
 
             Minimalist only python reactive frontend. 1 single script.
 
@@ -86,7 +100,7 @@ def home_page_content() -> None:
 
             So at the end. We only need:
 
-            - docker-compose file
+            - 1 docker-compose file
 
             - 1 python script
 
@@ -95,6 +109,7 @@ def home_page_content() -> None:
             """
 
         )
+ui.image('dev/test.pgerd.png')
 
 # From table_API.py: Defines the content and interaction logic for the API generator page.
 def api_generator_page_content() -> None:
