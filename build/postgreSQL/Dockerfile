@@ -1,4 +1,4 @@
-FROM postgres:15-3.4
+FROM postgres:15
 
 # Install the pg_cron extension
 RUN apt-get update \
