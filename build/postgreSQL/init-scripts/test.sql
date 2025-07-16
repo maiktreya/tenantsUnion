@@ -9,7 +9,7 @@ CREATE TABLE afiliadas (
     regimen TEXT,
     estado TEXT DEFAULT NULL,
     fecha_alta TEXT,
-    fecha_baja TEXT DEFAULT NULL
+    fecha_baja TEXT DEFAULT NULL piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL
 );
 
 CREATE TABLE pisos (
@@ -20,7 +20,7 @@ CREATE TABLE pisos (
     api TEXT,
     prop_vertical BOOLEAN NOT NULL,
     por_habitaciones BOOLEAN NOT NULL,
-    bloque_id INT NOT NULL
+    bloque_id INTEGER REFERENCES bloques (id) ON DELETE SET NULL
 );
 
 -- 2. BLOQUES (Building Blocks/Properties)
@@ -29,7 +29,7 @@ CREATE TABLE bloques (
     direccion TEXT,
     estado TEXT,
     api TEXT,
-    empresa_id INTEGER REFERENCES
+    empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL
 );
 
 -- 5. CONFLICTOS (Conflicts/Disputes)
@@ -53,6 +53,8 @@ CREATE TABLE diario_conflictos (
     ambito TEXT,
     afectada TEXT,
     causa TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    conflicto_id INTEGER REFERENCES conflictos (id) ON DELETE SET NULL
 );
 
 -- 1. EMPRESAS (Companies/Property Management Companies)
@@ -76,7 +78,8 @@ CREATE TABLE facturacion (
     id INT NOT NULL,
     Cuota DECIMAL(8, 2) NOT NULL,
     Periodicidad SMALLINT NOT NULL,
-    IBAN TEXT NOT NULL
+    IBAN TEXT NOT NULL,
+    afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL
 );
 
 CREATE TABLE solicitudes (id INT NOT NULL);
@@ -87,7 +90,7 @@ CREATE TABLE usuarios (
     alias TEXT,
     nombre TEXT,
     apellidos TEXT,
-    correo_electronico TEXT,
+    email TEXT,
     telefono TEXT,
     grupo_por_defecto TEXT,
     grupos TEXT,
