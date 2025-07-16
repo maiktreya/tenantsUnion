@@ -87,7 +87,7 @@ def home_page_content() -> None:
 
             Aplicación mínima para test app CRUD Restful. 3 servicios docker sin imagenes custom. Fully composable.
 
-            **PostgreSQL (DB) + PostgREST (API) + niceGUI (frontend)**W
+            **PostgreSQL (DB) + PostgREST (API) + niceGUI (frontend)**
             """
         )
 
