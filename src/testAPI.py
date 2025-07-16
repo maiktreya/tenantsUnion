@@ -2,7 +2,7 @@ import httpx
 from nicegui import ui
 
 # Update this to the correct PostgREST endpoint
-POSTGREST_URL = "http://localhost:3000/usuarios"
+POSTGREST_URL = "http://localhost:3001/usuarios"
 
 # Define the columns for display (adapted from your schema)
 columns = [

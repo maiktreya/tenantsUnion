@@ -2,7 +2,7 @@ import asyncio
 import httpx
 from nicegui import ui
 
-POSTGREST_URL = "http://localhost:3000/app_userd"
+POSTGREST_URL = "http://localhost:3001/usuarios"
 
 # Define columns for the table
 columns = [
