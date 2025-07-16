@@ -33,7 +33,7 @@ services:
   nicegui-app:
     image: python:3.11-slim
     ports:
-      - "8080:8080"
+      - "8081:8081"
     volumes:
       - ./nicegui_app.py:/app/nicegui_app.py:ro
     working_dir: /app

@@ -106,5 +106,6 @@ ui.page("/api-generator/")(api_generator_page_content)
 
 # --- 4. Application Start (from main.py) ---
 # This is the final step that starts the NiceGUI server.
-if __name__ == "__main__":
-    ui.run(title="Getting Started with NiceGUI", host="0.0.0.0", port=8080)
+# Changed main guard to support NiceGUI's multiprocessing requirements
+if __name__ in {"__main__", "__mp_main__"}:
+    ui.run(title="Getting Started with NiceGUI", host="0.0.0.0", port=8081)
