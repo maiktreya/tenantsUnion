@@ -39,8 +39,8 @@ services:
     working_dir: /app
     command: >
       sh -c "
-        pip install --upgrade pip --root-user-action option &&
-        pip install nicegui httpx --root-user-action option &&
+        pip install --root-user-action=ignore --upgrade pip  &&
+        pip install --root-user-action=ignore nicegui httpx  &&
         python nicegui_app.py
       "
     depends_on:
