@@ -200,23 +200,6 @@ VALUES (
     ('specialty', 'Especialitats');
 
 -- =============================================
--- UNION ORGANIZATION
--- =============================================
-
-CREATE TABLE union_sections (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    postal_codes TEXT[], -- Array of postal codes
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE commissions (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- =============================================
 -- PERSON AND MEMBER MANAGEMENT
 -- =============================================
 
@@ -484,6 +467,23 @@ CREATE INDEX idx_rental_contracts_member ON rental_contracts (member_id);
 CREATE INDEX idx_rental_contracts_housing ON rental_contracts (housing_unit_id);
 
 CREATE INDEX idx_rental_contracts_active ON rental_contracts (is_active);
+
+-- =============================================
+-- UNION ORGANIZATION
+-- =============================================
+
+CREATE TABLE union_sections (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    postal_codes TEXT[], -- Array of postal codes
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE commissions (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 -- =============================================
 -- CONFLICTS MANAGEMENT
