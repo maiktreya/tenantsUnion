@@ -261,6 +261,28 @@ BEFORE UPDATE ON persones
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TABLE origens_afiliacio (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TRIGGER set_updated_at_on_origens_afiliacio BEFORE UPDATE ON origens_afiliacio FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TABLE nivells_participacio (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TRIGGER set_updated_at_on_nivells_participacio BEFORE UPDATE ON nivells_participacio FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 --
 -- Table structure for `afiliades` (Affiliates) - Linked to `persones` and `contractes`
 --
@@ -542,6 +564,28 @@ BEFORE UPDATE ON conflictes
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TABLE tipus_assessorament (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TRIGGER set_updated_at_on_tipus_assessorament BEFORE UPDATE ON tipus_assessorament FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TABLE resultats_assessoraments (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TRIGGER set_updated_at_on_resultats_assessoraments BEFORE UPDATE ON resultats_assessoraments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 --
 -- Table structure for `assessoraments` (Assessments/Advisories)
 --
@@ -614,44 +658,11 @@ CREATE TABLE estats_habitatge (
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_AT_COLUMN_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TRIGGER set_updated_at_on_estats_habitatge BEFORE UPDATE ON estats_habitatge FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TABLE nivells_participacio (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TRIGGER set_updated_at_on_nivells_participacio BEFORE UPDATE ON nivells_participacio FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TABLE origens_afiliacio (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TRIGGER set_updated_at_on_origens_afiliacio BEFORE UPDATE ON origens_afiliacio FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TABLE resultats_assessoraments (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TRIGGER set_updated_at_on_resultats_assessoraments BEFORE UPDATE ON resultats_assessoraments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE serveis_juridics (
     id SERIAL PRIMARY KEY,
@@ -663,17 +674,6 @@ CREATE TABLE serveis_juridics (
 );
 
 CREATE TRIGGER set_updated_at_on_serveis_juridics BEFORE UPDATE ON serveis_juridics FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TABLE tipus_assessorament (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TRIGGER set_updated_at_on_tipus_assessorament BEFORE UPDATE ON tipus_assessorament FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE tipus_document (
     id SERIAL PRIMARY KEY,
@@ -742,6 +742,23 @@ CREATE TABLE collaboradores_collectiu (
     CONSTRAINT fk_collaboradores_collectiu FOREIGN KEY (collectiu_id) REFERENCES collectius (id)
 );
 
+CREATE TABLE agrupacions_blocs (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    owner_user INT NOT NULL,
+    owner_group INT NOT NULL,
+    create_user INT NOT NULL,
+    update_user INT NOT NULL,
+    delete_user INT DEFAULT NULL,
+    delete_timestamp TIMESTAMP DEFAULT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TRIGGER set_updated_at_on_agrupacions_blocs BEFORE UPDATE ON agrupacions_blocs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- blocs_agrupacio_blocs: Blocks belonging to a block group
 CREATE TABLE blocs_agrupacio_blocs (
     bloc_id INT NOT NULL,
@@ -751,6 +768,23 @@ CREATE TABLE blocs_agrupacio_blocs (
     CONSTRAINT fk_blocs_agrupacio_bloc FOREIGN KEY (bloc_id) REFERENCES blocs (id),
     CONSTRAINT fk_agrupacio_blocs_agrupacio FOREIGN KEY (agrupacio_bloc_id) REFERENCES agrupacions_blocs (id)
 );
+
+CREATE TABLE entramats (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    owner_user INT NOT NULL,
+    owner_group INT NOT NULL,
+    create_user INT NOT NULL,
+    update_user INT NOT NULL,
+    delete_user INT DEFAULT NULL,
+    delete_timestamp TIMESTAMP DEFAULT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TRIGGER set_updated_at_on_entramats BEFORE UPDATE ON entramats FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- blocs_entramat: Blocks belonging to an entanglement
 CREATE TABLE blocs_entramat (
@@ -785,23 +819,6 @@ CREATE TABLE pisos_entramat (
 --
 -- Remaining Tables (with updated data types and audit columns)
 --
-
-CREATE TABLE agrupacions_blocs (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    owner_user INT NOT NULL,
-    owner_group INT NOT NULL,
-    create_user INT NOT NULL,
-    update_user INT NOT NULL,
-    delete_user INT DEFAULT NULL,
-    delete_timestamp TIMESTAMP DEFAULT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TRIGGER set_updated_at_on_agrupacions_blocs BEFORE UPDATE ON agrupacions_blocs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE changes_log (
     id SERIAL PRIMARY KEY,
@@ -854,23 +871,6 @@ CREATE TABLE domiciliacions (
 );
 
 CREATE TRIGGER set_updated_at_on_domiciliacions BEFORE UPDATE ON domiciliacions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TABLE entramats (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    owner_user INT NOT NULL,
-    owner_group INT NOT NULL,
-    create_user INT NOT NULL,
-    update_user INT NOT NULL,
-    delete_user INT DEFAULT NULL,
-    delete_timestamp TIMESTAMP DEFAULT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TRIGGER set_updated_at_on_entramats BEFORE UPDATE ON entramats FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE especialitats (
     id SERIAL PRIMARY KEY,
@@ -988,8 +988,8 @@ ADD CONSTRAINT fk_users_default_group_groups FOREIGN KEY (default_group) REFEREN
 ALTER TABLE municipis
 ADD CONSTRAINT fk_municipis_provincia FOREIGN KEY (provincia_id) REFERENCES provincies (id);
 
-ALTER TABLE conflictes
-ADD CONSTRAINT fk_conflictes_causa FOREIGN KEY (causa_conflicte_id) REFERENCES causes_conflicte (id);
+-- ALTER TABLE conflictes
+-- ADD CONSTRAINT fk_conflictes_causa FOREIGN KEY (causa_conflicte_id) REFERENCES causes_conflicte (id);
 -- Assuming a cause_conflicte_id column is added to conflictes.
 
 -- Add more foreign key constraints as per your original schema and the new normalized design.
