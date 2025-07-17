@@ -1,4 +1,8 @@
 -- PostgreSQL version of the provided MySQL schema
+-- Create the schema if it doesn't exist
+CREATE SCHEMA IF NOT EXISTS sindicato_old;
+
+SET search_path TO sindicato_old;
 
 -- Drop tables if exist (for idempotency, you can remove in production)
 DROP TABLE IF EXISTS vw_afiliades CASCADE;
