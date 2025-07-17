@@ -1,136 +1,16 @@
--- PostgreSQL version of the provided MySQL schema
--- Create the schema if it doesn't exist
-CREATE SCHEMA IF NOT EXISTS sindicato_old;
+-- PostgreSQL version of the modernized schema for Sindicato Tenants Union
+-- Version 2.0 - Simplified and optimized design
 
-SET search_path TO sindicato_old;
+-- Create the schema
+CREATE SCHEMA IF NOT EXISTS sindicato;
 
--- Drop tables if exist (for idempotency, you can remove in production)
-DROP TABLE IF EXISTS vw_afiliades CASCADE;
+SET search_path TO sindicato;
 
-DROP TABLE IF EXISTS afiliada_historic_regims CASCADE;
+-- =============================================
+-- CORE INFRASTRUCTURE TABLES
+-- =============================================
 
-DROP TABLE IF EXISTS afiliades CASCADE;
-
-DROP TABLE IF EXISTS afiliades_delegades_conflicte CASCADE;
-
-DROP TABLE IF EXISTS agrupacions_blocs CASCADE;
-
-DROP TABLE IF EXISTS assessoraments CASCADE;
-
-DROP TABLE IF EXISTS assessorament_documents CASCADE;
-
-DROP TABLE IF EXISTS blocs CASCADE;
-
-DROP TABLE IF EXISTS blocs_agrupacio_blocs CASCADE;
-
-DROP TABLE IF EXISTS blocs_entramat CASCADE;
-
-DROP TABLE IF EXISTS blocs_importats CASCADE;
-
-DROP TABLE IF EXISTS causes_conflicte CASCADE;
-
-DROP TABLE IF EXISTS changes_log CASCADE;
-
-DROP TABLE IF EXISTS colaboradores_collectiu CASCADE;
-
-DROP TABLE IF EXISTS collectius CASCADE;
-
-DROP TABLE IF EXISTS comissions CASCADE;
-
-DROP TABLE IF EXISTS conflictes CASCADE;
-
-DROP TABLE IF EXISTS directius CASCADE;
-
-DROP TABLE IF EXISTS directius_empresa CASCADE;
-
-DROP TABLE IF EXISTS domiciliacions CASCADE;
-
-DROP TABLE IF EXISTS empreses CASCADE;
-
-DROP TABLE IF EXISTS entramats CASCADE;
-
-DROP TABLE IF EXISTS especialitats CASCADE;
-
-DROP TABLE IF EXISTS estats_habitatge CASCADE;
-
-DROP TABLE IF EXISTS "groups" CASCADE;
-
-DROP TABLE IF EXISTS import_templates CASCADE;
-
-DROP TABLE IF EXISTS interessades CASCADE;
-
-DROP TABLE IF EXISTS medias CASCADE;
-
-DROP TABLE IF EXISTS municipis CASCADE;
-
-DROP TABLE IF EXISTS negociacions_conflicte CASCADE;
-
-DROP TABLE IF EXISTS nivells_participacio CASCADE;
-
-DROP TABLE IF EXISTS no_afiliades CASCADE;
-
-DROP TABLE IF EXISTS options CASCADE;
-
-DROP TABLE IF EXISTS origens_afiliacio CASCADE;
-
-DROP TABLE IF EXISTS patterns CASCADE;
-
-DROP TABLE IF EXISTS persones CASCADE;
-
-DROP TABLE IF EXISTS pisos CASCADE;
-
-DROP TABLE IF EXISTS pisos_entramat CASCADE;
-
-DROP TABLE IF EXISTS processes CASCADE;
-
-DROP TABLE IF EXISTS process_executions CASCADE;
-
-DROP TABLE IF EXISTS provincies CASCADE;
-
-DROP TABLE IF EXISTS remote_printers CASCADE;
-
-DROP TABLE IF EXISTS remote_printer_jobs CASCADE;
-
-DROP TABLE IF EXISTS resolucions_conflicte CASCADE;
-
-DROP TABLE IF EXISTS resultats_assessoraments CASCADE;
-
-DROP TABLE IF EXISTS roles CASCADE;
-
-DROP TABLE IF EXISTS role_permissions CASCADE;
-
-DROP TABLE IF EXISTS seccions_sindicals CASCADE;
-
-DROP TABLE IF EXISTS serveis_juridics CASCADE;
-
-DROP TABLE IF EXISTS servei_juridic_documents CASCADE;
-
-DROP TABLE IF EXISTS service_tokens CASCADE;
-
-DROP TABLE IF EXISTS simpatitzants CASCADE;
-
-DROP TABLE IF EXISTS simpatitzant_historic_regims CASCADE;
-
-DROP TABLE IF EXISTS sollicituds CASCADE;
-
-DROP TABLE IF EXISTS tecniques CASCADE;
-
-DROP TABLE IF EXISTS tipus_assessoraments CASCADE;
-
-DROP TABLE IF EXISTS tipus_serveis_juridics CASCADE;
-
-DROP TABLE IF EXISTS tipus_sseguiment CASCADE;
-
-DROP TABLE IF EXISTS users CASCADE;
-
-DROP TABLE IF EXISTS user_groups CASCADE;
-
-DROP TABLE IF EXISTS user_page_options CASCADE;
-
-DROP TABLE IF EXISTS user_roles CASCADE;
-
--- Table definitions
-
+-- Simplified user management
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     code VARCHAR(20) NOT NULL UNIQUE,
@@ -138,1488 +18,998 @@ CREATE TABLE users (
     first_name VARCHAR(150) NOT NULL,
     last_name VARCHAR(150) NOT NULL,
     email VARCHAR(150) NOT NULL UNIQUE,
-    default_group INTEGER NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    phone VARCHAR(50)
+    phone VARCHAR(20) CHECK (phone ~ '^\+?[0-9\s\-\(\)]+$'),
+    default_group_id INTEGER NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE "groups" (
+CREATE TABLE groups (
     id SERIAL PRIMARY KEY,
     code VARCHAR(20) NOT NULL UNIQUE,
     title VARCHAR(150) NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE roles (
     id SERIAL PRIMARY KEY,
     code VARCHAR(20) NOT NULL UNIQUE,
     title VARCHAR(150) NOT NULL,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE role_permissions (
     id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
+    role_id INTEGER NOT NULL REFERENCES roles (id) ON DELETE CASCADE,
     permission VARCHAR(50) NOT NULL,
     operation VARCHAR(50) NOT NULL,
     level VARCHAR(1),
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (
-        parent_id,
+        role_id,
         permission,
         operation
     )
 );
 
-CREATE TABLE user_roles (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    child_id INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (parent_id, child_id)
-);
-
 CREATE TABLE user_groups (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    child_id INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (parent_id, child_id)
+    user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    group_id INTEGER NOT NULL REFERENCES groups (id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, group_id)
 );
 
-CREATE TABLE user_page_options (
+CREATE TABLE user_roles (
+    user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    role_id INTEGER NOT NULL REFERENCES roles (id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, role_id)
+);
+
+-- =============================================
+-- UNIFIED AUDIT SYSTEM
+-- =============================================
+
+CREATE TABLE audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    table_name VARCHAR(100) NOT NULL,
+    record_id INTEGER NOT NULL,
+    operation VARCHAR(10) NOT NULL CHECK (
+        operation IN ('INSERT', 'UPDATE', 'DELETE')
+    ),
+    user_id INTEGER REFERENCES users (id),
+    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    user_agent TEXT
+);
+
+CREATE INDEX idx_audit_log_table_record ON audit_log (table_name, record_id);
+
+CREATE INDEX idx_audit_log_user_time ON audit_log (user_id, changed_at);
+
+CREATE INDEX idx_audit_log_changed_at ON audit_log (changed_at);
+
+-- =============================================
+-- LOCATION MANAGEMENT
+-- =============================================
+
+CREATE TABLE provinces (
     id SERIAL PRIMARY KEY,
-    user_code VARCHAR(50) NOT NULL,
-    page_code VARCHAR(200) NOT NULL,
-    option_key VARCHAR(200) NOT NULL,
-    option_value TEXT,
-    UNIQUE (
-        user_code,
-        page_code,
-        option_key
+    code VARCHAR(2) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE municipalities (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    province_id INTEGER NOT NULL REFERENCES provinces (id),
+    UNIQUE (name, province_id)
+);
+
+CREATE TABLE addresses (
+    id SERIAL PRIMARY KEY,
+    street_name VARCHAR(200),
+    street_number VARCHAR(20),
+    floor VARCHAR(10),
+    door VARCHAR(10),
+    complement VARCHAR(50),
+    postal_code VARCHAR(10),
+    municipality_id INTEGER REFERENCES municipalities (id),
+    google_place_id VARCHAR(100),
+    full_address TEXT NOT NULL,
+    coordinates POINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_addresses_municipality ON addresses (municipality_id);
+
+CREATE INDEX idx_addresses_postal_code ON addresses (postal_code);
+
+CREATE INDEX idx_addresses_coordinates ON addresses USING GIST (coordinates);
+
+-- =============================================
+-- CONSOLIDATED LOOKUP SYSTEM
+-- =============================================
+
+CREATE TABLE lookup_categories (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT
+);
+
+CREATE TABLE lookup_values (
+    id SERIAL PRIMARY KEY,
+    category_id INTEGER NOT NULL REFERENCES lookup_categories (id),
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    name_es VARCHAR(200),
+    display_order INTEGER DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    metadata JSONB,
+    UNIQUE (category_id, code)
+);
+
+CREATE INDEX idx_lookup_values_category_active ON lookup_values (category_id, is_active);
+
+-- Insert standard lookup categories
+INSERT INTO
+    lookup_categories (code, name)
+VALUES (
+        'housing_status',
+        'Estats Habitatge'
+    ),
+    (
+        'member_origin',
+        'Origens Afiliació'
+    ),
+    (
+        'participation_level',
+        'Nivells Participació'
+    ),
+    (
+        'conflict_cause',
+        'Causes Conflicte'
+    ),
+    (
+        'conflict_resolution',
+        'Resolucions Conflicte'
+    ),
+    (
+        'follow_up_type',
+        'Tipus Seguiment'
+    ),
+    (
+        'advisory_type',
+        'Tipus Assessoraments'
+    ),
+    (
+        'advisory_result',
+        'Resultats Assessoraments'
+    ),
+    (
+        'legal_service_type',
+        'Tipus Serveis Jurídics'
+    ),
+    ('specialty', 'Especialitats');
+
+-- =============================================
+-- PERSON AND MEMBER MANAGEMENT
+-- =============================================
+
+CREATE TABLE persons (
+    id SERIAL PRIMARY KEY,
+    tax_id VARCHAR(20) UNIQUE CHECK (tax_id ~ '^[A-Z0-9]{8,20}$'),
+    gender CHAR(1) CHECK (gender IN ('M', 'F', 'X')),
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100),
+    email VARCHAR(150),
+    phone VARCHAR(20) CHECK (phone ~ '^\+?[0-9\s\-\(\)]+$'),
+    wants_newsletter BOOLEAN DEFAULT FALSE,
+    wants_communications BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_persons_email ON persons (email);
+
+CREATE INDEX idx_persons_tax_id ON persons (tax_id);
+
+CREATE TABLE collectives (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    email VARCHAR(150) NOT NULL,
+    phone VARCHAR(20),
+    contact_person VARCHAR(200),
+    contact_phone VARCHAR(20),
+    allows_payments BOOLEAN DEFAULT FALSE,
+    allows_advisories BOOLEAN DEFAULT FALSE,
+    allows_direct_debit BOOLEAN DEFAULT FALSE,
+    default_fee DECIMAL(10, 2),
+    serial_prefix VARCHAR(8),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Unified members table (replacing afiliades, no_afiliades, simpatitzants)
+CREATE TABLE members (
+    id SERIAL PRIMARY KEY,
+    person_id INTEGER NOT NULL REFERENCES persons(id),
+    collective_id INTEGER REFERENCES collectives(id),
+    member_type VARCHAR(20) NOT NULL CHECK (member_type IN ('affiliate', 'non_affiliate', 'sympathizer')),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('active', 'inactive', 'suspended', 'cancelled')),
+
+-- Membership dates
+joined_at DATE NOT NULL, left_at DATE,
+
+-- Origin and participation
+origin_id INTEGER REFERENCES lookup_values (id),
+participation_level_id INTEGER REFERENCES lookup_values (id),
+union_section_id INTEGER REFERENCES union_sections (id),
+commission_id INTEGER REFERENCES commissions (id),
+
+-- Payment information (only for affiliates)
+payment_method CHAR(1) CHECK (
+    payment_method IN ('B', 'E', 'T')
+), -- Bank, Cash, Transfer
+payment_frequency CHAR(1) CHECK (
+    payment_frequency IN ('M', 'T', 'S', 'A')
+), -- Monthly, Trimestral, Semestral, Annual
+bank_account VARCHAR(24) CHECK (
+    bank_account ~ '^[A-Z]{2}[0-9]{22}$'
+), -- IBAN format
+fee_amount DECIMAL(10, 2),
+
+-- Follow-up
+last_followup_date DATE,
+followup_type_id INTEGER REFERENCES lookup_values (id),
+
+-- Additional info
+
+notes TEXT,
+    internal_comments TEXT,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_member_payment CHECK (
+        (member_type = 'affiliate' AND payment_method IS NOT NULL) OR
+        (member_type != 'affiliate' AND payment_method IS NULL)
     )
 );
 
-CREATE TABLE persones (
+CREATE INDEX idx_members_person ON members (person_id);
+
+CREATE INDEX idx_members_type_status ON members (member_type, status);
+
+CREATE INDEX idx_members_collective ON members (collective_id);
+
+CREATE INDEX idx_members_joined_at ON members (joined_at);
+
+-- =============================================
+-- HOUSING AND PROPERTY MANAGEMENT
+-- =============================================
+
+CREATE TABLE companies (
     id SERIAL PRIMARY KEY,
-    genere VARCHAR(1),
-    nom VARCHAR(100) NOT NULL,
-    cognoms VARCHAR(100),
+    tax_id VARCHAR(20) UNIQUE CHECK (tax_id ~ '^[A-Z0-9]{8,20}$'),
+    name VARCHAR(200) NOT NULL,
+    is_api BOOLEAN DEFAULT FALSE,
+    website VARCHAR(200),
     email VARCHAR(150),
-    telefon VARCHAR(50),
-    butlleti SMALLINT,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    no_rebre_info SMALLINT
+    phone VARCHAR(20),
+    address_id INTEGER REFERENCES addresses (id),
+    network_id INTEGER REFERENCES property_networks (id),
+    description TEXT,
+    info_url VARCHAR(200),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE estats_habitatge (
+CREATE INDEX idx_companies_network ON companies (network_id);
+
+CREATE INDEX idx_companies_tax_id ON companies (tax_id);
+
+CREATE TABLE property_networks (
     id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    nom_es VARCHAR(50),
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE provincies (
+CREATE TABLE buildings (
     id SERIAL PRIMARY KEY,
-    codi VARCHAR(2) NOT NULL UNIQUE,
-    nom VARCHAR(100) NOT NULL,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    address_id INTEGER NOT NULL REFERENCES addresses(id),
+
+-- Building characteristics
+status_id INTEGER REFERENCES lookup_values (id),
+construction_year INTEGER CHECK (
+    construction_year BETWEEN 1800 AND EXTRACT(
+        YEAR
+        FROM CURRENT_DATE
+    )
+),
+total_homes INTEGER CHECK (total_homes >= 0),
+total_shops INTEGER CHECK (total_shops >= 0),
+has_vertical_property BOOLEAN,
+has_elevator BOOLEAN,
+has_parking BOOLEAN,
+is_empty BOOLEAN DEFAULT FALSE,
+empty_since DATE,
+surface_m2 INTEGER CHECK (surface_m2 > 0),
+
+-- Ownership
+owner_company_id INTEGER REFERENCES companies (id),
+api_company_id INTEGER REFERENCES companies (id),
+ownership_last_updated DATE,
+
+-- HPO (social housing) info
+
+is_hpo BOOLEAN DEFAULT FALSE,
+    hpo_end_date DATE,
+
+    observations TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE municipis (
+CREATE INDEX idx_buildings_address ON buildings (address_id);
+
+CREATE INDEX idx_buildings_owner ON buildings (owner_company_id);
+
+CREATE INDEX idx_buildings_api ON buildings (api_company_id);
+
+CREATE TABLE building_groups (
     id SERIAL PRIMARY KEY,
-    nom VARCHAR(200) NOT NULL UNIQUE,
-    provincia INTEGER NOT NULL,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    name VARCHAR(200) NOT NULL UNIQUE,
+    owner_company_id INTEGER NOT NULL REFERENCES companies (id),
+    api_company_id INTEGER REFERENCES companies (id),
+    ownership_last_updated DATE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE empreses (
-    id SERIAL PRIMARY KEY,
-    cif VARCHAR(20) UNIQUE,
-    nom VARCHAR(100) NOT NULL,
-    api SMALLINT,
-    web VARCHAR(200),
-    email TEXT,
-    telefon VARCHAR(50),
-    google_id VARCHAR(400),
-    adreca VARCHAR(400),
-    nom_via VARCHAR(200),
-    numero VARCHAR(20),
-    escala VARCHAR(10),
-    pis VARCHAR(10),
-    porta VARCHAR(10),
-    complement VARCHAR(50),
-    municipi INTEGER,
-    codi_postal VARCHAR(5),
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    web_info_empresa VARCHAR(200),
-    entramat INTEGER,
-    descripcio TEXT
+CREATE TABLE building_group_members (
+    building_group_id INTEGER NOT NULL REFERENCES building_groups (id) ON DELETE CASCADE,
+    building_id INTEGER NOT NULL REFERENCES buildings (id) ON DELETE CASCADE,
+    PRIMARY KEY (
+        building_group_id,
+        building_id
+    )
 );
 
-CREATE TABLE pisos (
+CREATE TABLE housing_units (
     id SERIAL PRIMARY KEY,
-    adreca VARCHAR(400) NOT NULL,
-    bloc INTEGER NOT NULL,
-    escala VARCHAR(10),
-    pis VARCHAR(50),
-    porta VARCHAR(10),
-    complement VARCHAR(50),
-    estat INTEGER,
-    superficie NUMERIC(3, 0),
-    num_habitacions NUMERIC(2, 0),
-    cedula_habitabilitat VARCHAR(1),
-    certificat_energetic VARCHAR(1),
-    buit VARCHAR(1),
-    data_buit TIMESTAMP,
-    api INTEGER,
-    propietat INTEGER,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    propietat_ultima_actualitzacio TIMESTAMP,
-    propietat_any_actualitzacio NUMERIC(4, 0)
+    building_id INTEGER NOT NULL REFERENCES buildings(id),
+    address_id INTEGER NOT NULL REFERENCES addresses(id),
+
+-- Unit identification
+floor VARCHAR(10), door VARCHAR(10),
+
+-- Characteristics
+status_id INTEGER REFERENCES lookup_values (id),
+surface_m2 INTEGER CHECK (surface_m2 > 0),
+bedrooms INTEGER CHECK (bedrooms >= 0),
+has_habitability_cert BOOLEAN,
+has_energy_cert BOOLEAN,
+is_empty BOOLEAN DEFAULT FALSE,
+empty_since DATE,
+
+-- Ownership (if different from building)
+
+owner_company_id INTEGER REFERENCES companies(id),
+    api_company_id INTEGER REFERENCES companies(id),
+    ownership_last_updated DATE,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE blocs (
+CREATE INDEX idx_housing_units_building ON housing_units (building_id);
+
+CREATE INDEX idx_housing_units_owner ON housing_units (owner_company_id);
+
+-- =============================================
+-- RENTAL CONTRACTS AND REGIMES
+-- =============================================
+
+CREATE TABLE rental_contracts (
     id SERIAL PRIMARY KEY,
-    google_id VARCHAR(400) NOT NULL,
-    adreca VARCHAR(400) NOT NULL,
-    nom_via VARCHAR(200) NOT NULL,
-    numero VARCHAR(20) NOT NULL,
-    municipi INTEGER NOT NULL,
-    codi_postal VARCHAR(5) NOT NULL,
-    estat INTEGER,
-    any_construccio NUMERIC(4, 0),
-    num_habitatges NUMERIC(3, 0),
-    num_locals NUMERIC(3, 0),
-    propietat_vertical VARCHAR(1),
-    ascensor VARCHAR(1),
-    parquing VARCHAR(1),
-    buit VARCHAR(1),
-    data_buit TIMESTAMP,
-    api INTEGER,
-    propietat INTEGER,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    superficie NUMERIC(5, 0),
-    propietat_ultima_actualitzacio TIMESTAMP,
-    propietat_any_actualitzacio NUMERIC(4, 0),
-    observacions VARCHAR(200),
-    hpo VARCHAR(1),
-    data_fi_hpo TIMESTAMP
+    member_id INTEGER NOT NULL REFERENCES members(id),
+    housing_unit_id INTEGER REFERENCES housing_units(id),
+
+-- Contract type
+regime CHAR(1) NOT NULL CHECK (
+    regime IN ('P', 'L', 'H', 'A')
+), -- Property, Rent, Room, Other
+regime_other VARCHAR(50),
+
+-- If not normalized address
+is_normalized_address BOOLEAN DEFAULT TRUE, custom_address TEXT,
+
+-- Contract details
+start_date DATE NOT NULL,
+is_indefinite BOOLEAN DEFAULT FALSE,
+duration_months INTEGER CHECK (duration_months > 0),
+extensions INTEGER DEFAULT 0,
+monthly_rent DECIMAL(10, 2) CHECK (monthly_rent >= 0),
+
+-- Household info
+inhabitants INTEGER CHECK (inhabitants > 0),
+monthly_income DECIMAL(10, 2) CHECK (monthly_income >= 0),
+
+-- Status
+
+is_active BOOLEAN DEFAULT TRUE,
+    end_date DATE,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_contract_dates CHECK (end_date IS NULL OR end_date >= start_date),
+    CONSTRAINT chk_regime_other CHECK (
+        (regime = 'A' AND regime_other IS NOT NULL) OR
+        (regime != 'A' AND regime_other IS NULL)
+    )
 );
 
-CREATE TABLE agrupacions_blocs (
+CREATE INDEX idx_rental_contracts_member ON rental_contracts (member_id);
+
+CREATE INDEX idx_rental_contracts_housing ON rental_contracts (housing_unit_id);
+
+CREATE INDEX idx_rental_contracts_active ON rental_contracts (is_active);
+
+-- =============================================
+-- UNION ORGANIZATION
+-- =============================================
+
+CREATE TABLE union_sections (
     id SERIAL PRIMARY KEY,
-    nom VARCHAR(200) NOT NULL UNIQUE,
-    propietat INTEGER NOT NULL,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    api INTEGER,
-    propietat_any_actualitzacio NUMERIC(4, 0)
+    name VARCHAR(100) NOT NULL UNIQUE,
+    postal_codes TEXT[], -- Array of postal codes
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE blocs_agrupacio_blocs (
+CREATE TABLE commissions (
     id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    bloc INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    UNIQUE (parent_id, bloc)
+    name VARCHAR(100) NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE blocs_entramat (
+-- =============================================
+-- CONFLICTS MANAGEMENT
+-- =============================================
+
+CREATE TABLE conflicts (
     id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    child_id INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (parent_id, child_id)
+    status VARCHAR(20) NOT NULL CHECK (status IN ('open', 'hibernating', 'closed')),
+    scope CHAR(1) NOT NULL CHECK (scope IN ('I', 'C', 'B')), -- Individual, Collective, Building
+
+-- Affected entities (only one should be set based on scope)
+affected_member_id INTEGER REFERENCES members (id),
+affected_building_id INTEGER REFERENCES buildings (id),
+affected_building_group_id INTEGER REFERENCES building_groups (id),
+affected_network_id INTEGER REFERENCES property_networks (id),
+
+-- Conflict details
+cause_id INTEGER NOT NULL REFERENCES lookup_values (id),
+delegate_user_id INTEGER REFERENCES users (id),
+
+-- Important dates
+opened_at DATE NOT NULL,
+last_assembly_at DATE,
+hibernated_at DATE,
+closed_at DATE,
+next_eviction_at DATE,
+
+-- Actions taken (using JSONB for flexibility)
+actions_taken JSONB DEFAULT '{}',
+
+-- Resolution
+
+resolution_id INTEGER REFERENCES lookup_values(id),
+    resolution_result CHAR(1) CHECK (resolution_result IN ('W', 'L', 'P')), -- Win, Loss, Partial
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_conflict_scope CHECK (
+        (scope = 'I' AND affected_member_id IS NOT NULL) OR
+        (scope = 'C' AND affected_building_id IS NOT NULL) OR
+        (scope = 'B' AND (affected_building_group_id IS NOT NULL OR affected_network_id IS NOT NULL))
+    )
 );
 
-CREATE TABLE blocs_importats (
-    id SERIAL PRIMARY KEY,
-    status VARCHAR(50) NOT NULL,
-    nom_via_original VARCHAR(200),
-    numero_original VARCHAR(20),
-    municipi_original VARCHAR(200),
-    codi_postal_original VARCHAR(5),
-    adreca_original VARCHAR(400),
-    google_id VARCHAR(400),
-    adreca VARCHAR(400),
-    nom_via VARCHAR(200),
-    numero VARCHAR(20),
-    municipi INTEGER,
-    codi_postal VARCHAR(5),
-    estat INTEGER,
-    any_construccio NUMERIC(4, 0),
-    num_habitatges NUMERIC(3, 0),
-    num_locals NUMERIC(3, 0),
-    propietat_vertical VARCHAR(1),
-    superficie NUMERIC(5, 0),
-    ascensor VARCHAR(1),
-    parquing VARCHAR(1),
-    buit VARCHAR(1),
-    data_buit TIMESTAMP,
-    cif_api_original VARCHAR(20),
-    api_original VARCHAR(200),
-    cif_propietat_original VARCHAR(20),
-    propietat_original VARCHAR(200),
-    api INTEGER,
-    propietat INTEGER,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    propietat_ultima_actualitzacio TIMESTAMP
+CREATE INDEX idx_conflicts_status ON conflicts (status);
+
+CREATE INDEX idx_conflicts_member ON conflicts (affected_member_id);
+
+CREATE INDEX idx_conflicts_building ON conflicts (affected_building_id);
+
+CREATE INDEX idx_conflicts_opened_at ON conflicts (opened_at);
+
+CREATE TABLE conflict_delegates (
+    conflict_id INTEGER NOT NULL REFERENCES conflicts (id) ON DELETE CASCADE,
+    member_id INTEGER NOT NULL REFERENCES members (id),
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (conflict_id, member_id)
 );
 
-CREATE TABLE comissions (
+CREATE TABLE conflict_negotiations (
     id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    conflict_id INTEGER NOT NULL REFERENCES conflicts (id),
+    negotiation_date DATE NOT NULL,
+    status TEXT NOT NULL,
+    tasks TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE nivells_participacio (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
+CREATE INDEX idx_conflict_negotiations_conflict ON conflict_negotiations (conflict_id);
 
-CREATE TABLE origens_afiliacio (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
+-- =============================================
+-- ADVISORY AND LEGAL SERVICES
+-- =============================================
 
-CREATE TABLE tipus_sseguiment (
+CREATE TABLE technicians (
     id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TABLE seccions_sindicals (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    codis_postals VARCHAR(400)
-);
-
-CREATE TABLE afiliades (
-    id SERIAL PRIMARY KEY,
-    cif VARCHAR(20) NOT NULL UNIQUE,
-    persona INTEGER NOT NULL,
-    status VARCHAR(50) NOT NULL,
-    data_alta TIMESTAMP NOT NULL,
-    data_baixa TIMESTAMP,
-    origen_afiliacio INTEGER,
-    nivell_participacio INTEGER,
-    comissio INTEGER,
-    forma_pagament VARCHAR(1),
-    compte_corrent VARCHAR(24),
-    quota NUMERIC(5, 2),
-    regim VARCHAR(1),
-    regim_altres VARCHAR(50),
-    pis INTEGER,
-    data_inici_contracte TIMESTAMP,
-    durada_contracte NUMERIC(2, 0),
-    renda_contracte NUMERIC(6, 2),
-    num_habitants NUMERIC(2, 0),
-    ingressos_mensuals NUMERIC(7, 2),
-    collectiu INTEGER,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    contracte_indefinit SMALLINT,
-    durada_contracte_prorrogues NUMERIC(1, 0),
-    comentaris TEXT,
-    adreca_no_normalitzada SMALLINT,
-    adreca_no_normalitzada_text VARCHAR(400),
-    frequencia_pagament VARCHAR(1),
-    seccio_sindical INTEGER NOT NULL,
-    data_seguiment TIMESTAMP,
-    tipus_seguiment INTEGER,
-    observacions_estat TEXT
-);
-
-CREATE TABLE afiliada_historic_regims (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    regim VARCHAR(1),
-    regim_altres VARCHAR(50),
-    pis INTEGER,
-    adreca_no_normalitzada SMALLINT,
-    adreca_no_normalitzada_text VARCHAR(400),
-    data_inici_contracte TIMESTAMP,
-    contracte_indefinit SMALLINT,
-    durada_contracte NUMERIC(2, 0),
-    durada_contracte_prorrogues NUMERIC(1, 0),
-    renda_contracte NUMERIC(6, 2),
-    num_habitants NUMERIC(2, 0),
-    ingressos_mensuals NUMERIC(7, 2),
-    data_fi_regim TIMESTAMP NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL
-);
-
-CREATE TABLE no_afiliades (
-    id SERIAL PRIMARY KEY,
-    persona INTEGER NOT NULL,
-    regim VARCHAR(1),
-    regim_altres VARCHAR(50),
-    pis INTEGER,
-    data_inici_contracte TIMESTAMP,
-    durada_contracte NUMERIC(2, 0),
-    renda_contracte NUMERIC(6, 2),
-    num_habitants NUMERIC(2, 0),
-    ingressos_mensuals NUMERIC(7, 2),
-    collectiu INTEGER NOT NULL,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    data_alta TIMESTAMP,
-    doble_afiliada SMALLINT DEFAULT 0,
-    tipus_id VARCHAR(1) NOT NULL DEFAULT 'C',
-    cif VARCHAR(20) UNIQUE,
-    pais VARCHAR(20),
-    forma_pagament VARCHAR(1),
-    frequencia_pagament VARCHAR(1),
-    compte_corrent VARCHAR(24),
-    quota NUMERIC(5, 2)
-);
-
-CREATE TABLE simpatitzants (
-    id SERIAL PRIMARY KEY,
-    cif VARCHAR(20) NOT NULL UNIQUE,
-    persona INTEGER NOT NULL,
-    status VARCHAR(50) NOT NULL,
-    data_alta TIMESTAMP NOT NULL,
-    data_baixa TIMESTAMP,
-    observacions_estat TEXT,
-    origen_afiliacio INTEGER,
-    seccio_sindical INTEGER NOT NULL,
-    nivell_participacio INTEGER,
-    comissio INTEGER,
-    regim VARCHAR(1),
-    regim_altres VARCHAR(50),
-    pis INTEGER,
-    data_inici_contracte TIMESTAMP,
-    contracte_indefinit SMALLINT,
-    durada_contracte NUMERIC(2, 0),
-    durada_contracte_prorrogues NUMERIC(1, 0),
-    renda_contracte NUMERIC(6, 2),
-    num_habitants NUMERIC(2, 0),
-    ingressos_mensuals NUMERIC(7, 2),
-    collectiu INTEGER,
-    comentaris TEXT,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TABLE simpatitzant_historic_regims (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    regim VARCHAR(1),
-    regim_altres VARCHAR(50),
-    pis INTEGER,
-    data_inici_contracte TIMESTAMP,
-    contracte_indefinit SMALLINT,
-    durada_contracte NUMERIC(2, 0),
-    durada_contracte_prorrogues NUMERIC(1, 0),
-    renda_contracte NUMERIC(6, 2),
-    num_habitants NUMERIC(2, 0),
-    ingressos_mensuals NUMERIC(7, 2),
-    data_fi_regim TIMESTAMP NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL
-);
-
-CREATE TABLE causes_conflicte (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TABLE resolucions_conflicte (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    nom VARCHAR(50) NOT NULL,
-    resultat VARCHAR(1) NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    UNIQUE (parent_id, nom)
-);
-
-CREATE TABLE conflictes (
-    id SERIAL PRIMARY KEY,
-    status VARCHAR(50) NOT NULL,
-    ambit VARCHAR(1) NOT NULL,
-    afiliada_afectada INTEGER,
-    bloc_afectat INTEGER,
-    entramat_afectat INTEGER,
-    delegada INTEGER,
-    causa INTEGER NOT NULL,
-    data_obertura TIMESTAMP NOT NULL,
-    data_darrera_assemblea TIMESTAMP,
-    data_hivernacio TIMESTAMP,
-    data_tancament TIMESTAMP,
-    data_proper_desnonament TIMESTAMP,
-    demanda SMALLINT,
-    registre_propietat SMALLINT,
-    assemblea SMALLINT,
-    carta_enviada SMALLINT,
-    embustiada SMALLINT,
-    accions SMALLINT,
-    accions_descripcio VARCHAR(400),
-    resolucio INTEGER,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    agrupacio_blocs_afectada INTEGER,
-    no_afiliada_afectada INTEGER,
-    oficina_habitatge SMALLINT,
-    serveis_socials SMALLINT,
-    justicia_gratuita SMALLINT,
-    taula_emergencia SMALLINT,
-    padro_municipal SMALLINT,
-    informe_exclusio_residencial SMALLINT,
-    afiliades_delegades TEXT,
-    trucada_propietat SMALLINT,
-    simpatitzant_afectada INTEGER,
-    informe_vulnerabilitat SMALLINT,
-    reunions_negociacio SMALLINT
-);
-
-CREATE TABLE negociacions_conflicte (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    data TIMESTAMP NOT NULL,
-    estat TEXT NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    tasques TEXT
-);
-
-CREATE TABLE afiliades_delegades_conflicte (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    child_id INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (parent_id, child_id)
-);
-
-CREATE TABLE changes_log (
-    id SERIAL PRIMARY KEY,
-    object VARCHAR(200) NOT NULL,
-    object_id INTEGER NOT NULL,
-    child_table VARCHAR(50),
-    child_table_id INTEGER,
-    operation VARCHAR(1),
-    timestamp TIMESTAMP NOT NULL,
-    "user" INTEGER NOT NULL,
-    changes TEXT NOT NULL
-);
-
-CREATE TABLE collectius (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(200) NOT NULL,
-    descripcio TEXT,
+    name VARCHAR(200) NOT NULL UNIQUE,
     email VARCHAR(150) NOT NULL,
-    telefon VARCHAR(50),
-    persona_contacte VARCHAR(200),
-    telefon_persona_contacte VARCHAR(50),
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    cobraments SMALLINT DEFAULT 0,
-    assessoraments SMALLINT DEFAULT 0,
-    quota NUMERIC(5, 2),
-    num_serie VARCHAR(8),
-    domiciliacions SMALLINT DEFAULT 0
+    phone VARCHAR(20),
+    specialty_id INTEGER NOT NULL REFERENCES lookup_values (id),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE colaboradores_collectiu (
+CREATE TABLE advisories (
     id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    child_id INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (parent_id, child_id)
+    member_id INTEGER REFERENCES members(id),
+    type_id INTEGER NOT NULL REFERENCES lookup_values(id),
+    technician_id INTEGER REFERENCES technicians(id),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'in_progress', 'completed', 'cancelled')),
+
+-- Dates
+contact_date DATE, advisory_date DATE, completion_date DATE,
+
+-- Details
+
+description TEXT,
+    internal_comments TEXT,
+    result_id INTEGER REFERENCES lookup_values(id),
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE assessoraments (
+CREATE INDEX idx_advisories_member ON advisories (member_id);
+
+CREATE INDEX idx_advisories_technician ON advisories (technician_id);
+
+CREATE INDEX idx_advisories_status ON advisories (status);
+
+CREATE TABLE legal_services (
     id SERIAL PRIMARY KEY,
-    afiliada INTEGER,
-    tipus INTEGER NOT NULL,
-    tecnica INTEGER,
-    data_assessorament TIMESTAMP,
-    descripcio TEXT,
-    comentaris TEXT,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    status VARCHAR(50) NOT NULL,
-    data_contacte TIMESTAMP,
-    data_finalitzacio TIMESTAMP,
-    resultat INTEGER,
-    tipus_beneficiaria VARCHAR(1) NOT NULL DEFAULT 'A',
-    no_afiliada INTEGER
+    member_id INTEGER NOT NULL REFERENCES members (id),
+    type_id INTEGER NOT NULL REFERENCES lookup_values (id),
+    technician_id INTEGER REFERENCES technicians (id),
+    status VARCHAR(20) NOT NULL CHECK (
+        status IN (
+            'pending',
+            'in_progress',
+            'completed',
+            'cancelled'
+        )
+    ),
+    service_date DATE,
+    price DECIMAL(10, 2),
+    description TEXT,
+    internal_comments TEXT,
+    result CHAR(1) CHECK (
+        result IN ('W', 'L', 'P', 'O')
+    ), -- Win, Loss, Partial, Other
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE resultats_assessoraments (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
+CREATE INDEX idx_legal_services_member ON legal_services (member_id);
 
-CREATE TABLE tipus_assessoraments (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
+CREATE INDEX idx_legal_services_technician ON legal_services (technician_id);
 
-CREATE TABLE tecniques (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(200) NOT NULL UNIQUE,
-    email VARCHAR(150) NOT NULL,
-    telefon VARCHAR(50),
-    especialitat INTEGER NOT NULL,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
+-- =============================================
+-- DOCUMENT MANAGEMENT
+-- =============================================
 
-CREATE TABLE especialitats (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE TABLE assessorament_documents (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    document INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL
-);
-
-CREATE TABLE medias (
+CREATE TABLE documents (
     id SERIAL PRIMARY KEY,
     file_name VARCHAR(400) NOT NULL,
-    hash VARCHAR(100) NOT NULL UNIQUE,
-    title VARCHAR(100) NOT NULL,
-    description VARCHAR(500),
-    is_image SMALLINT,
-    is_public SMALLINT,
-    file_size NUMERIC(12, 0) NOT NULL,
-    image_width NUMERIC(5, 0),
-    image_height NUMERIC(5, 0),
+    file_hash VARCHAR(100) NOT NULL UNIQUE,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
     mime_type VARCHAR(100) NOT NULL,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    image_quality INTEGER DEFAULT 1
+    file_size BIGINT NOT NULL CHECK (file_size > 0),
+    is_public BOOLEAN DEFAULT FALSE,
+
+-- For images
+
+is_image BOOLEAN DEFAULT FALSE,
+    image_width INTEGER,
+    image_height INTEGER,
+
+    uploaded_by INTEGER NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE domiciliacions (
+CREATE INDEX idx_documents_hash ON documents (file_hash);
+
+CREATE INDEX idx_documents_uploaded_by ON documents (uploaded_by);
+
+-- Polymorphic document associations
+CREATE TABLE document_associations (
     id SERIAL PRIMARY KEY,
-    data_emissio TIMESTAMP,
-    fitxer INTEGER,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    document_id INTEGER NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (
+        document_id,
+        entity_type,
+        entity_id
+    )
 );
 
-CREATE TABLE directius (
+CREATE INDEX idx_document_associations_entity ON document_associations (entity_type, entity_id);
+
+-- =============================================
+-- FINANCIAL MANAGEMENT
+-- =============================================
+
+CREATE TABLE direct_debit_batches (
     id SERIAL PRIMARY KEY,
-    nom VARCHAR(200) NOT NULL,
-    descripcio TEXT,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    issue_date DATE NOT NULL,
+    file_document_id INTEGER REFERENCES documents (id),
+    total_amount DECIMAL(12, 2),
+    total_receipts INTEGER,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE directius_empresa (
+CREATE TABLE member_receipts (
     id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    child_id INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (parent_id, child_id)
+    member_id INTEGER NOT NULL REFERENCES members (id),
+    batch_id INTEGER REFERENCES direct_debit_batches (id),
+    amount DECIMAL(10, 2) NOT NULL,
+    concept VARCHAR(200),
+    due_date DATE NOT NULL,
+    paid_date DATE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE entramats (
+CREATE INDEX idx_member_receipts_member ON member_receipts (member_id);
+
+CREATE INDEX idx_member_receipts_batch ON member_receipts (batch_id);
+
+CREATE INDEX idx_member_receipts_status ON member_receipts (status);
+
+-- =============================================
+-- APPLICATION CONFIGURATION
+-- =============================================
+
+CREATE TABLE app_settings (
     id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    descripcio TEXT,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    section VARCHAR(50) NOT NULL,
+    key VARCHAR(100) NOT NULL,
+    value TEXT,
+    description TEXT,
+    UNIQUE (section, key)
 );
 
-CREATE TABLE pisos_entramat (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    child_id INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (parent_id, child_id)
+CREATE TABLE user_preferences (
+    user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    page_code VARCHAR(100) NOT NULL,
+    preference_key VARCHAR(100) NOT NULL,
+    preference_value TEXT,
+    PRIMARY KEY (
+        user_id,
+        page_code,
+        preference_key
+    )
 );
 
-CREATE TABLE sollicituds (
-    id SERIAL PRIMARY KEY,
-    status VARCHAR(50) NOT NULL,
-    genere VARCHAR(1),
-    nom VARCHAR(100),
-    cognoms VARCHAR(100),
-    email VARCHAR(150),
-    telefon VARCHAR(50),
-    butlleti SMALLINT,
-    cif VARCHAR(20),
-    data_alta TIMESTAMP,
-    origen_afiliacio INTEGER,
-    forma_pagament VARCHAR(1),
-    compte_corrent VARCHAR(24),
-    quota NUMERIC(5, 2),
-    regim VARCHAR(1),
-    regim_altres VARCHAR(50),
-    google_id_original TEXT,
-    adreca_original VARCHAR(400),
-    municipi_original VARCHAR(200),
-    codi_postal_original VARCHAR(5),
-    google_id TEXT,
-    adreca VARCHAR(400),
-    nom_via VARCHAR(200),
-    numero VARCHAR(20),
-    municipi INTEGER,
-    codi_postal VARCHAR(5),
-    escala VARCHAR(10),
-    pis VARCHAR(50),
-    porta VARCHAR(10),
-    complement VARCHAR(50),
-    any_construccio NUMERIC(4, 0),
-    ascensor VARCHAR(1),
-    parquing VARCHAR(1),
-    estat_pis INTEGER,
-    superficie NUMERIC(3, 0),
-    cedula_habitabilitat VARCHAR(1),
-    certificat_energetic VARCHAR(1),
-    cif_api_original VARCHAR(20),
-    nom_api_original VARCHAR(100),
-    api INTEGER,
-    cif_propietat_original VARCHAR(20),
-    nom_propietat_original VARCHAR(100),
-    propietat INTEGER,
-    pis_data_inici_contracte TIMESTAMP,
-    pis_durada_contracte NUMERIC(2, 0),
-    pis_renda_contracte NUMERIC(6, 2),
-    habitacio_renda_contracte NUMERIC(6, 2),
-    pis_num_habitants NUMERIC(2, 0),
-    habitacio_num_habitants NUMERIC(2, 0),
-    pis_ingressos_mensuals NUMERIC(7, 2),
-    habitacio_ingressos_mensuals NUMERIC(7, 2),
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    pis_contracte_indefinit SMALLINT,
-    pis_durada_contracte_prorrogues NUMERIC(1, 0),
-    comentaris TEXT,
-    adreca_no_normalitzada SMALLINT,
-    adreca_no_normalitzada_text TEXT,
-    frequencia_pagament VARCHAR(1),
-    seccio_sindical INTEGER,
-    no_rebre_info SMALLINT,
-    propietat_vertical VARCHAR(1)
-);
+-- =============================================
+-- SUPPORT TABLES
+-- =============================================
 
 CREATE TABLE import_templates (
     id SERIAL PRIMARY KEY,
-    import VARCHAR(50) NOT NULL,
-    name VARCHAR(50) NOT NULL,
-    content TEXT
+    import_type VARCHAR(50) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    content TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE options (
+CREATE TABLE application_forms (
     id SERIAL PRIMARY KEY,
-    section VARCHAR(50) NOT NULL,
-    option_key VARCHAR(200),
-    option_value VARCHAR(500),
-    UNIQUE (section, option_key)
+    form_type VARCHAR(20) NOT NULL DEFAULT 'membership',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+
+-- All form data stored as JSONB for flexibility
+form_data JSONB NOT NULL,
+
+-- Processed results
+
+processed_at TIMESTAMP,
+    processed_by INTEGER REFERENCES users(id),
+    processing_notes TEXT,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE serveis_juridics (
-    id SERIAL PRIMARY KEY,
-    status VARCHAR(50) NOT NULL,
-    afiliada INTEGER NOT NULL,
-    tipus INTEGER NOT NULL,
-    tecnica INTEGER,
-    data_servei TIMESTAMP,
-    preu NUMERIC(5, 2),
-    descripcio TEXT,
-    comentaris TEXT,
-    resultat VARCHAR(1),
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
+CREATE INDEX idx_application_forms_status ON application_forms (status);
 
-CREATE TABLE servei_juridic_documents (
-    id SERIAL PRIMARY KEY,
-    parent_id INTEGER NOT NULL,
-    document INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL
-);
+CREATE INDEX idx_application_forms_type ON application_forms (form_type);
 
-CREATE TABLE tipus_serveis_juridics (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
+-- =============================================
+-- VIEWS FOR BACKWARD COMPATIBILITY
+-- =============================================
 
--- Example View definition (adapt columns as needed)
+-- Create view to mimic old afiliades table structure
 CREATE OR REPLACE VIEW vw_afiliades AS
 SELECT
-    pe.genere,
-    pe.nom,
-    pe.cognoms,
-    pe.email,
-    pe.telefon,
+    m.id,
+    p.tax_id AS cif,
+    p.gender AS genere,
+    p.first_name AS nom,
+    p.last_name AS cognoms,
+    p.email,
+    p.phone AS telefon,
+    p.wants_newsletter AS butlleti,
+    m.status,
+    m.joined_at AS data_alta,
+    m.left_at AS data_baixa,
+    lo.name AS origen_afiliacio,
+    lp.name AS nivell_participacio,
+    c.name AS comissio,
+    m.payment_method AS forma_pagament,
+    m.payment_frequency AS frequencia_pagament,
+    m.bank_account AS compte_corrent,
+    m.fee_amount AS quota,
+    rc.regime AS regim,
+    rc.regime_other AS regim_altres,
     CASE
-        WHEN pe.butlleti IS NULL
-        OR pe.butlleti = 0 THEN 'n'
-        ELSE 's'
-    END AS butlleti,
-    a.cif,
-    CASE
-        WHEN a.adreca_no_normalitzada IS NULL
-        OR a.adreca_no_normalitzada = 0 THEN 's'
-        ELSE 'n'
-    END AS adreca_normalitzada,
-    CASE
-        WHEN a.adreca_no_normalitzada = 1 THEN a.adreca_no_normalitzada_text
-        ELSE p.adreca
+        WHEN rc.is_normalized_address THEN a.full_address
+        ELSE rc.custom_address
     END AS adreca,
-    b.codi_postal,
-    m.nom AS municipi,
-    pr.nom AS provincia,
-    a.data_alta,
-    a.status AS estat,
-    a.data_baixa,
-    a.regim,
-    CASE
-        WHEN a.regim = 'P' THEN 'Propietat'
-        WHEN a.regim = 'L' THEN 'Lloguer'
-        WHEN a.regim = 'H' THEN 'Habitació'
-        WHEN a.regim = 'A' THEN a.regim_altres
-    END AS regim_descripcio,
-    co.nom AS collectiu,
-    c.nom AS comissio,
-    a.forma_pagament,
-    a.frequencia_pagament,
-    a.quota,
-    np.nom AS nivell_participacio,
-    of.nom AS origen_afiliacio,
-    ehp.nom AS estat_pis,
-    p.num_habitacions,
-    p.cedula_habitabilitat,
-    p.certificat_energetic,
-    p.superficie AS superficie_pis,
-    b.any_construccio,
-    b.ascensor,
-    b.num_habitatges,
-    b.num_locals,
-    b.parquing,
-    b.propietat_vertical,
-    b.superficie AS superficie_bloc,
-    ehb.nom AS estat_bloc,
-    CASE
-        WHEN p.propietat IS NOT NULL THEN epp.nom
-        WHEN b.propietat IS NOT NULL THEN epb.nom
-        WHEN ag.propietat IS NOT NULL THEN epa.nom
-        ELSE NULL
-    END AS propietat,
-    CASE
-        WHEN p.api IS NOT NULL THEN eap.nom
-        WHEN b.api IS NOT NULL THEN eab.nom
-        ELSE NULL
-    END AS api
+    a.postal_code AS codi_postal,
+    mun.name AS municipi,
+    prov.name AS provincia,
+    col.name AS collectiu,
+    rc.start_date AS data_inici_contracte,
+    rc.duration_months AS durada_contracte,
+    rc.monthly_rent AS renda_contracte,
+    rc.inhabitants AS num_habitants,
+    rc.monthly_income AS ingressos_mensuals,
+    us.name AS seccio_sindical
 FROM
-    afiliades a
-    LEFT JOIN persones pe ON a.persona = pe.id
-    LEFT JOIN comissions c ON a.comissio = c.id
-    LEFT JOIN collectius co ON a.collectiu = co.id
-    LEFT JOIN nivells_participacio np ON a.nivell_participacio = np.id
-    LEFT JOIN origens_afiliacio of ON a.origen_afiliacio = of.id
-    LEFT JOIN pisos p ON a.pis = p.id
-    LEFT JOIN blocs b ON p.bloc = b.id
-    LEFT JOIN blocs_agrupacio_blocs bag ON b.id = bag.bloc
-    LEFT JOIN agrupacions_blocs ag ON bag.parent_id = ag.id
-    LEFT JOIN estats_habitatge ehp ON p.estat = ehp.id
-    LEFT JOIN estats_habitatge ehb ON b.estat = ehb.id
-    LEFT JOIN municipis m ON b.municipi = m.id
-    LEFT JOIN provincies pr ON m.provincia = pr.id
-    LEFT JOIN empreses epp ON p.propietat = epp.id
-    LEFT JOIN empreses epb ON b.propietat = epb.id
-    LEFT JOIN empreses epa ON ag.propietat = epa.id
-    LEFT JOIN empreses eap ON p.api = eap.id
-    LEFT JOIN empreses eab ON b.api = eab.id;
+    members m
+    JOIN persons p ON m.person_id = p.id
+    LEFT JOIN lookup_values lo ON m.origin_id = lo.id
+    LEFT JOIN lookup_values lp ON m.participation_level_id = lp.id
+    LEFT JOIN commissions c ON m.commission_id = c.id
+    LEFT JOIN rental_contracts rc ON rc.member_id = m.id
+    AND rc.is_active = TRUE
+    LEFT JOIN housing_units hu ON rc.housing_unit_id = hu.id
+    LEFT JOIN addresses a ON COALESCE(hu.address_id, hu.building_id) = a.id
+    LEFT JOIN municipalities mun ON a.municipality_id = mun.id
+    LEFT JOIN provinces prov ON mun.province_id = prov.id
+    LEFT JOIN collectives col ON m.collective_id = col.id
+    LEFT JOIN union_sections us ON m.union_section_id = us.id
+WHERE
+    m.member_type = 'affiliate';
 
--- ==========================
--- FOREIGN KEYS AND INDEXES
--- ==========================
+-- =============================================
+-- AUDIT TRIGGER FUNCTION
+-- =============================================
 
--- users
-ALTER TABLE users
-ADD CONSTRAINT fk_users_default_group_groups FOREIGN KEY (default_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+CREATE OR REPLACE FUNCTION audit_trigger_function()
+RETURNS TRIGGER AS $$
+DECLARE
+    audit_user_id INTEGER;
+    old_values JSONB;
+    new_values JSONB;
+BEGIN
+    -- Get current user ID from session variable (set by application)
+    audit_user_id := current_setting('app.current_user_id', TRUE)::INTEGER;
 
--- user_groups & user_roles
-ALTER TABLE user_groups
-ADD CONSTRAINT fk_user_groups_parent_id_users FOREIGN KEY (parent_id) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_user_groups_child_id_groups FOREIGN KEY (child_id) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_user_groups_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+    IF TG_OP = 'DELETE' THEN
+        old_values := to_jsonb(OLD);
+        new_values := NULL;
 
-ALTER TABLE user_roles
-ADD CONSTRAINT fk_user_roles_parent_id_users FOREIGN KEY (parent_id) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_user_roles_child_id_roles FOREIGN KEY (child_id) REFERENCES roles (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_user_roles_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+        INSERT INTO audit_log (table_name, record_id, operation, user_id, old_values, new_values)
+        VALUES (TG_TABLE_NAME, OLD.id, TG_OP, audit_user_id, old_values, new_values);
 
--- user_page_options
--- No FKs (all string-based).
+        RETURN OLD;
+    ELSIF TG_OP = 'UPDATE' THEN
+        old_values := to_jsonb(OLD);
+        new_values := to_jsonb(NEW);
 
--- roles, role_permissions
-ALTER TABLE roles
-ADD CONSTRAINT fk_roles_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_roles_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_roles_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_roles_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_roles_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+        -- Only log if there are actual changes
+        IF old_values != new_values THEN
+            INSERT INTO audit_log (table_name, record_id, operation, user_id, old_values, new_values)
+            VALUES (TG_TABLE_NAME, NEW.id, TG_OP, audit_user_id, old_values, new_values);
+        END IF;
 
-ALTER TABLE role_permissions
-ADD CONSTRAINT fk_role_permissions_parent_id_roles FOREIGN KEY (parent_id) REFERENCES roles (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_role_permissions_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_role_permissions_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+        -- Update the updated_at timestamp
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+    ELSIF TG_OP = 'INSERT' THEN
+        new_values := to_jsonb(NEW);
 
--- provincies, municipis
-ALTER TABLE municipis
-ADD CONSTRAINT fk_municipis_provincia_provincies FOREIGN KEY (provincia) REFERENCES provincies (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_municipis_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_municipis_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_municipis_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_municipis_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_municipis_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+        INSERT INTO audit_log (table_name, record_id, operation, user_id, old_values, new_values)
+        VALUES (TG_TABLE_NAME, NEW.id, TG_OP, audit_user_id, NULL, new_values);
 
-ALTER TABLE provincies
-ADD CONSTRAINT fk_provincies_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_provincies_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_provincies_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_provincies_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_provincies_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+        RETURN NEW;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
 
--- estats_habitatge
-ALTER TABLE estats_habitatge
-ADD CONSTRAINT fk_estats_habitatge_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_estats_habitatge_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_estats_habitatge_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_estats_habitatge_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_estats_habitatge_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- =============================================
+-- APPLY AUDIT TRIGGERS TO KEY TABLES
+-- =============================================
 
--- empreses
-ALTER TABLE empreses
-ADD CONSTRAINT fk_empreses_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_empreses_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_empreses_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_empreses_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_empreses_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_empreses_municipi_municipis FOREIGN KEY (municipi) REFERENCES municipis (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_empreses_entramat_entramats FOREIGN KEY (entramat) REFERENCES entramats (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- List of tables that need audit trails
+DO $$
+DECLARE
+    t text;
+    tables text[] := ARRAY[
+        'members', 'persons', 'rental_contracts', 'conflicts',
+        'buildings', 'housing_units', 'companies', 'advisories',
+        'legal_services', 'direct_debit_batches'
+    ];
+BEGIN
+    FOREACH t IN ARRAY tables
+    LOOP
+        EXECUTE format('
+            CREATE TRIGGER audit_trigger_%I
+            AFTER INSERT OR UPDATE OR DELETE ON %I
+            FOR EACH ROW EXECUTE FUNCTION audit_trigger_function()',
+            t, t);
+    END LOOP;
+END $$;
 
--- pisos
-ALTER TABLE pisos
-ADD CONSTRAINT fk_pisos_bloc_blocs FOREIGN KEY (bloc) REFERENCES blocs (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_estat_estats_habitatge FOREIGN KEY (estat) REFERENCES estats_habitatge (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_api_empreses FOREIGN KEY (api) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_propietat_empreses FOREIGN KEY (propietat) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- =============================================
+-- USEFUL INDEXES FOR PERFORMANCE
+-- =============================================
 
--- blocs
-ALTER TABLE blocs
-ADD CONSTRAINT fk_blocs_municipi_municipis FOREIGN KEY (municipi) REFERENCES municipis (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_estat_estats_habitatge FOREIGN KEY (estat) REFERENCES estats_habitatge (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_api_empreses FOREIGN KEY (api) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_propietat_empreses FOREIGN KEY (propietat) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Full text search on persons
+CREATE INDEX idx_persons_fulltext ON persons USING gin (
+    to_tsvector (
+        'spanish',
+        first_name || ' ' || COALESCE(last_name, '')
+    )
+);
 
--- agrupacions_blocs
-ALTER TABLE agrupacions_blocs
-ADD CONSTRAINT fk_agrupacions_blocs_propietat_empreses FOREIGN KEY (propietat) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_agrupacions_blocs_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_agrupacions_blocs_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_agrupacions_blocs_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_agrupacions_blocs_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_agrupacions_blocs_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_agrupacions_blocs_api_empreses FOREIGN KEY (api) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Partial indexes for active records
+CREATE INDEX idx_members_active ON members (person_id)
+WHERE
+    status = 'active';
 
--- blocs_agrupacio_blocs
-ALTER TABLE blocs_agrupacio_blocs
-ADD CONSTRAINT fk_blocs_agrupacio_blocs_parent_id_agrupacions_blocs FOREIGN KEY (parent_id) REFERENCES agrupacions_blocs (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_agrupacio_blocs_bloc_blocs FOREIGN KEY (bloc) REFERENCES blocs (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_agrupacio_blocs_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_agrupacio_blocs_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+CREATE INDEX idx_buildings_empty ON buildings (id)
+WHERE
+    is_empty = TRUE;
 
--- blocs_entramat
-ALTER TABLE blocs_entramat
-ADD CONSTRAINT fk_blocs_entramat_parent_id_entramats FOREIGN KEY (parent_id) REFERENCES entramats (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_entramat_child_id_blocs FOREIGN KEY (child_id) REFERENCES blocs (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_entramat_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+CREATE INDEX idx_conflicts_open ON conflicts (id)
+WHERE
+    status = 'open';
 
--- blocs_importats
-ALTER TABLE blocs_importats
-ADD CONSTRAINT fk_blocs_importats_api_empreses FOREIGN KEY (api) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_importats_propietat_empreses FOREIGN KEY (propietat) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_importats_municipi_municipis FOREIGN KEY (municipi) REFERENCES municipis (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_importats_estat_estats_habitatge FOREIGN KEY (estat) REFERENCES estats_habitatge (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_importats_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_importats_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_importats_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_importats_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_blocs_importats_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- =============================================
+-- SAMPLE DATA MIGRATION HELPERS
+-- =============================================
 
--- afiliades
-ALTER TABLE afiliades
-ADD CONSTRAINT fk_afiliades_persona_persones FOREIGN KEY (persona) REFERENCES persones (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_origen_afiliacio_origens_afiliacio FOREIGN KEY (origen_afiliacio) REFERENCES origens_afiliacio (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_nivell_participacio_nivells_participacio FOREIGN KEY (nivell_participacio) REFERENCES nivells_participacio (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_comissio_comissions FOREIGN KEY (comissio) REFERENCES comissions (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_pis_pisos FOREIGN KEY (pis) REFERENCES pisos (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_collectiu_collectius FOREIGN KEY (collectiu) REFERENCES collectius (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_seccio_sindical_seccions_sindicals FOREIGN KEY (seccio_sindical) REFERENCES seccions_sindicals (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_tipus_seguiment_tipus_sseguiment FOREIGN KEY (tipus_seguiment) REFERENCES tipus_sseguiment (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Helper function to migrate from old schema
+CREATE OR REPLACE FUNCTION migrate_lookup_value(
+    p_category_code VARCHAR,
+    p_old_name VARCHAR
+) RETURNS INTEGER AS $$
+DECLARE
+    v_category_id INTEGER;
+    v_value_id INTEGER;
+BEGIN
+    SELECT id INTO v_category_id FROM lookup_categories WHERE code = p_category_code;
 
--- afiliada_historic_regims
-ALTER TABLE afiliada_historic_regims
-ADD CONSTRAINT fk_afiliada_historic_regims_parent_id_afiliades FOREIGN KEY (parent_id) REFERENCES afiliades (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliada_historic_regims_pis_pisos FOREIGN KEY (pis) REFERENCES pisos (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliada_historic_regims_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliada_historic_regims_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+    INSERT INTO lookup_values (category_id, code, name)
+    VALUES (v_category_id, LOWER(REPLACE(p_old_name, ' ', '_')), p_old_name)
+    ON CONFLICT (category_id, code) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id INTO v_value_id;
 
--- simpatitzants
-ALTER TABLE simpatitzants
-ADD CONSTRAINT fk_simpatitzants_persona_persones FOREIGN KEY (persona) REFERENCES persones (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_origen_afiliacio_origens_afiliacio FOREIGN KEY (origen_afiliacio) REFERENCES origens_afiliacio (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_seccio_sindical_seccions_sindicals FOREIGN KEY (seccio_sindical) REFERENCES seccions_sindicals (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_nivell_participacio_nivells_participacio FOREIGN KEY (nivell_participacio) REFERENCES nivells_participacio (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_comissio_comissions FOREIGN KEY (comissio) REFERENCES comissions (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_pis_pisos FOREIGN KEY (pis) REFERENCES pisos (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_collectiu_collectius FOREIGN KEY (collectiu) REFERENCES collectius (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzants_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+    RETURN v_value_id;
+END;
+$$ LANGUAGE plpgsql;
 
--- simpatitzant_historic_regims
-ALTER TABLE simpatitzant_historic_regims
-ADD CONSTRAINT fk_simpatitzant_historic_regims_parent_id_simpatitzants FOREIGN KEY (parent_id) REFERENCES simpatitzants (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzant_historic_regims_pis_pisos FOREIGN KEY (pis) REFERENCES pisos (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzant_historic_regims_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_simpatitzant_historic_regims_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- =============================================
+-- PERMISSIONS AND ROW LEVEL SECURITY (RLS)
+-- =============================================
 
--- causes_conflicte
-ALTER TABLE causes_conflicte
-ADD CONSTRAINT fk_causes_conflicte_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_causes_conflicte_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_causes_conflicte_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_causes_conflicte_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_causes_conflicte_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Enable RLS on sensitive tables
+ALTER TABLE members ENABLE ROW LEVEL SECURITY;
 
--- resolucions_conflicte
-ALTER TABLE resolucions_conflicte
-ADD CONSTRAINT fk_resolucions_conflicte_parent_id_causes_conflicte FOREIGN KEY (parent_id) REFERENCES causes_conflicte (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_resolucions_conflicte_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_resolucions_conflicte_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE persons ENABLE ROW LEVEL SECURITY;
 
--- conflictes
-ALTER TABLE conflictes
-ADD CONSTRAINT fk_conflictes_afiliada_afectada_afiliades FOREIGN KEY (afiliada_afectada) REFERENCES afiliades (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_bloc_afectat_blocs FOREIGN KEY (bloc_afectat) REFERENCES blocs (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_entramat_afectat_entramats FOREIGN KEY (entramat_afectat) REFERENCES entramats (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_delegada_users FOREIGN KEY (delegada) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_resolucio_resolucions_conflicte FOREIGN KEY (resolucio) REFERENCES resolucions_conflicte (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_causa_causes_conflicte FOREIGN KEY (causa) REFERENCES causes_conflicte (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_agrupacio_blocs_afectada_agrupacions_blocs FOREIGN KEY (agrupacio_blocs_afectada) REFERENCES agrupacions_blocs (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_no_afiliada_afectada_no_afiliades FOREIGN KEY (no_afiliada_afectada) REFERENCES no_afiliades (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_conflictes_simpatitzant_afectada_simpatitzants FOREIGN KEY (simpatitzant_afectada) REFERENCES simpatitzants (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE rental_contracts ENABLE ROW LEVEL SECURITY;
 
--- negociacions_conflicte
-ALTER TABLE negociacions_conflicte
-ADD CONSTRAINT fk_negociacions_conflicte_parent_id_conflictes FOREIGN KEY (parent_id) REFERENCES conflictes (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_negociacions_conflicte_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_negociacions_conflicte_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 
--- afiliades_delegades_conflicte
-ALTER TABLE afiliades_delegades_conflicte
-ADD CONSTRAINT fk_afiliades_delegades_conflicte_parent_id_conflictes FOREIGN KEY (parent_id) REFERENCES conflictes (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_delegades_conflicte_child_id_afiliades FOREIGN KEY (child_id) REFERENCES afiliades (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_afiliades_delegades_conflicte_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Example RLS policy (customize based on your needs)
+CREATE POLICY members_view_policy ON members
+    FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM user_groups ug
+            WHERE ug.user_id = current_setting('app.current_user_id', TRUE)::INTEGER
+            AND ug.group_id IN (1, 2, 3) -- Admin groups
+        )
+        OR id = current_setting('app.current_user_id', TRUE)::INTEGER
+    );
 
--- changes_log
-ALTER TABLE changes_log
-ADD CONSTRAINT fk_changes_log_user_users FOREIGN KEY ("user") REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- =============================================
+-- MAINTENANCE PROCEDURES
+-- =============================================
 
--- colaboradores_collectiu
-ALTER TABLE colaboradores_collectiu
-ADD CONSTRAINT fk_collaboradores_collectiu_parent_id_collectius FOREIGN KEY (parent_id) REFERENCES collectius (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_collaboradores_collectiu_child_id_users FOREIGN KEY (child_id) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_collaboradores_collectiu_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Procedure to clean up old audit logs
+CREATE OR REPLACE PROCEDURE cleanup_audit_logs(
+    p_days_to_keep INTEGER DEFAULT 365
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    DELETE FROM audit_log
+    WHERE changed_at < CURRENT_TIMESTAMP - INTERVAL '1 day' * p_days_to_keep;
 
--- assessoraments
-ALTER TABLE assessoraments
-ADD CONSTRAINT fk_assessoraments_afiliada_afiliades FOREIGN KEY (afiliada) REFERENCES afiliades (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessoraments_tipus_tipus_assessoraments FOREIGN KEY (tipus) REFERENCES tipus_assessoraments (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessoraments_tecnica_tecniques FOREIGN KEY (tecnica) REFERENCES tecniques (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessoraments_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessoraments_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessoraments_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessoraments_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessoraments_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessoraments_resultat_resultats_assessoraments FOREIGN KEY (resultat) REFERENCES resultats_assessoraments (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessoraments_no_afiliada_no_afiliades FOREIGN KEY (no_afiliada) REFERENCES no_afiliades (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+    RAISE NOTICE 'Cleaned up audit logs older than % days', p_days_to_keep;
+END;
+$$;
 
--- resultats_assessoraments
-ALTER TABLE resultats_assessoraments
-ADD CONSTRAINT fk_resultats_assessoraments_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_resultats_assessoraments_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_resultats_assessoraments_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_resultats_assessoraments_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_resultats_assessoraments_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Function to get member statistics
+CREATE OR REPLACE FUNCTION get_member_statistics()
+RETURNS TABLE (
+    member_type VARCHAR(20),
+    status VARCHAR(20),
+    count BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT m.member_type, m.status, COUNT(*)
+    FROM members m
+    GROUP BY m.member_type, m.status
+    ORDER BY m.member_type, m.status;
+END;
+$$ LANGUAGE plpgsql;
 
--- tipus_assessoraments
-ALTER TABLE tipus_assessoraments
-ADD CONSTRAINT fk_tipus_assessoraments_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_assessoraments_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_assessoraments_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_assessoraments_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_assessoraments_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- =============================================
+-- FINAL CLEANUP AND OPTIMIZATION
+-- =============================================
 
--- tecniques
-ALTER TABLE tecniques
-ADD CONSTRAINT fk_tecniques_especialitat_especialitats FOREIGN KEY (especialitat) REFERENCES especialitats (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tecniques_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tecniques_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tecniques_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tecniques_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tecniques_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Update table statistics
+ANALYZE;
 
--- especialitats
-ALTER TABLE especialitats
-ADD CONSTRAINT fk_especialitats_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_especialitats_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_especialitats_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_especialitats_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_especialitats_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Create extension for better text search if needed
+CREATE EXTENSION IF NOT EXISTS unaccent;
 
--- assessorament_documents
-ALTER TABLE assessorament_documents
-ADD CONSTRAINT fk_assessorament_documents_parent_id_assessoraments FOREIGN KEY (parent_id) REFERENCES assessoraments (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessorament_documents_document_medias FOREIGN KEY (document) REFERENCES medias (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessorament_documents_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_assessorament_documents_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- medias
-ALTER TABLE medias
-ADD CONSTRAINT fk_medias_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_medias_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_medias_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_medias_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_medias_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+-- Add comment documentation
+COMMENT ON SCHEMA sindicato IS 'Sindicato Tenants Union Database Schema v2.0';
 
--- domiciliacions
-ALTER TABLE domiciliacions
-ADD CONSTRAINT fk_domiciliacions_fitxer_medias FOREIGN KEY (fitxer) REFERENCES medias (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_domiciliacions_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_domiciliacions_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_domiciliacions_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_domiciliacions_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_domiciliacions_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+COMMENT ON
+TABLE members IS 'Unified table for all member types (affiliates, non-affiliates, sympathizers)';
 
--- directius_empresa
-ALTER TABLE directius_empresa
-ADD CONSTRAINT fk_directius_empresa_parent_id_empreses FOREIGN KEY (parent_id) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_directius_empresa_child_id_directius FOREIGN KEY (child_id) REFERENCES directius (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_directius_empresa_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
+COMMENT ON
+TABLE audit_log IS 'Centralized audit trail for all database changes';
 
--- directius
-ALTER TABLE directius
-ADD CONSTRAINT fk_directius_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_directius_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_directius_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_directius_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_directius_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- entramats
-ALTER TABLE entramats
-ADD CONSTRAINT fk_entramats_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_entramats_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_entramats_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_entramats_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_entramats_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- pisos_entramat
-ALTER TABLE pisos_entramat
-ADD CONSTRAINT fk_pisos_entramat_parent_id_entramats FOREIGN KEY (parent_id) REFERENCES entramats (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_entramat_child_id_pisos FOREIGN KEY (child_id) REFERENCES pisos (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_pisos_entramat_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- sollicituds
-ALTER TABLE sollicituds
-ADD CONSTRAINT fk_sollicituds_origen_afiliacio_origens_afiliacio FOREIGN KEY (origen_afiliacio) REFERENCES origens_afiliacio (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_municipi_municipis FOREIGN KEY (municipi) REFERENCES municipis (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_estat_pis_estats_habitatge FOREIGN KEY (estat_pis) REFERENCES estats_habitatge (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_api_empreses FOREIGN KEY (api) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_propietat_empreses FOREIGN KEY (propietat) REFERENCES empreses (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_sollicituds_seccio_sindical_seccions_sindicals FOREIGN KEY (seccio_sindical) REFERENCES seccions_sindicals (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- servei_juridic_documents
-ALTER TABLE servei_juridic_documents
-ADD CONSTRAINT fk_servei_juridic_documents_parent_id_serveis_juridics FOREIGN KEY (parent_id) REFERENCES serveis_juridics (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_servei_juridic_documents_document_medias FOREIGN KEY (document) REFERENCES medias (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_servei_juridic_documents_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_servei_juridic_documents_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- serveis_juridics
-ALTER TABLE serveis_juridics
-ADD CONSTRAINT fk_serveis_juridics_afiliada_afiliades FOREIGN KEY (afiliada) REFERENCES afiliades (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_serveis_juridics_tipus_tipus_serveis_juridics FOREIGN KEY (tipus) REFERENCES tipus_serveis_juridics (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_serveis_juridics_tecnica_tecniques FOREIGN KEY (tecnica) REFERENCES tecniques (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_serveis_juridics_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_serveis_juridics_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_serveis_juridics_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_serveis_juridics_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_serveis_juridics_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- tipus_serveis_juridics
-ALTER TABLE tipus_serveis_juridics
-ADD CONSTRAINT fk_tipus_serveis_juridics_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_serveis_juridics_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_serveis_juridics_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_serveis_juridics_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_serveis_juridics_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- tipus_sseguiment
-ALTER TABLE tipus_sseguiment
-ADD CONSTRAINT fk_tipus_sseguiment_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_sseguiment_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_sseguiment_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_sseguiment_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_tipus_sseguiment_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- seccions_sindicals
-ALTER TABLE seccions_sindicals
-ADD CONSTRAINT fk_seccions_sindicals_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_seccions_sindicals_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_seccions_sindicals_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_seccions_sindicals_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_seccions_sindicals_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- origens_afiliacio
-ALTER TABLE origens_afiliacio
-ADD CONSTRAINT fk_origens_afiliacio_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_origens_afiliacio_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_origens_afiliacio_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_origens_afiliacio_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_origens_afiliacio_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- collectius
-ALTER TABLE collectius
-ADD CONSTRAINT fk_collectius_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_collectius_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_collectius_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_collectius_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_collectius_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- options
--- Already has a unique(section, option_key) constraint.
-
--- import_templates
--- No FKs.
-
--- ==========================
--- END FOREIGN KEYS AND INDEXES
--- ==========================
+COMMENT ON
+TABLE lookup_values IS 'Configurable lookup values replacing multiple type tables';
