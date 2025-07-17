@@ -7,3 +7,4 @@ src/modules/__pycache__
 src
 dev
 tests
+build/postgreSQL/init-scripts/03-test.sql
