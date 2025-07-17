@@ -1080,20 +1080,6 @@ CREATE TABLE options (
     UNIQUE (section, option_key)
 );
 
-CREATE TABLE resultats_assessoraments (
-    id SERIAL PRIMARY KEY,
-    nom VARCHAR(50) NOT NULL UNIQUE,
-    owner_user INTEGER NOT NULL,
-    owner_group INTEGER NOT NULL,
-    create_user INTEGER NOT NULL,
-    update_user INTEGER NOT NULL,
-    delete_user INTEGER,
-    create_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_timestamp TIMESTAMP NOT NULL,
-    delete_timestamp TIMESTAMP,
-    active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
 CREATE TABLE serveis_juridics (
     id SERIAL PRIMARY KEY,
     status VARCHAR(50) NOT NULL,

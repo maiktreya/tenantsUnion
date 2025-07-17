@@ -1,4 +1,4 @@
-#.env uncomment for prod
+.env uncomment for prod
 .venv
 src/__pycache__
 src/pages/__pycache__
