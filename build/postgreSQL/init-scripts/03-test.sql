@@ -1620,17 +1620,6 @@ ADD CONSTRAINT fk_collectius_delete_user_users FOREIGN KEY (delete_user) REFEREN
 -- import_templates
 -- No FKs.
 
--- patterns, changes_log
-ALTER TABLE patterns
-ADD CONSTRAINT fk_patterns_owner_user_users FOREIGN KEY (owner_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_patterns_owner_group_groups FOREIGN KEY (owner_group) REFERENCES "groups" (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_patterns_create_user_users FOREIGN KEY (create_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_patterns_update_user_users FOREIGN KEY (update_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-ADD CONSTRAINT fk_patterns_delete_user_users FOREIGN KEY (delete_user) REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE changes_log
-ADD CONSTRAINT fk_changes_log_user_users FOREIGN KEY ("user") REFERENCES users (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
 -- ==========================
 -- END FOREIGN KEYS AND INDEXES
 -- ==========================
