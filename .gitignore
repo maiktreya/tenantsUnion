@@ -1,10 +1,4 @@
-.env uncomment for prod
-.venv
 src/__pycache__
 src/pages/__pycache__
 src/modules/__pycache__
 # src/* includes the modular refractored app files
-src
-dev
-tests
-build/postgreSQL/init-scripts/03-test.sql
