@@ -200,6 +200,23 @@ VALUES (
     ('specialty', 'Especialitats');
 
 -- =============================================
+-- UNION ORGANIZATION
+-- =============================================
+
+CREATE TABLE union_sections (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    postal_codes TEXT[], -- Array of postal codes
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE commissions (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =============================================
 -- PERSON AND MEMBER MANAGEMENT
 -- =============================================
 
@@ -271,6 +288,7 @@ last_followup_date DATE,
 followup_type_id INTEGER REFERENCES lookup_values (id),
 
 -- Additional info
+
 
 notes TEXT,
     internal_comments TEXT,
@@ -351,6 +369,7 @@ ownership_last_updated DATE,
 
 -- HPO (social housing) info
 
+
 is_hpo BOOLEAN DEFAULT FALSE,
     hpo_end_date DATE,
 
@@ -402,6 +421,7 @@ empty_since DATE,
 
 -- Ownership (if different from building)
 
+
 owner_company_id INTEGER REFERENCES companies(id),
     api_company_id INTEGER REFERENCES companies(id),
     ownership_last_updated DATE,
@@ -445,6 +465,7 @@ monthly_income DECIMAL(10, 2) CHECK (monthly_income >= 0),
 
 -- Status
 
+
 is_active BOOLEAN DEFAULT TRUE,
     end_date DATE,
 
@@ -463,23 +484,6 @@ CREATE INDEX idx_rental_contracts_member ON rental_contracts (member_id);
 CREATE INDEX idx_rental_contracts_housing ON rental_contracts (housing_unit_id);
 
 CREATE INDEX idx_rental_contracts_active ON rental_contracts (is_active);
-
--- =============================================
--- UNION ORGANIZATION
--- =============================================
-
-CREATE TABLE union_sections (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    postal_codes TEXT[], -- Array of postal codes
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE commissions (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
 
 -- =============================================
 -- CONFLICTS MANAGEMENT
@@ -511,6 +515,7 @@ next_eviction_at DATE,
 actions_taken JSONB DEFAULT '{}',
 
 -- Resolution
+
 
 resolution_id INTEGER REFERENCES lookup_values(id),
     resolution_result CHAR(1) CHECK (resolution_result IN ('W', 'L', 'P')), -- Win, Loss, Partial
@@ -578,6 +583,7 @@ contact_date DATE, advisory_date DATE, completion_date DATE,
 
 -- Details
 
+
 description TEXT,
     internal_comments TEXT,
     result_id INTEGER REFERENCES lookup_values(id),
@@ -635,6 +641,7 @@ CREATE TABLE documents (
     is_public BOOLEAN DEFAULT FALSE,
 
 -- For images
+
 
 is_image BOOLEAN DEFAULT FALSE,
     image_width INTEGER,
@@ -742,6 +749,7 @@ CREATE TABLE application_forms (
 form_data JSONB NOT NULL,
 
 -- Processed results
+
 
 processed_at TIMESTAMP,
     processed_by INTEGER REFERENCES users(id),
