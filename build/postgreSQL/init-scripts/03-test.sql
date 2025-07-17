@@ -1130,15 +1130,6 @@ CREATE TABLE tipus_serveis_juridics (
     active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
--- Add other tables as needed following the same patterns...
-
--- Foreign Keys and Indexes should be added here according to your relations,
--- Using the following syntax (example for 'afiliades'):
-ALTER TABLE afiliades
-ADD CONSTRAINT fk_afiliades_persona_persones FOREIGN KEY (persona) REFERENCES persones (id) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- (Continue for all foreign key relationships as per your original schema...)
-
 -- Example View definition (adapt columns as needed)
 CREATE OR REPLACE VIEW vw_afiliades AS
 SELECT
