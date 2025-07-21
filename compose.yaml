@@ -32,6 +32,8 @@ services:
 
   nicegui-app:
     image: python:3.11-slim
+    profiles:
+      - Frontend
     ports:
       - "8081:8081"
     volumes:

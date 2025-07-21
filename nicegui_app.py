@@ -96,7 +96,7 @@ def home_page_content() -> None:
 def api_generator_page_content() -> None:
     # Uses the 'frame' context manager to apply the common layout.
     with frame("Testeo de API endpoints y renderizado"):
-        endpoint_input = ui.input("API endpoint", value="http://server:3000/usuarios")
+        endpoint_input = ui.input("API endpoint", value="http://localhost:3001/usuarios")
         # The button's click event calls the 'show_table' function defined above.
         ui.button(
             "Fetch and Show Table", on_click=lambda: show_table(endpoint_input.value)
