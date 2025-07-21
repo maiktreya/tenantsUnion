@@ -1,0 +1,56 @@
+services:
+  server:
+    image: postgrest/postgrest:v12.2.8
+    ports:
+      - "3001:3000"
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PGRST_OPENAPI_SERVER_PROXY_URI: ${POSTGRES_API_URL}
+      PGRST_DB_ANON_ROLE: ${POSTGRES_USER}
+      PGRST_DB_SCHEMA: ${POSTGRES_DB_SCHEMA}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # Mounts the directory with your SQL initialization script(s)
+      - ./build/postgreSQL/init-scripts:/docker-entrypoint-initdb.d
+      # CORRECTED PATH: Mounts your CSV data from its actual location
+      - ./back/SI_MAD/db_fork/sample_2:/csv-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  nicegui-app:
+    image: python:3.11-slim
+    profiles:
+      - Frontend
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./nicegui_app.py:/app/nicegui_app.py:ro
+    working_dir: /app
+    command: >
+      sh -c "
+        pip install --root-user-action=ignore --upgrade pip  &&
+        pip install --root-user-action=ignore nicegui httpx  &&
+        python nicegui_app.py
+      "
+    depends_on:
+      - server
+      - db
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
