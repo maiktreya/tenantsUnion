@@ -1,0 +1,115 @@
+erDiagram
+    entramado_empresas {
+        int id PK "Primary Key"
+        text nombre "UNIQUE"
+        text descripcion
+    }
+
+    empresas {
+        int id PK "Primary Key"
+        int entramado_id FK "Foreign Key to entramado_empresas"
+        text nombre
+        text cif_nif_nie "UNIQUE"
+        text directivos
+        text api
+        text direccion_fiscal
+    }
+
+    bloques {
+        int id PK "Primary Key"
+        int empresa_id FK "Foreign Key to empresas"
+        text direccion "UNIQUE"
+        text estado
+        text api
+    }
+
+    pisos {
+        int id PK "Primary Key"
+        int bloque_id FK "Foreign Key to bloques"
+        text direccion "UNIQUE, NOT NULL"
+        text municipio
+        int cp
+        text api
+        boolean prop_vertical
+        boolean por_habitaciones
+    }
+
+    afiliadas {
+        int id PK "Primary Key"
+        int piso_id FK "Foreign Key to pisos"
+        text num_afiliada "UNIQUE"
+        text nombre
+        text apellidos
+        text cif "UNIQUE"
+        text genero
+        text regimen
+        text estado
+        date fecha_alta
+    }
+
+    facturacion {
+        int id PK "Primary Key"
+        int afiliada_id FK "Foreign Key to afiliadas"
+        decimal cuota
+        smallint periodicidad
+        text forma_pago
+        text iban
+    }
+
+    usuarios {
+        int id PK "Primary Key"
+        text alias "UNIQUE"
+        text nombre
+        text apellidos
+        text email
+        text roles
+    }
+
+    asesorias {
+        int id PK "Primary Key"
+        int afiliada_id FK "Foreign Key to afiliadas"
+        int tecnica_id FK "Foreign Key to usuarios"
+        text estado
+        date fecha_asesoria
+        text tipo_beneficiaria
+        text tipo
+        text resultado
+    }
+
+    conflictos {
+        int id PK "Primary Key"
+        int afiliada_id FK "Foreign Key to afiliadas"
+        int usuario_responsable_id FK "Foreign Key to usuarios"
+        text estado
+        text ambito
+        text causa
+        date fecha_apertura
+        date fecha_cierre
+        text descripcion
+        text resolucion
+    }
+
+    diario_conflictos {
+        int id PK "Primary Key"
+        int conflicto_id FK "Foreign Key to conflictos"
+        text estado
+        text ambito
+        text afectada
+        text causa
+        timestamp created_at
+    }
+
+    solicitudes {
+        int id PK "Primary Key"
+    }
+
+    entramado_empresas ||--o{ empresas : "has"
+    empresas ||--o{ bloques : "owns"
+    bloques ||--o{ pisos : "contains"
+    pisos ||--o{ afiliadas : "houses"
+    afiliadas |o--|| facturacion : "has"
+    afiliadas ||--o{ asesorias : "requests"
+    usuarios ||--o{ asesorias : "provides"
+    afiliadas ||--o{ conflictos : "has"
+    usuarios ||--o{ conflictos : "manages"
+    conflictos ||--o{ diario_conflictos : "logs"

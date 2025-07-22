@@ -195,6 +195,18 @@ CREATE TABLE staging_bloques (
     col_extra_3 TEXT
 );
 
+-- ✅ NUEVO: Tabla staging para los pisos
+CREATE TABLE staging_pisos (
+    direccion TEXT,
+    estado TEXT,
+    api TEXT,
+    propiedad TEXT,
+    entramado TEXT,
+    num_afiliadas TEXT,
+    num_preafiliadas TEXT,
+    num_inq_colaboradoras TEXT
+);
+
 CREATE TABLE staging_asesorias (
     estado TEXT,
     fecha_asesoria TEXT,
@@ -245,6 +257,15 @@ WITH (
 
 COPY staging_bloques
 FROM '/csv-data/Bloques.csv'
+WITH (
+        FORMAT csv,
+        DELIMITER ';',
+        HEADER true
+    );
+
+-- ✅ NUEVO: Carga de datos de pisos al área de staging
+COPY staging_pisos
+FROM '/csv-data/Pisos.csv'
 WITH (
         FORMAT csv,
         DELIMITER ';',
@@ -310,6 +331,53 @@ SELECT s.direccion, e.id, s.estado, s.api
 FROM
     staging_bloques s
     JOIN empresas e ON s.propiedad = e.nombre ON CONFLICT (direccion) DO NOTHING;
+
+-- ✅ CORREGIDO: Migración de datos para la tabla de pisos
+WITH BloqueCandidatos AS (
+    -- Para cada piso, se buscan todos los bloques cuya dirección sea un prefijo de la dirección del piso.
+    -- Se asigna un número de fila, dando prioridad (rn=1) al bloque con la dirección más larga (la más específica).
+    SELECT
+        p.direccion AS piso_direccion,
+        b.id AS bloque_id,
+        ROW_NUMBER() OVER(PARTITION BY p.direccion ORDER BY LENGTH(b.direccion) DESC) as rn
+    FROM
+        staging_pisos p
+    JOIN
+        bloques b ON p.direccion LIKE b.direccion || '%'
+    WHERE
+        p.direccion IS NOT NULL AND p.direccion != ''
+),
+MejorCoincidenciaBloque AS (
+    -- Se selecciona solo la mejor coincidencia para cada piso (la más larga).
+    SELECT piso_direccion, bloque_id FROM BloqueCandidatos WHERE rn = 1
+)
+INSERT INTO
+    pisos (
+        direccion,
+        municipio,
+        cp,
+        api,
+        bloque_id,
+        prop_vertical,
+        por_habitaciones
+    )
+SELECT
+    s.direccion,
+    -- Extrae el municipio de la última parte del string de dirección, separada por comas.
+    TRIM((string_to_array(s.direccion, ','))[array_upper(string_to_array(s.direccion, ','), 1)]),
+    -- Extrae el código postal de la penúltima parte, lo limpia de caracteres no numéricos y lo convierte a entero.
+    CAST(NULLIF(regexp_replace((string_to_array(s.direccion, ','))[array_upper(string_to_array(s.direccion, ','), 1) - 1], '\D', '', 'g'), '') AS INTEGER),
+    NULLIF(s.api, ''),
+    mcb.bloque_id,
+    FALSE, -- Valor por defecto, no disponible en el CSV
+    FALSE  -- Valor por defecto, no disponible en el CSV
+FROM
+    staging_pisos s
+LEFT JOIN
+    MejorCoincidenciaBloque mcb ON s.direccion = mcb.piso_direccion
+WHERE
+    s.direccion IS NOT NULL AND s.direccion != ''
+ON CONFLICT (direccion) DO NOTHING;
 
 INSERT INTO
     usuarios (
@@ -413,6 +481,8 @@ DROP TABLE staging_afiliadas;
 DROP TABLE staging_empresas;
 
 DROP TABLE staging_bloques;
+
+DROP TABLE staging_pisos;
 
 DROP TABLE staging_asesorias;
 
