@@ -25,7 +25,7 @@ services:
       # Mounts the directory with your SQL initialization script(s)
       - ./build/postgreSQL/init-scripts:/docker-entrypoint-initdb.d
       # CORRECTED PATH: Mounts your CSV data from its actual location
-      - ./back/SI_MAD/db_fork/sample_2:/csv-data
+      - ./back/SI_MAD/db_fork:/csv-data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
