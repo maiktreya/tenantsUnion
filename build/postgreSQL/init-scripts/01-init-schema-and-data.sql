@@ -1,9 +1,8 @@
 -- =====================================================================
 -- ARCHIVO 01: CREACIÓN DE ESQUEMA E IMPORTACIÓN (VERSIÓN FINAL)
 -- =====================================================================
--- Este script implementa un enfoque de staging estándar y directo para
--- todos los archivos CSV. Cada tabla de staging es una réplica exacta
--- de la cabecera de su archivo de origen.
+-- Este script crea el esquema, importa los datos, y aplica mejoras
+-- en la integridad referencial y la indexación para un diseño robusto.
 -- =====================================================================
 
 -- CREACIÓN DEL ESQUEMA
@@ -13,7 +12,6 @@ SET search_path TO sindicato_inq, public;
 
 -- =====================================================================
 -- PARTE 1: DEFINICIÓN DE LAS TABLAS FINALES Y NORMALIZADAS
--- (Esta sección no ha sido modificada)
 -- =====================================================================
 
 CREATE TABLE entramado_empresas (
@@ -73,15 +71,17 @@ CREATE TABLE afiliadas (
     fecha_alta DATE
 );
 
+-- ✅ MEJORA: La facturación se elimina si se elimina la afiliada.
 CREATE TABLE facturacion (
     id SERIAL PRIMARY KEY,
-    afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
+    afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE CASCADE,
     cuota DECIMAL(8, 2),
     periodicidad SMALLINT,
     forma_pago TEXT,
     iban TEXT
 );
 
+-- ✅ MEJORA: Se elimina la columna redundante `beneficiaria_nombre`.
 CREATE TABLE asesorias (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
@@ -89,16 +89,15 @@ CREATE TABLE asesorias (
     estado TEXT,
     fecha_asesoria DATE,
     tipo_beneficiaria TEXT,
-    beneficiaria_nombre TEXT,
     tipo TEXT,
     resultado TEXT
 );
 
+-- ✅ MEJORA: Se elimina la columna redundante `afectada`.
 CREATE TABLE conflictos (
     id SERIAL PRIMARY KEY,
     estado TEXT DEFAULT NULL,
     ambito TEXT,
-    afectada TEXT,
     causa TEXT,
     fecha_apertura DATE,
     fecha_cierre DATE,
@@ -108,6 +107,7 @@ CREATE TABLE conflictos (
     usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL
 );
 
+-- ✅ MEJORA: Las entradas del diario se eliminan si se elimina el conflicto.
 CREATE TABLE diario_conflictos (
     id SERIAL PRIMARY KEY,
     estado TEXT DEFAULT NULL,
@@ -115,13 +115,39 @@ CREATE TABLE diario_conflictos (
     afectada TEXT,
     causa TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    conflicto_id INTEGER REFERENCES conflictos (id) ON DELETE SET NULL
+    conflicto_id INTEGER REFERENCES conflictos (id) ON DELETE CASCADE
 );
 
 CREATE TABLE solicitudes (id SERIAL PRIMARY KEY);
 
 -- =====================================================================
--- PARTE 2: LÓGICA DE IMPORTACIÓN CON TABLAS STAGING CORREGIDAS
+-- PARTE 1.5: CREACIÓN DE ÍNDICES PARA MEJORAR EL RENDIMIENTO
+-- =====================================================================
+-- ✅ MEJORA: Se añaden índices a todas las claves foráneas.
+
+CREATE INDEX idx_empresas_entramado_id ON empresas (entramado_id);
+
+CREATE INDEX idx_bloques_empresa_id ON bloques (empresa_id);
+
+CREATE INDEX idx_pisos_bloque_id ON pisos (bloque_id);
+
+CREATE INDEX idx_afiliadas_piso_id ON afiliadas (piso_id);
+
+CREATE INDEX idx_facturacion_afiliada_id ON facturacion (afiliada_id);
+
+CREATE INDEX idx_asesorias_afiliada_id ON asesorias (afiliada_id);
+
+CREATE INDEX idx_asesorias_tecnica_id ON asesorias (tecnica_id);
+
+CREATE INDEX idx_conflictos_afiliada_id ON conflictos (afiliada_id);
+
+CREATE INDEX idx_conflictos_usuario_responsable_id ON conflictos (usuario_responsable_id);
+
+CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
+
+-- =====================================================================
+-- PARTE 2: LÓGICA DE IMPORTACIÓN CON TABLAS STAGING
+-- (El proceso de staging no se modifica para no romper la importación)
 -- =====================================================================
 
 -- 2.1. Crear tablas Staging
@@ -342,17 +368,16 @@ FROM
     staging_afiliadas s
     JOIN afiliadas a ON s.num_afiliada = a.num_afiliada ON CONFLICT (id) DO NOTHING;
 
--- ✅ CORRECCIÓN: Se utiliza to_date() para interpretar correctamente el formato de fecha DD/MM/YYYY.
+-- ✅ MEJORA: El INSERT ya no incluye la columna redundante `afectada`.
 INSERT INTO
     conflictos (
         afiliada_id,
         estado,
         ambito,
-        afectada,
         causa,
         fecha_apertura
     )
-SELECT a.id, s.estado, s.ambito, s.afectada, s.causa, to_date (
+SELECT a.id, s.estado, s.ambito, s.causa, to_date (
         NULLIF(s.fecha_apertura, ''), 'DD/MM/YYYY'
     )
 FROM
@@ -361,7 +386,7 @@ FROM
         a.nombre || ' ' || a.apellidos
     ) = s.afectada ON CONFLICT (id) DO NOTHING;
 
--- ✅ CORRECCIÓN: Se utiliza to_date() para interpretar correctamente el formato de fecha DD/MM/YYYY.
+-- ✅ MEJORA: El INSERT ya no incluye la columna redundante `beneficiaria_nombre`.
 INSERT INTO
     asesorias (
         afiliada_id,
@@ -369,13 +394,12 @@ INSERT INTO
         estado,
         tipo,
         fecha_asesoria,
-        beneficiaria_nombre,
         resultado,
         tipo_beneficiaria
     )
 SELECT a.id, u.id, s.estado, s.tipo, to_date (
         NULLIF(s.fecha_asesoria, ''), 'DD/MM/YYYY'
-    ), s.beneficiaria_nombre, s.resultado, s.tipo_beneficiaria
+    ), s.resultado, s.tipo_beneficiaria
 FROM
     staging_asesorias s
     LEFT JOIN afiliadas a ON (
