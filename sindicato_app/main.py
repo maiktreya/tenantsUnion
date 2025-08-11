@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+import os
 from pathlib import Path
 from nicegui import ui, app
 from config import config
-from api.client import APIClient  # Import API client
+from api.client import APIClient
 from views.home import HomeView
 from views.admin import AdminView
 from views.views_explorer import ViewsExplorerView
@@ -12,7 +13,7 @@ class Application:
     """Main application class"""
 
     def __init__(self):
-        self.api_client = APIClient(config.API_BASE_URL)  # Create API client instance
+        self.api_client = APIClient(config.API_BASE_URL)
         self.current_view = 'home'
         self.view_containers = {}
         self.views = {}
@@ -22,10 +23,15 @@ class Application:
 
     def setup_static_files(self):
         """Setup static files serving for assets"""
+        # Get the path to the assets folder
         base_dir = Path(__file__).parent
         assets_dir = base_dir / 'assets'
+
+        # Create assets directory if it doesn't exist
         assets_dir.mkdir(exist_ok=True)
         (assets_dir / 'images').mkdir(exist_ok=True)
+
+        # Serve static files from assets folder
         app.add_static_files('/assets', str(assets_dir))
 
     def show_view(self, view_name: str):
@@ -35,35 +41,55 @@ class Application:
             container.set_visibility(name == view_name)
 
     def create_header(self):
-        """Create the application header with logo"""
+        """Create the application header with logo banner"""
         with ui.header().classes('bg-white shadow-lg'):
             with ui.row().classes('w-full items-center p-2 gap-4'):
-                # Logo container
+                # Logo container - occupying ~1/5 of header width
                 with ui.element('div').classes(
                     'w-1/5 min-w-[200px] max-w-[280px] cursor-pointer'
                 ).on('click', lambda: self.show_view('home')):
-                    ui.image('/assets/images/logo.png').classes(
-                        'h-12 w-auto object-contain'
-                    )
+                    ui.image('/assets/images/logo.png')
 
+                # Separator line
                 ui.element('div').classes('h-10 w-px bg-gray-300')
-                ui.label('Sistema de Gestión').classes('text-xl font-semibold text-gray-800')
+
+                # Application title - slightly smaller to not compete with logo
+                ui.label('Sistema de Gestión').classes(
+                    'text-xl font-italic text-gray-400'
+                )
+
+                # Spacer to push navigation to the right
                 ui.space()
 
-                # Navigation buttons
+                # Navigation buttons with updated styling to match the red theme
                 with ui.row().classes('gap-2'):
-                    ui.button('Inicio', on_click=lambda: self.show_view('home')).props('flat color=red-600')
-                    ui.button('Tablas', on_click=lambda: self.show_view('admin')).props('flat color=red-600')
-                    ui.button('Vistas', on_click=lambda: self.show_view('views')).props('flat color=red-600')
-                    ui.button('Conflictos', on_click=lambda: self.show_view('conflicts')).props('flat color=red-600')
+                    ui.button(
+                        'Inicio',
+                        on_click=lambda: self.show_view('home')
+                    ).props('flat color=red-600')
+
+                    ui.button(
+                        'Tablas',
+                        on_click=lambda: self.show_view('admin')
+                    ).props('flat color=red-600')
+
+                    ui.button(
+                        'Vistas',
+                        on_click=lambda: self.show_view('views')
+                    ).props('flat color=red-600')
+
+                    ui.button(
+                        'Conflictos',
+                        on_click=lambda: self.show_view('conflicts')
+                    ).props('flat color=red-600')
 
     def create_views(self):
         """Create all application views"""
-        # Initialize views - passing API client to each view
+        # Initialize views
         self.views['home'] = HomeView(self.show_view)
         self.views['admin'] = AdminView(self.api_client)
         self.views['views'] = ViewsExplorerView(self.api_client)
-        self.views['conflicts'] = ConflictsView(self.api_client)  # Pass API client
+        self.views['conflicts'] = ConflictsView(self.api_client)
 
         # Create view containers
         with ui.column().classes('w-full min-h-screen bg-gray-50'):
@@ -100,9 +126,12 @@ async def shutdown_handler():
 # Register shutdown handler
 app.on_shutdown(shutdown_handler)
 
+# Run the application
 if __name__ in {"__main__", "__mp_main__"}:
+
+
     ui.run(
         host=config.APP_HOST,
         port=config.APP_PORT,
-        title=config.APP_TITLE
+        title=config.APP_TITLE,
     )

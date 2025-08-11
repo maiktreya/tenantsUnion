@@ -1,11 +1,9 @@
-from .data_table_component import DataTableComponent
-from .conflict_manager import ConflictManager
+from .data_table import DataTable
 from .dialogs import RecordDialog, ConflictNoteDialog
 from .filters import FilterPanel
 
 __all__ = [
-    'DataTableComponent',
-    'ConflictManager',
+    'DataTable',
     'RecordDialog',
     'ConflictNoteDialog',
     'FilterPanel'
