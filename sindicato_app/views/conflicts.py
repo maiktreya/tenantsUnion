@@ -63,7 +63,7 @@ class ConflictsView:
     async def _load_conflicts(self):
         """Load all conflicts"""
         try:
-            conflicts = await self.api.get_records('conflictos')
+            conflicts = await self.api.get_records('conflictos', order='id.asc')
             self.state.set_conflicts(conflicts)
 
             # Update select options
