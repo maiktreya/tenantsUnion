@@ -27,10 +27,11 @@ TABLE_INFO = {
     'diario_conflictos': {'display_name': 'Diario Conflictos', 'id_field': 'id'}
 }
 
+# Materialized View metadata
 VIEW_INFO = {
-    'vista_conflictos_activos': {'display_name': 'Conflictos Activos'},
-    'vista_resumen_facturacion_empresa': {'display_name': 'Resumen de Facturación por Empresa'},
-    'vista_usuarios_afiliados': {'display_name': 'Usuarios Afiliados'},
+    'v_afiliadas': {'display_name': 'Info completa de Afiliadas'},
+    'v_bloques': {'display_name': 'Info de Bloques'},
+    'v_empresas': {'display_name': 'Info completa de Empresas'},
 }
 
 config = Config()
