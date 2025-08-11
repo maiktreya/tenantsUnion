@@ -19,7 +19,7 @@ class ConflictsView:
         container = ui.column().classes('w-full p-4 gap-4')
 
         with container:
-            ui.label('Gestor de Conflictos').classes('text-h4')
+            ui.label('Toma de actas').classes('text-h4')
 
             with ui.row().classes('w-full gap-4'):
                 # Left panel - Selection and info
