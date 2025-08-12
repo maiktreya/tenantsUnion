@@ -54,12 +54,12 @@ class Application:
                         "flat color=red-600"
                     )
 
-                    ui.button("Tablas", on_click=lambda: self.show_view("admin")).props(
-                        "flat color=red-600"
-                    )
+                    # ui.button("Tablas", on_click=lambda: self.show_view("admin")).props(
+                    #    "flat color=red-600"
+                    # )
 
                     ui.button(
-                        "CRUD Mejorado",
+                        "administración BBDD",
                         on_click=lambda: self.show_view("enhanced_crud"),
                     ).props("flat color=red-600")
 

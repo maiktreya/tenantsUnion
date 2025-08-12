@@ -22,7 +22,9 @@ class EnhancedCrudView:
         container = ui.column().classes("w-full p-4 gap-4")
 
         with container:
-            ui.label("Administración de Tablas (Mejorada)").classes("text-h4")
+            ui.label("Administración de Tablas y Registros BBDD").classes(
+                "text-h6 font-italic"
+            )
 
             # Toolbar
             with ui.row().classes("w-full gap-4 items-center"):
