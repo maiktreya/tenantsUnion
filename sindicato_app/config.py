@@ -7,7 +7,7 @@ class Config:
     API_BASE_URL: str = "http://localhost:3000"
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8081
-    APP_TITLE: str = "Gestión Sindicato INQ"
+    APP_TITLE: str = "Gestión Sindicato Inquilinas de Madrid"
     PAGE_SIZE_OPTIONS: list = None
 
     def __post_init__(self):
@@ -20,7 +20,15 @@ TABLE_INFO = {
     "entramado_empresas": {"display_name": "Entramado Empresas", "id_field": "id"},
     "empresas": {"display_name": "Empresas", "id_field": "id"},
     "bloques": {"display_name": "Bloques", "id_field": "id"},
-    "pisos": {"display_name": "Pisos", "id_field": "id"},
+    "pisos": {
+        "display_name": "Pisos",
+        "id_field": "id",
+        # NEW: Defines that 'pisos' has 'afiliadas' as children
+        "child_relations": {
+            "table": "afiliadas",  # The table where the children live.
+            "foreign_key": "piso_id",  # The field in the 'afiliadas' table that links back to a 'piso'.
+        },
+    },
     "usuarios": {"display_name": "Usuarios", "id_field": "id"},
     "afiliadas": {
         "display_name": "Afiliadas",
