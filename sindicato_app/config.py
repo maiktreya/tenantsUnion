@@ -22,7 +22,11 @@ TABLE_INFO = {
     "bloques": {"display_name": "Bloques", "id_field": "id"},
     "pisos": {"display_name": "Pisos", "id_field": "id"},
     "usuarios": {"display_name": "Usuarios", "id_field": "id"},
-    "afiliadas": {"display_name": "Afiliadas", "id_field": "id"},
+    "afiliadas": {
+        "display_name": "Afiliadas",
+        "id_field": "id",
+        "relations": {"piso_id": {"view": "v_pisos", "display_field": "direccion"}},
+    },
     "facturacion": {"display_name": "Facturación", "id_field": "id"},
     "asesorias": {"display_name": "Asesorías", "id_field": "id"},
     "conflictos": {"display_name": "Conflictos", "id_field": "id"},
