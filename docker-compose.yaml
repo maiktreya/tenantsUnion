@@ -40,13 +40,13 @@ services:
     ports:
       - "8081:8081"
     volumes:
-      - ./nicegui_app.py:/app/nicegui_app.py:ro
+      - ./sindicato_app:/app:ro
     working_dir: /app
     command: >
       sh -c "
         pip install --root-user-action=ignore --upgrade pip  &&
         pip install --root-user-action=ignore nicegui httpx  &&
-        python nicegui_app.py
+        python main.py
       "
     depends_on:
       - server
