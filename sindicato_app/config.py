@@ -25,7 +25,7 @@ TABLE_INFO = {
     "afiliadas": {
         "display_name": "Afiliadas",
         "id_field": "id",
-        "relations": {"piso_id": {"view": "v_pisos", "display_field": "direccion"}},
+        "relations": {"piso_id": {"view": "pisos", "display_field": "direccion"}},
     },
     "facturacion": {"display_name": "Facturación", "id_field": "id"},
     "asesorias": {"display_name": "Asesorías", "id_field": "id"},
