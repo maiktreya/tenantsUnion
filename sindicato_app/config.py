@@ -83,11 +83,8 @@ TABLE_INFO = {
         "display_name": "Diario Conflictos",
         "id_field": "id",
         "relations": {
-            "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre"},
+            "conflicto_id": {"view": "conflictos", "display_field": "descripcion"}
         },
-        # Only allow diario_conflictos if the associated conflicto has afiliada_id not null.
-        # When adding, set ambito = "Afiliada" by default if afiliada_id is not null.
     },
     "solicitudes": {"display_name": "Solicitudes", "id_field": "id"},
 }

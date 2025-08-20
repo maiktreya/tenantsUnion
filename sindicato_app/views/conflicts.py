@@ -103,8 +103,8 @@ class ConflictsView:
                 info_items = [
                     ('ID', conflict.get('id', 'N/A')),
                     ('Estado', conflict.get('estado', 'N/A')),
-                    ('Ámbito', conflict.get('ambito', 'N/A')),
                     ('Afiliada', conflict.get('afiliada_id', 'N/A')),
+                    ('Ámbito', conflict.get('ambito', 'N/A')),
                     ('Causa', conflict.get('causa', 'N/A')),
                     ('Fecha de Apertura', conflict.get('fecha_apertura', 'N/A')),
                     ('Fecha de Cierre', conflict.get('fecha_cierre', 'N/A')),
@@ -149,6 +149,7 @@ class ConflictsView:
                 ui.label(
                     entry.get('created_at', 'Sin fecha')
                 ).classes('text-caption text-gray-600')
+
                 if entry.get('estado'):
                     ui.label(f"Estado: {entry['estado']}").classes('text-caption')
 
@@ -157,20 +158,15 @@ class ConflictsView:
                     ui.label('Causa:').classes('font-semibold mr-2')
                     ui.label(entry['causa'])
 
+            if entry.get('afectada'):
+                with ui.row().classes('mb-1'):
+                    ui.label('Afectada:').classes('font-semibold mr-2')
+                    ui.label(entry['afectada'])
+
             if entry.get('ambito'):
                 with ui.row().classes('mb-1'):
                     ui.label('Ámbito:').classes('font-semibold mr-2')
                     ui.label(entry['ambito'])
-
-            if entry.get('afiliada_id'):
-                with ui.row().classes('mb-1'):
-                    ui.label('Afiliada:').classes('font-semibold mr-2')
-                    ui.label(str(entry['afiliada_id']))
-
-            if entry.get('descripcion'):
-                with ui.row().classes('mb-1'):
-                    ui.label('Descripción:').classes('font-semibold mr-2')
-                    ui.label(entry['descripcion'])
 
     async def _add_note(self):
         """Add a new note to the selected conflict"""
@@ -178,25 +174,16 @@ class ConflictsView:
             ui.notify('Por favor, seleccione un conflicto primero', type='warning')
             return
 
-        # Prepare context for the dialog, including afiliada_id if present
-        conflict = self.state.selected_conflict
-        dialog_kwargs = {
-            'api': self.api,
-            'conflict': conflict,
-            'on_success': None,
-        }
-        # Pass afiliada_id if present in the selected conflict
-        if 'afiliada_id' in conflict:
-            dialog_kwargs['afiliada_id'] = conflict['afiliada_id']
-
         async def on_note_added():
             """Callback after note is added"""
             await self._load_conflicts()
-            await self._on_conflict_change(conflict['id'])
+            await self._on_conflict_change(self.state.selected_conflict['id'])
 
-        dialog_kwargs['on_success'] = on_note_added
-
-        dialog = ConflictNoteDialog(**dialog_kwargs)
+        dialog = ConflictNoteDialog(
+            api=self.api,
+            conflict=self.state.selected_conflict,
+            on_success=on_note_added
+        )
         dialog.open()
 
     def _clear_displays(self):
