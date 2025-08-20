@@ -104,6 +104,7 @@ class ConflictsView:
                     ('ID', conflict.get('id', 'N/A')),
                     ('Estado', conflict.get('estado', 'N/A')),
                     ('Ámbito', conflict.get('ambito', 'N/A')),
+                    ('Afiliada', conflict.get('afiliada_id', 'N/A')),
                     ('Causa', conflict.get('causa', 'N/A')),
                     ('Fecha de Apertura', conflict.get('fecha_apertura', 'N/A')),
                     ('Fecha de Cierre', conflict.get('fecha_cierre', 'N/A')),
@@ -148,7 +149,6 @@ class ConflictsView:
                 ui.label(
                     entry.get('created_at', 'Sin fecha')
                 ).classes('text-caption text-gray-600')
-
                 if entry.get('estado'):
                     ui.label(f"Estado: {entry['estado']}").classes('text-caption')
 
@@ -157,15 +157,20 @@ class ConflictsView:
                     ui.label('Causa:').classes('font-semibold mr-2')
                     ui.label(entry['causa'])
 
-            if entry.get('afectada'):
-                with ui.row().classes('mb-1'):
-                    ui.label('Afectada:').classes('font-semibold mr-2')
-                    ui.label(entry['afectada'])
-
             if entry.get('ambito'):
                 with ui.row().classes('mb-1'):
                     ui.label('Ámbito:').classes('font-semibold mr-2')
                     ui.label(entry['ambito'])
+
+            if entry.get('afiliada_id'):
+                with ui.row().classes('mb-1'):
+                    ui.label('Afiliada:').classes('font-semibold mr-2')
+                    ui.label(str(entry['afiliada_id']))
+
+            if entry.get('descripcion'):
+                with ui.row().classes('mb-1'):
+                    ui.label('Descripción:').classes('font-semibold mr-2')
+                    ui.label(entry['descripcion'])
 
     async def _add_note(self):
         """Add a new note to the selected conflict"""
