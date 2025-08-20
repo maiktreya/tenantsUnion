@@ -60,7 +60,29 @@ class ConflictsState:
 
     def can_add_diario_conflicto(self, conflict: Optional[Dict]) -> bool:
         """
-        Returns True if diario_conflictos can be added for this conflict
-        (i.e., conflict has afiliada_id not null).
+        Determine if a diario_conflicto can be added for the given conflict.
+
+        Logic:
+        - diario_conflicto can be added if:
+          - The conflict has an 'afiliada_id' (i.e., it's related to an 'Afiliada').
+          - The conflict is not closed (assuming there's a 'estado' field where 'Cerrado' means closed).
+
+        :param conflict: The conflict dictionary, typically from the selected_conflict.
+        :return: True if diario_conflicto can be added, False otherwise.
         """
-        return conflict is not None and conflict.get("afiliada_id") is not None
+        if not conflict:
+            return False
+
+        # Check if the conflict has an 'afiliada_id' and is not closed
+        return (
+            conflict.get('afiliada_id') is not None and
+            conflict.get('estado') != 'Cerrado'
+        )
+
+# Example usage in your view logic:
+# from state.conflicts_state import ConflictsState
+# conflicts_state = ConflictsState()
+# if conflicts_state.can_add_diario_conflicto(selected_conflict):
+#     # Show diario_conflictos UI
+# else:
+#     # Hide or disable diario_conflictos UI
