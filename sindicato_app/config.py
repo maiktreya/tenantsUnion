@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import os
 
+
 @dataclass
 class Config:
     API_BASE_URL: str = os.environ.get("POSTGREST_API_URL", "http://localhost:3001")
@@ -12,6 +13,7 @@ class Config:
     def __post_init__(self):
         if self.PAGE_SIZE_OPTIONS is None:
             self.PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100]
+
 
 # =====================================================================
 #  TABLE & RELATIONSHIP METADATA
@@ -77,14 +79,18 @@ TABLE_INFO = {
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre"},
             "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"},
         },
-        "child_relations": {"table": "diario_conflictos", "foreign_key": "conflicto_id"},
+        "child_relations": {
+            "table": "diario_conflictos",
+            "foreign_key": "conflicto_id",
+        },
     },
     "diario_conflictos": {
         "display_name": "Diario Conflictos",
         "id_field": "id",
         "relations": {
-            "conflicto_id": {"view": "conflictos", "display_field": "descripcion"}
+            "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
         },
+        "child_relations": {"table": "conflictos", "foreign_key": "afiliada_id"},
     },
     "solicitudes": {"display_name": "Solicitudes", "id_field": "id"},
 }
