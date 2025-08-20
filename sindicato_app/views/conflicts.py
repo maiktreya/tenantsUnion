@@ -178,16 +178,25 @@ class ConflictsView:
             ui.notify('Por favor, seleccione un conflicto primero', type='warning')
             return
 
+        # Prepare context for the dialog, including afiliada_id if present
+        conflict = self.state.selected_conflict
+        dialog_kwargs = {
+            'api': self.api,
+            'conflict': conflict,
+            'on_success': None,
+        }
+        # Pass afiliada_id if present in the selected conflict
+        if 'afiliada_id' in conflict:
+            dialog_kwargs['afiliada_id'] = conflict['afiliada_id']
+
         async def on_note_added():
             """Callback after note is added"""
             await self._load_conflicts()
-            await self._on_conflict_change(self.state.selected_conflict['id'])
+            await self._on_conflict_change(conflict['id'])
 
-        dialog = ConflictNoteDialog(
-            api=self.api,
-            conflict=self.state.selected_conflict,
-            on_success=on_note_added
-        )
+        dialog_kwargs['on_success'] = on_note_added
+
+        dialog = ConflictNoteDialog(**dialog_kwargs)
         dialog.open()
 
     def _clear_displays(self):
