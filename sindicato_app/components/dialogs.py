@@ -225,9 +225,15 @@ class ConflictNoteDialog:
                 "Ámbito", value=self.conflict.get("ambito", "")
             ).classes("w-full")
 
-            afectada_input = ui.input("Afectada").classes("w-full")
+            afectada_input = ui.input(
+                "Ámbito", value=self.conflict.get("afiliada_id", "")
+            ).classes("w-full")
 
-            causa_input = ui.textarea("Causa/Notas").classes("w-full")
+            causa_input = ui.input(
+                "Causa", value=self.conflict.get("causa", "")
+            ).classes("w-full")
+
+            notas_input = ui.textarea("Actualización/Notas").classes("w-full")
 
             # Action buttons
             with ui.row().classes("w-full justify-end gap-2"):
