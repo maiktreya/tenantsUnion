@@ -3,7 +3,7 @@ import os
 
 @dataclass
 class Config:
-    API_BASE_URL: str = "http://localhost:3000"
+    API_BASE_URL: str = os.environ.get("POSTGREST_API_URL", "http://localhost:3001")
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8081
     APP_TITLE: str = "Gestión Sindicato INQ"
