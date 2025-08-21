@@ -31,7 +31,7 @@ class BaseTableState:
         self.sort_column = None
         self.sort_ascending = True
         self.current_page = ReactiveValue(1)
-        self.page_size = ReactiveValue(10)
+        self.page_size = ReactiveValue(5)
 
         # UI element references
         self.filter_container = None

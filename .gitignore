@@ -1,3 +1,4 @@
+# Python bytecode
 __pycache__/
 *.pyc
 *.pyo
@@ -5,7 +6,11 @@ __pycache__/
 *.pyc.*
 *.pyo.*
 *.pyd.*
-.venv/
-.vscode/
-back/
-dev/
+
+# Environment and IDE
+.venv
+.vscode
+
+# other local folders
+back
+dev

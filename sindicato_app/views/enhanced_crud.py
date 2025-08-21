@@ -1,10 +1,11 @@
-from typing import Dict
+from typing import Dict, List, Union
 from nicegui import ui
 from api.client import APIClient
 from state.admin_state import AdminState
 from components.data_table import DataTable
 from components.dialogs import EnhancedRecordDialog
 from utils.export import export_to_csv
+from utils.importer import CSVImporterDialog
 from config import config, TABLE_INFO
 
 
@@ -15,7 +16,7 @@ class EnhancedCrudView:
         self.api = api_client
         self.state = AdminState()
         self.data_table = None
-        self.detail_container = None  # Placeholder for the detail section
+        self.detail_container = None
 
     def create(self) -> ui.column:
         """Create the enhanced CRUD view UI."""
@@ -54,79 +55,101 @@ class EnhancedCrudView:
                     "Exportar CSV", icon="download", on_click=self._export_data
                 ).props("color=orange-600")
 
+                ui.button(
+                    "Importar CSV", icon="upload", on_click=self._open_import_dialog
+                ).props("color=orange-600")
+
             # Filters
             with ui.expansion("Filtros y Búsqueda", icon="filter_list").classes(
                 "w-full"
             ).props("default-opened"):
                 self.state.filter_container = ui.column().classes("w-full")
 
-            # Data table with the new row click handler
             self.data_table = DataTable(
                 state=self.state,
                 on_edit=self._edit_record,
                 on_delete=self._delete_record,
-                on_row_click=self._on_row_click,  # Pass the handler
+                on_row_click=self._on_row_click,
             )
             self.data_table.create()
 
-            # Separator and container for the dependency details
             ui.separator().classes("my-4")
             self.detail_container = ui.column().classes("w-full")
 
         return container
 
-    # REPLACE the existing _on_row_click method with this one.
+    def _open_import_dialog(self):
+        """Opens the CSV import dialog."""
+        if not self.state.selected_table.value:
+            ui.notify("Por favor, seleccione una tabla primero", type="warning")
+            return
+
+        dialog = CSVImporterDialog(
+            api=self.api,
+            table_name=self.state.selected_table.value,
+            on_success=self._refresh_data,
+        )
+        dialog.open()
+
+    # --- THIS IS THE CORRECTED METHOD ---
     async def _on_row_click(self, record: Dict):
-        """Handles a click on a row to show related 'child' records."""
+        """
+        Handles a click on a row to show related 'child' records.
+        This version correctly handles both a single relation (dict) and
+        multiple relations (list of dicts) in the config.
+        """
         self.detail_container.clear()
         selected_table_name = self.state.selected_table.value
         table_info = TABLE_INFO.get(selected_table_name, {})
-        child_relation = table_info.get("child_relations")
 
-        if not child_relation:
+        # Get child relations, which can be a dict or a list of dicts
+        child_relations = table_info.get("child_relations")
+
+        if not child_relations:
             return
 
-        child_table = child_relation["table"]
-        foreign_key = child_relation["foreign_key"]
-        record_id = record.get("id")
+        # Ensure child_relations is always a list to simplify processing
+        if isinstance(child_relations, dict):
+            child_relations = [child_relations]
 
+        record_id = record.get("id")
         if record_id is None:
             return
 
         with self.detail_container:
-            ui.label(
-                f"Registros de '{child_table}' relacionados con '{selected_table_name}' (ID: {record_id})"
-            ).classes("text-h6 mb-2")
+            # Iterate through each defined child relation and fetch its data
+            for relation in child_relations:
+                child_table = relation["table"]
+                foreign_key = relation["foreign_key"]
 
-            try:
-                filters = {foreign_key: f"eq.{record_id}"}
-                related_records = await self.api.get_records(
-                    child_table, filters=filters
-                )
+                ui.label(
+                    f"Registros de '{child_table}' relacionados con '{selected_table_name}' (ID: {record_id})"
+                ).classes("text-h6 mb-2")
 
-                if not related_records:
-                    ui.label("No se encontraron registros relacionados.").classes(
-                        "text-gray-500"
+                try:
+                    filters = {foreign_key: f"eq.{record_id}"}
+                    related_records = await self.api.get_records(
+                        child_table, filters=filters
                     )
-                    return
 
-                # NEW FORMATTING LOGIC STARTS HERE
-                # Use a grid layout to nicely arrange the cards.
-                with ui.grid(columns=2).classes("w-full gap-4"):
-                    for rel_record in related_records:
-                        # Create a separate card for each related record.
-                        with ui.card().classes("w-full"):
-                            # Display each key-value pair on its own row for clarity.
-                            for key, value in rel_record.items():
-                                with ui.row().classes("w-full"):
-                                    ui.label(f"{key}:").classes("font-semibold w-32")
-                                    ui.label(str(value)).classes("flex-grow")
-                # NEW FORMATTING LOGIC ENDS HERE
+                    if not related_records:
+                        ui.label("No se encontraron registros relacionados.").classes(
+                            "text-gray-500"
+                        )
+                        continue # Move to the next relation
 
-            except Exception as e:
-                ui.notify(
-                    f"Error al cargar registros relacionados: {str(e)}", type="negative"
-                )
+                    with ui.grid(columns=2).classes("w-full gap-4 mb-4"):
+                        for rel_record in related_records:
+                            with ui.card().classes("w-full"):
+                                for key, value in rel_record.items():
+                                    with ui.row().classes("w-full"):
+                                        ui.label(f"{key}:").classes("font-semibold w-32")
+                                        ui.label(str(value)).classes("flex-grow")
+
+                except Exception as e:
+                    ui.notify(
+                        f"Error al cargar datos de '{child_table}': {str(e)}", type="negative"
+                    )
 
     async def _load_table_data(self, table_name: str = None):
         """Load data for the selected table and clear the detail view."""
