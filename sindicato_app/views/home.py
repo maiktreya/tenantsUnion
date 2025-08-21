@@ -23,7 +23,7 @@ class HomeView:
                     icon="storage",
                     title="Administración de Tablas",
                     description="Gestionar todas las tablas de la base de datos con operaciones CRUD completas",
-                    on_click=lambda: self.navigate("enhanced_crud"),
+                    on_click=lambda: self.navigate("admin"),
                 )
 
                 # Views card

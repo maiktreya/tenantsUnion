@@ -8,7 +8,6 @@ from views.home import HomeView
 from views.admin import AdminView
 from views.views_explorer import ViewsExplorerView
 from views.conflicts import ConflictsView
-from views.enhanced_crud import EnhancedCrudView  # Make sure this import is present
 
 
 class Application:
@@ -54,14 +53,9 @@ class Application:
                         "flat color=red-600"
                     )
 
-                    # ui.button("Tablas", on_click=lambda: self.show_view("admin")).props(
-                    #    "flat color=red-600"
-                    # )
-
-                    ui.button(
-                        "administración BBDD",
-                        on_click=lambda: self.show_view("enhanced_crud"),
-                    ).props("flat color=red-600")
+                    ui.button("admin BBDD", on_click=lambda: self.show_view("admin")).props(
+                       "flat color=red-600"
+                    )
 
                     ui.button("Vistas", on_click=lambda: self.show_view("views")).props(
                         "flat color=red-600"
@@ -75,9 +69,7 @@ class Application:
         """Create all application views"""
         self.views["home"] = HomeView(self.show_view)
         self.views["admin"] = AdminView(self.api_client)
-        self.views["enhanced_crud"] = EnhancedCrudView(
-            self.api_client
-        )  # This line creates the view instance
+
         self.views["views"] = ViewsExplorerView(self.api_client)
         self.views["conflicts"] = ConflictsView(self.api_client)
 
