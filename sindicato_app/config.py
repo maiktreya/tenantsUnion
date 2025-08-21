@@ -4,6 +4,7 @@ import os
 
 @dataclass
 class Config:
+    """Application configuration settings."""
     API_BASE_URL: str = os.environ.get("POSTGREST_API_URL", "http://localhost:3001")
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8081
@@ -18,13 +19,14 @@ class Config:
 # =====================================================================
 #  TABLE & RELATIONSHIP METADATA
 # =====================================================================
-# This dictionary drives the behavior of the entire Enhanced CRUD view.
-# It defines not only the tables but also how they relate to each other.
-# Now supports multiple child_relations per table.
+# This dictionary is the engine for the Enhanced CRUD view.
+# It defines table relationships to automatically generate dropdowns for foreign keys.
+# - 'relations': Defines parent relationships (foreign keys in this table).
+# - 'child_relations': Defines child relationships (tables that have a foreign key to this table).
 
 TABLE_INFO = {
     "entramado_empresas": {
-        "display_name": "Entramado Empresas",
+        "display_name": "Entramado de Empresas",
         "id_field": "id",
         "child_relations": {"table": "empresas", "foreign_key": "entramado_id"},
     },
@@ -32,6 +34,7 @@ TABLE_INFO = {
         "display_name": "Empresas",
         "id_field": "id",
         "relations": {
+            # This table has a foreign key 'entramado_id' to 'entramado_empresas'.
             "entramado_id": {"view": "entramado_empresas", "display_field": "nombre"}
         },
         "child_relations": {"table": "bloques", "foreign_key": "empresa_id"},
@@ -39,35 +42,57 @@ TABLE_INFO = {
     "bloques": {
         "display_name": "Bloques",
         "id_field": "id",
-        "relations": {"empresa_id": {"view": "empresas", "display_field": "nombre"}},
+        "relations": {
+            # This table has a foreign key 'empresa_id' to 'empresas'.
+            "empresa_id": {"view": "empresas", "display_field": "nombre"}
+        },
         "child_relations": {"table": "pisos", "foreign_key": "bloque_id"},
     },
     "pisos": {
         "display_name": "Pisos",
         "id_field": "id",
-        "relations": {"bloque_id": {"view": "bloques", "display_field": "direccion"}},
+        "relations": {
+            # This table has a foreign key 'bloque_id' to 'bloques'.
+            "bloque_id": {"view": "bloques", "display_field": "direccion"}
+        },
         "child_relations": {"table": "afiliadas", "foreign_key": "piso_id"},
     },
     "usuarios": {
         "display_name": "Usuarios",
         "id_field": "id",
-        "child_relations": {"table": "asesorias", "foreign_key": "tecnica_id"},
+        # Users can be related to multiple other tables as children.
+        "child_relations": [
+            {"table": "asesorias", "foreign_key": "tecnica_id"},
+            {"table": "conflictos", "foreign_key": "usuario_responsable_id"},
+        ]
     },
     "afiliadas": {
         "display_name": "Afiliadas",
         "id_field": "id",
-        "relations": {"piso_id": {"view": "pisos", "display_field": "direccion"}},
-        "child_relations": {"table": "facturacion", "foreign_key": "afiliada_id"},
+        "relations": {
+            # This table has a foreign key 'piso_id' to 'pisos'.
+            "piso_id": {"view": "pisos", "display_field": "direccion"}
+        },
+        # 'Afiliadas' can be parents to multiple other records.
+        "child_relations": [
+            {"table": "facturacion", "foreign_key": "afiliada_id"},
+            {"table": "asesorias", "foreign_key": "afiliada_id"},
+            {"table": "conflictos", "foreign_key": "afiliada_id"},
+        ]
     },
     "facturacion": {
         "display_name": "Facturación",
         "id_field": "id",
-        "relations": {"afiliada_id": {"view": "afiliadas", "display_field": "nombre"}},
+        "relations": {
+            # This table has a foreign key 'afiliada_id' to 'afiliadas'.
+            "afiliada_id": {"view": "afiliadas", "display_field": "nombre"}
+        },
     },
     "asesorias": {
         "display_name": "Asesorías",
         "id_field": "id",
         "relations": {
+            # This table has foreign keys to both 'afiliadas' and 'usuarios'.
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre"},
             "tecnica_id": {"view": "usuarios", "display_field": "alias"},
         },
@@ -76,6 +101,7 @@ TABLE_INFO = {
         "display_name": "Conflictos",
         "id_field": "id",
         "relations": {
+            # This table is linked to both 'afiliadas' and 'usuarios'.
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre"},
             "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"},
         },
@@ -85,14 +111,23 @@ TABLE_INFO = {
         },
     },
     "diario_conflictos": {
-        "display_name": "Diario Conflictos",
+        "display_name": "Diario de Conflictos",
         "id_field": "id",
         "relations": {
+            # A journal entry belongs to a single conflict.
             "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
+            # ENHANCEMENT: Added this relation based on the 'ConflictNoteDialog' logic,
+            # which allows associating a journal entry with an 'afiliada'.
+            "afiliada_id": {"view": "afiliadas", "display_field": "nombre"},
         },
-        "child_relations": {"table": "conflictos", "foreign_key": "afiliada_id"},
+        # FIX: Removed the incorrect 'child_relations' that created a circular dependency.
+        # A journal entry is a child and cannot be a parent to the main 'conflictos' table.
     },
-    "solicitudes": {"display_name": "Solicitudes", "id_field": "id"},
+    "solicitudes": {
+        "display_name": "Solicitudes",
+        "id_field": "id"
+        # No relations are defined as its structure is simple.
+    },
 }
 
 # =====================================================================

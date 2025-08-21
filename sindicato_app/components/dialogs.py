@@ -226,10 +226,10 @@ class ConflictNoteDialog:
             ).classes("w-full")
 
             afectada_input = ui.input(
-                "Ámbito", value=self.conflict.get("afiliada_id", "")
+                "Afectada", value=self.conflict.get("afiliada_id", "")
             ).classes("w-full")
 
-            causa_input = ui.input(
+            notas_input = ui.input(
                 "Causa", value=self.conflict.get("causa", "")
             ).classes("w-full")
 
@@ -247,7 +247,7 @@ class ConflictNoteDialog:
                             "estado": estado_input.value or None,
                             "ambito": ambito_input.value or None,
                             "afectada": afectada_input.value or None,
-                            "causa": causa_input.value or None,
+                            "causa": notas_input.value or None,
                             "created_at": datetime.now().isoformat(),
                         }
 

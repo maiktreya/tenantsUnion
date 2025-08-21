@@ -5,5 +5,7 @@ __pycache__/
 *.pyc.*
 *.pyo.*
 *.pyd.*
-.venv
-.vscode
+.venv/
+.vscode/
+back/
+dev/

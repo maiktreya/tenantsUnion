@@ -106,7 +106,7 @@ class ConflictsView:
                     ("Estado", conflict.get("estado", "N/A")),
                     ("Afiliada", conflict.get("afiliada_id", "N/A")),
                     ("Ámbito", conflict.get("ambito", "N/A")),
-                    ("Causa", conflict.get("causa", "N/A")),
+                    ("causa", conflict.get("causa", "N/A")),
                     ("Fecha de Apertura", conflict.get("fecha_apertura", "N/A")),
                     ("Fecha de Cierre", conflict.get("fecha_cierre", "N/A")),
                     ("Descripción", conflict.get("descripcion", "N/A")),
@@ -158,7 +158,7 @@ class ConflictsView:
 
             if entry.get("causa"):
                 with ui.row().classes("mb-1"):
-                    ui.label("Causa:").classes("font-semibold mr-2")
+                    ui.label("Nota:").classes("font-semibold mr-2")
                     ui.label(entry["causa"])
 
             if entry.get("Afiliada"):
