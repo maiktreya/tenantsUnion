@@ -278,6 +278,7 @@ class ConflictNoteDialog:
                             k: v for k, v in note_data.items() if v is not None
                         }
 
+                        # Save the diary note (create or update)
                         if self.mode == "create":
                             result = await self.api.create_record(
                                 "diario_conflictos", note_data
@@ -287,16 +288,29 @@ class ConflictNoteDialog:
                                 "diario_conflictos", self.record["id"], note_data
                             )
 
+                        # --- MODIFIED SECTION START ---
                         if result:
-                            if (
-                                estado_input.value
-                                and estado_input.value != self.conflict.get("estado")
-                            ):
+                            conflict_update_data = {}
+                            new_estado = estado_input.value
+
+                            # Check if the conflict's main status needs updating
+                            if new_estado and new_estado != self.conflict.get("estado"):
+                                conflict_update_data["estado"] = new_estado
+
+                            # If the new status is "Cerrado", set the closing date
+                            if new_estado == "Cerrado":
+                                conflict_update_data["fecha_cierre"] = (
+                                    datetime.now().strftime("%Y-%m-%d")
+                                )
+
+                            # If there's anything to update in the main conflict record, make the API call
+                            if conflict_update_data:
                                 await self.api.update_record(
                                     "conflictos",
                                     self.conflict["id"],
-                                    {"estado": estado_input.value},
+                                    conflict_update_data,
                                 )
+
                             ui.notify(
                                 f"Nota {'añadida' if self.mode == 'create' else 'actualizada'} con éxito",
                                 type="positive",
@@ -305,6 +319,7 @@ class ConflictNoteDialog:
 
                             if self.on_success:
                                 await self.on_success()
+                        # --- MODIFIED SECTION END ---
 
                     except Exception as e:
                         ui.notify(
