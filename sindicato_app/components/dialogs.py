@@ -196,11 +196,18 @@ class ConflictNoteDialog:
     """Dialog for adding notes to conflicts"""
 
     def __init__(
-        self, api: APIClient, conflict: Dict, on_success: Optional[Callable] = None
+        self,
+        api: APIClient,
+        conflict: Dict,
+        on_success: Optional[Callable] = None,
+        record: Optional[Dict] = None,
+        mode: str = "create",
     ):
         self.api = api
         self.conflict = conflict
         self.on_success = on_success
+        self.record = record or {}
+        self.mode = mode
         self.dialog = None
 
     def open(self):
@@ -210,30 +217,46 @@ class ConflictNoteDialog:
         self.dialog = ui.dialog()
 
         with self.dialog, ui.card().classes("w-96"):
-            ui.label(f'Añadir Nota al Conflicto #{self.conflict["id"]}').classes(
-                "text-h6"
+            title = (
+                f'Añadir Nota al Conflicto #{self.conflict["id"]}'
+                if self.mode == "create"
+                else f'Editar Nota #{self.record.get("id")}'
             )
+            ui.label(title).classes("text-h6")
 
             # Input fields
+            initial_estado = (
+                self.record.get("estado")
+                if self.mode == "edit"
+                else self.conflict.get("estado", "")
+            )
             estado_input = ui.select(
                 options=["Abierto", "En proceso", "Resuelto", "Cerrado"],
                 label="Estado",
-                value=self.conflict.get("estado", ""),
+                value=initial_estado,
             ).classes("w-full")
 
             ambito_input = ui.input(
-                "Ámbito", value=self.conflict.get("ambito", "")
+                "Ámbito",
+                value=(
+                    self.record.get("ambito")
+                    if self.mode == "edit"
+                    else self.conflict.get("ambito", "")
+                ),
             ).classes("w-full")
 
             afectada_input = ui.input(
-                "Afectada", value=self.conflict.get("afiliada_id", "")
+                "Afectada",
+                value=(
+                    self.record.get("afectada")
+                    if self.mode == "edit"
+                    else self.conflict.get("afiliada_id", "")
+                ),
             ).classes("w-full")
 
-            notas_input = ui.input(
-                "Causa", value=self.conflict.get("causa", "")
+            notas_input = ui.textarea(
+                "Actualización/Notas", value=self.record.get("causa", "")
             ).classes("w-full")
-
-            notas_input = ui.textarea("Actualización/Notas").classes("w-full")
 
             # Action buttons
             with ui.row().classes("w-full justify-end gap-2"):
@@ -241,28 +264,30 @@ class ConflictNoteDialog:
 
                 async def save_note():
                     try:
-                        # Create note entry
                         note_data = {
                             "conflicto_id": self.conflict["id"],
                             "estado": estado_input.value or None,
                             "ambito": ambito_input.value or None,
                             "afectada": afectada_input.value or None,
                             "causa": notas_input.value or None,
-                            "created_at": datetime.now().isoformat(),
                         }
+                        if self.mode == "create":
+                            note_data["created_at"] = datetime.now().isoformat()
 
-                        # Remove None values
                         note_data = {
                             k: v for k, v in note_data.items() if v is not None
                         }
 
-                        # Save to diario_conflictos
-                        result = await self.api.create_record(
-                            "diario_conflictos", note_data
-                        )
+                        if self.mode == "create":
+                            result = await self.api.create_record(
+                                "diario_conflictos", note_data
+                            )
+                        else:
+                            result = await self.api.update_record(
+                                "diario_conflictos", self.record["id"], note_data
+                            )
 
                         if result:
-                            # Update conflict status if changed
                             if (
                                 estado_input.value
                                 and estado_input.value != self.conflict.get("estado")
@@ -272,15 +297,19 @@ class ConflictNoteDialog:
                                     self.conflict["id"],
                                     {"estado": estado_input.value},
                                 )
-
-                            ui.notify("Nota añadida con éxito", type="positive")
+                            ui.notify(
+                                f"Nota {'añadida' if self.mode == 'create' else 'actualizada'} con éxito",
+                                type="positive",
+                            )
                             self.dialog.close()
 
                             if self.on_success:
                                 await self.on_success()
 
                     except Exception as e:
-                        ui.notify(f"Error al añadir la nota: {str(e)}", type="negative")
+                        ui.notify(
+                            f"Error al guardar la nota: {str(e)}", type="negative"
+                        )
 
                 ui.button(
                     "Guardar", on_click=lambda: ui.timer(0.1, save_note, once=True)

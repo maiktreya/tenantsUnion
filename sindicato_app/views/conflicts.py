@@ -64,7 +64,10 @@ class ConflictsView:
     async def _load_conflicts(self):
         """Load all conflicts"""
         try:
-            conflicts = await self.api.get_records("conflictos", order="id.asc")
+            # Fetch from the new view instead of the table
+            conflicts = await self.api.get_records(
+                "v_conflictos_con_afiliada", order="id.asc"
+            )
             self.state.set_conflicts(conflicts)
 
             # Update select options
@@ -104,9 +107,10 @@ class ConflictsView:
                 info_items = [
                     ("ID", conflict.get("id", "N/A")),
                     ("Estado", conflict.get("estado", "N/A")),
-                    ("Afiliada", conflict.get("afiliada_id", "N/A")),
+                    # Display the full name from the view
+                    ("Afiliada", conflict.get("afiliada_nombre_completo", "N/A")),
                     ("Ámbito", conflict.get("ambito", "N/A")),
-                    ("causa", conflict.get("causa", "N/A")),
+                    ("Causa", conflict.get("causa", "N/A")),
                     ("Fecha de Apertura", conflict.get("fecha_apertura", "N/A")),
                     ("Fecha de Cierre", conflict.get("fecha_cierre", "N/A")),
                     ("Descripción", conflict.get("descripcion", "N/A")),
@@ -125,8 +129,9 @@ class ConflictsView:
         self.history_container.clear()
 
         try:
+            # Fetch from the new view instead of the table
             history = await self.api.get_records(
-                "diario_conflictos",
+                "v_diario_conflictos_con_afiliada",
                 {"conflicto_id": f'eq.{self.state.selected_conflict["id"]}'},
             )
             self.state.set_history(history)
@@ -148,23 +153,32 @@ class ConflictsView:
     def _create_history_entry(self, entry: dict):
         """Create a history entry card"""
         with ui.card().classes("w-full mb-2"):
-            with ui.row().classes("w-full justify-between mb-2"):
-                ui.label(entry.get("created_at", "Sin fecha")).classes(
-                    "text-caption text-gray-600"
-                )
+            with ui.row().classes("w-full justify-between items-center"):
+                with ui.column():
+                    ui.label(entry.get("created_at", "Sin fecha")).classes(
+                        "text-caption text-gray-600"
+                    )
+                    if entry.get("estado"):
+                        ui.label(f"Estado: {entry['estado']}").classes("text-caption")
 
-                if entry.get("estado"):
-                    ui.label(f"Estado: {entry['estado']}").classes("text-caption")
+                with ui.row().classes("gap-2"):
+                    ui.button(
+                        icon="edit", on_click=lambda e=entry: self._edit_note(e)
+                    ).props("size=sm flat dense")
+                    ui.button(
+                        icon="delete", on_click=lambda e=entry: self._delete_note(e)
+                    ).props("size=sm flat dense color=negative")
 
             if entry.get("causa"):
                 with ui.row().classes("mb-1"):
                     ui.label("Nota:").classes("font-semibold mr-2")
                     ui.label(entry["causa"])
 
-            if entry.get("Afiliada"):
+            # Display the full name from the view
+            if entry.get("afiliada_nombre_completo"):
                 with ui.row().classes("mb-1"):
-                    ui.label(f"Afiliada: {entry['Afiliada']}")
-                    ui.label(entry["Afiliada"])
+                    ui.label("Afiliada:").classes("font-semibold mr-2")
+                    ui.label(entry["afiliada_nombre_completo"])
 
             if entry.get("ambito"):
                 with ui.row().classes("mb-1"):
@@ -186,7 +200,48 @@ class ConflictsView:
             api=self.api,
             conflict=self.state.selected_conflict,
             on_success=on_note_added,
+            mode="create",
         )
+        dialog.open()
+
+    async def _edit_note(self, note: dict):
+        """Edit an existing note"""
+
+        async def on_note_updated():
+            """Callback after note is updated"""
+            await self._load_conflict_history()
+
+        dialog = ConflictNoteDialog(
+            api=self.api,
+            conflict=self.state.selected_conflict,
+            record=note,
+            on_success=on_note_updated,
+            mode="edit",
+        )
+        dialog.open()
+
+    async def _delete_note(self, note: dict):
+        """Delete a note with confirmation"""
+        note_id = note.get("id")
+
+        with ui.dialog() as dialog, ui.card():
+            ui.label(f"¿Eliminar nota #{note_id}?").classes("text-h6")
+            ui.label("Esta acción no se puede deshacer.").classes(
+                "text-body2 text-gray-600"
+            )
+
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button("Cancelar", on_click=dialog.close).props("flat")
+
+                async def confirm():
+                    success = await self.api.delete_record("diario_conflictos", note_id)
+                    if success:
+                        ui.notify("Nota eliminada con éxito", type="positive")
+                        dialog.close()
+                        await self._load_conflict_history()
+
+                ui.button("Eliminar", on_click=confirm).props("color=negative")
+
         dialog.open()
 
     def _clear_displays(self):

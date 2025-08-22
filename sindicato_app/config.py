@@ -5,6 +5,7 @@ import os
 @dataclass
 class Config:
     """Application configuration settings."""
+
     API_BASE_URL: str = os.environ.get("POSTGREST_API_URL", "http://localhost:3001")
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8081
@@ -64,7 +65,7 @@ TABLE_INFO = {
         "child_relations": [
             {"table": "asesorias", "foreign_key": "tecnica_id"},
             {"table": "conflictos", "foreign_key": "usuario_responsable_id"},
-        ]
+        ],
     },
     "afiliadas": {
         "display_name": "Afiliadas",
@@ -78,14 +79,14 @@ TABLE_INFO = {
             {"table": "facturacion", "foreign_key": "afiliada_id"},
             {"table": "asesorias", "foreign_key": "afiliada_id"},
             {"table": "conflictos", "foreign_key": "afiliada_id"},
-        ]
+        ],
     },
     "facturacion": {
         "display_name": "Facturación",
         "id_field": "id",
         "relations": {
             # This table has a foreign key 'afiliada_id' to 'afiliadas'.
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre"}
+            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"}
         },
     },
     "asesorias": {
@@ -93,7 +94,7 @@ TABLE_INFO = {
         "id_field": "id",
         "relations": {
             # This table has foreign keys to both 'afiliadas' and 'usuarios'.
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre"},
+            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
             "tecnica_id": {"view": "usuarios", "display_field": "alias"},
         },
     },
@@ -102,7 +103,7 @@ TABLE_INFO = {
         "id_field": "id",
         "relations": {
             # This table is linked to both 'afiliadas' and 'usuarios'.
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre"},
+            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
             "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"},
         },
         "child_relations": {
@@ -118,14 +119,14 @@ TABLE_INFO = {
             "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
             # ENHANCEMENT: Added this relation based on the 'ConflictNoteDialog' logic,
             # which allows associating a journal entry with an 'afiliada'.
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre"},
+            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
         },
         # FIX: Removed the incorrect 'child_relations' that created a circular dependency.
         # A journal entry is a child and cannot be a parent to the main 'conflictos' table.
     },
     "solicitudes": {
         "display_name": "Solicitudes",
-        "id_field": "id"
+        "id_field": "id",
         # No relations are defined as its structure is simple.
     },
 }
@@ -137,6 +138,10 @@ VIEW_INFO = {
     "v_afiliadas": {"display_name": "Info completa de Afiliadas"},
     "v_bloques": {"display_name": "Info de Bloques"},
     "v_empresas": {"display_name": "Info completa de Empresas"},
+    "v_conflictos_con_afiliada": {"display_name": "Conflictos con Info de Afiliada"},
+    "v_diario_conflictos_con_afiliada": {
+        "display_name": "Diario de Conflictos con Info de Afiliada"
+    },
 }
 
 config = Config()

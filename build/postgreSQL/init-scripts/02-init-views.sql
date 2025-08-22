@@ -48,3 +48,22 @@ GROUP BY
     b.id,
     e.nombre,
     ee.nombre;
+
+-- View for conflicts with the affiliate's full name
+CREATE OR REPLACE VIEW v_conflictos_con_afiliada AS
+SELECT
+    c.*,
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo
+FROM conflictos c
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id;
+
+-- View for diary entries with the affiliate's full name
+-- Note: It assumes 'afectada' stores the affiliate's ID as text.
+CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
+SELECT
+    d.*,
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo
+FROM
+    diario_conflictos d
+LEFT JOIN
+    afiliadas a ON d.afectada::integer = a.id;
