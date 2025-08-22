@@ -8,7 +8,7 @@
 SET search_path TO sindicato_inq, public;
 
 -- VISTA 1: AFILIADAS (replica la estructura del CSV principal)
-CREATE MATERIALIZED VIEW v_afiliadas AS
+CREATE OR REPLACE VIEW v_afiliadas AS
 SELECT
     a.num_afiliada AS "Núm.Afiliada", a.nombre AS "Nombre", a.apellidos AS "Apellidos", a.cif AS "CIF", a.genero AS "Género",
     TRIM(CONCAT_WS(', ', p.direccion, p.municipio, p.cp::text)) AS "Dirección",
@@ -23,7 +23,7 @@ LEFT JOIN empresas e ON b.empresa_id = e.id
 LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id;
 
 -- VISTA 2: EMPRESAS (replica la estructura de Empresas.csv con conteos)
-CREATE MATERIALIZED VIEW v_empresas AS
+CREATE OR REPLACE VIEW v_empresas AS
 SELECT e.nombre AS "Nombre", e.cif_nif_nie AS "CIF/NIF/NIE", ee.nombre AS "Entramado", e.directivos AS "Directivos", e.api AS "API", e.direccion_fiscal AS "Dirección", COUNT(DISTINCT a.id) AS "Núm.Afiliadas"
 FROM
     empresas e
@@ -36,7 +36,7 @@ GROUP BY
     ee.nombre;
 
 -- VISTA 3: BLOQUES (replica la estructura de Bloques.csv con conteos)
-CREATE MATERIALIZED VIEW v_bloques AS
+CREATE OR REPLACE VIEW v_bloques AS
 SELECT b.direccion AS "Dirección", b.estado AS "Estado", b.api AS "API", e.nombre AS "Propiedad", ee.nombre AS "Entramado", COUNT(DISTINCT a.id) AS "Núm.Afiliadas"
 FROM
     bloques b
