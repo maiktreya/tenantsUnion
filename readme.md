@@ -1,9 +1,15 @@
 
------
-
 # Sistema de Gestión para el Sindicato de Inquilinas de Madrid
 
 Este proyecto es una aplicación web de escritorio desarrollada para facilitar la gestión interna de la información del **Sindicato de Inquilinas e Inquilinos de Madrid**. La interfaz, construida con **NiceGUI**, ofrece una experiencia de usuario rápida y reactiva para interactuar con una base de datos PostgreSQL a través de una API de PostgREST.
+
+```
+┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐
+│   NiceGUI       │    │  PostgREST   │    │   PostgreSQL    │
+│   Frontend      │◄──►│   API        │◄──►│   Database      │
+│   (Puerto 8081) │    │  (Puerto 3001) │    │   (Puerto 5432) │
+└─────────────────┘    └──────────────┘    └─────────────────┘
+```
 
 ## 📋 Características Principales
 
@@ -29,22 +35,11 @@ La aplicación se organiza en tres módulos principales para cubrir todas las ne
   - **Edición y Borrado de Notas**: Las entradas del historial pueden ser editadas o eliminadas.
   - **Actualización Automática**: Al añadir una nota con el estado **"Cerrado"**, la `fecha_cierre` del conflicto principal se actualiza automáticamente.
 
-## 🏗️ Arquitectura y Tecnologías
+## 🚀 Tecnologías Utilizadas
 
-El sistema implementa una arquitectura de **3 microservicios** con una clara separación de responsabilidades.
-
-```
-┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐
-│   NiceGUI       │    │  PostgREST   │    │   PostgreSQL    │
-│   Frontend      │◄──►│   API        │◄──►│   Database      │
-│   (Puerto 8081) │    │  (Puerto 3001) │    │   (Puerto 5432) │
-└─────────────────┘    └──────────────┘    └─────────────────┘
-```
-
-  - **Frontend**: Python con el framework [NiceGUI](https://nicegui.io/) para una interfaz web rápida y reactiva.
+  - **Backend y Frontend**: Python con el framework [NiceGUI](https://nicegui.io/) para una interfaz web rápida.
   - **API**: [PostgREST](http://postgrest.org/) para generar una API RESTful directamente desde la base de datos PostgreSQL.
-  - **Base de Datos**: PostgreSQL 15.
-  - **Orquestación**: Docker Compose para gestionar los servicios.
+  - **Base de Datos**: PostgreSQL.
 
 ## 🛠️ Cómo Ejecutar la Aplicación
 
@@ -55,47 +50,33 @@ El sistema implementa una arquitectura de **3 microservicios** con una clara sep
     cd tu-repositorio
     ```
 
-2.  **Configurar las variables de entorno**:
-    Crea un archivo `.env` en la raíz del proyecto basándote en el fichero `.env` que ya existe y modifica los valores si es necesario.
-
-3.  **Ejecutar la aplicación con Docker Compose**:
-    Asegúrate de tener Docker instalado y ejecuta el siguiente comando:
+2.  **Instalar dependencias**:
 
     ```bash
-    docker-compose up
+    pip install -r requirements.txt
     ```
 
-4.  **Acceder a la aplicación**:
-    Abre tu navegador y ve a `http://localhost:8081`.
+3.  **Configurar la conexión a la API**:
+    Asegúrate de que tu instancia de PostgREST esté corriendo. La aplicación buscará la URL en la variable de entorno `POSTGREST_API_URL`. Si no la encuentra, usará `http://localhost:3001` por defecto. Este sistema esta pensado por si el frontend desea correrse "live" sin integrar en compose.
 
-## 📊 Modelo de Datos
+    Para correr la composición completa:
 
-El modelo de datos está bien normalizado y sigue una jerarquía lógica para representar las entidades del mundo real.
+    ```bash
+    docker compose up --profile Frontend up -d
+    ```
 
-#### Jerarquía Principal
+    Para correr el backend desde docker compose y editar "live" el frontend corriendo sobre python:
 
-```
-Entramado Empresas → Empresas → Bloques → Pisos → Afiliadas
-```
+    ```bash
+    docker compose up - d && python sindicato_app/main.py # sin activar su profile docker no levanta por defecto el frontend web
+    ```
 
-#### Tablas Principales
+4.  **Ejecutar la aplicación**:
 
-  - **Entramado Empresas**: Grupos o redes de empresas inmobiliarias.
-  - **Empresas**: Propietarios o gestores de propiedades individuales.
-  - **Bloques**: Edificios completos.
-  - **Pisos**: Unidades de vivienda individuales.
-  - **Afiliadas**: Miembros del sindicato.
-  - **Usuarios**: Personal del sindicato que utiliza el sistema.
-  - **Conflictos**: Disputas y su seguimiento.
-  - **Asesorías**: Consultas y servicios de asesoramiento.
-  - **Facturación**: Gestión de cuotas de las afiliadas.
+    ```bash
+    python sindicato_app/main.py
+    ```
 
-## 🌐 Endpoints de la API (Vistas Materializadas)
+5.  Abre tu navegador y ve a `http://localhost:8081`.
 
-Para optimizar el rendimiento y simplificar las consultas desde el frontend, la API de PostgREST expone varias **vistas materializadas**. Estas vistas denormalizan los datos uniendo varias tablas para ofrecer endpoints estables y eficientes.
-
-  - `v_afiliadas`: Ofrece una vista completa y aplanada de cada afiliada, uniendo información de `facturacion`, `pisos`, `bloques` y `empresas`.
-  - `v_empresas`: Muestra información de las empresas y añade un conteo de las afiliadas asociadas a cada una.
-  - `v_bloques`: Similar a la vista de empresas, pero centrada en los bloques, con un conteo de afiliadas por bloque.
-  - `v_conflictos_con_afiliada`: Enriquece la tabla de conflictos con el nombre completo de la afiliada asociada, evitando consultas adicionales.
-  - `v_diario_conflictos_con_afiliada`: Añade el nombre de la afiliada a las entradas del historial de conflictos.
+-----
