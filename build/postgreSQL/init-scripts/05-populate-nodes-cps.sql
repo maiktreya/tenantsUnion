@@ -12,7 +12,7 @@ SET search_path TO sindicato_inq, public;
 -- =====================================================================
 -- Se insertan los nodos principales. Si ya existen, no se hace nada.
 
-INSERT INTO nodos (nombre, descripcion) VALUES
+INSERT INTO sindicato_inq.nodos (nombre, descripcion) VALUES
     ('Centro-Arganzuela-Retiro', 'Agrupa los distritos de Centro, Arganzuela, Retiro, Moncloa y Chamberí.'),
     ('Latina', 'Nodo del distrito de Latina.'),
     ('Carabanchel', 'Nodo del distrito de Carabanchel.'),
@@ -29,42 +29,42 @@ ON CONFLICT (nombre) DO NOTHING;
 -- Se asocia cada código postal con su nodo correspondiente.
 
 -- Nodo: Centro-Arganzuela-Retiro
-INSERT INTO nodos_cp_mapping (cp, nodo_id)
-SELECT cp, (SELECT id FROM nodos WHERE nombre = 'Centro-Arganzuela-Retiro')
+INSERT INTO sindicato_inq.nodos_cp_mapping (cp, nodo_id)
+SELECT cp, (SELECT id FROM sindicato_inq.nodos WHERE nombre = 'Centro-Arganzuela-Retiro')
 FROM (VALUES
     (28004), (28005), (28007), (28008), (28009), (28010),
     (28012), (28013), (28014), (28015), (28045)
 ) AS data(cp) ON CONFLICT (cp) DO NOTHING;
 
 -- Nodo: Latina
-INSERT INTO nodos_cp_mapping (cp, nodo_id)
-SELECT cp, (SELECT id FROM nodos WHERE nombre = 'Latina')
+INSERT INTO sindicato_inq.nodos_cp_mapping (cp, nodo_id)
+SELECT cp, (SELECT id FROM sindicato_inq.nodos WHERE nombre = 'Latina')
 FROM (VALUES (28011), (28024), (28044)) AS data(cp)
 ON CONFLICT (cp) DO NOTHING;
 
 -- Nodo: Carabanchel
-INSERT INTO nodos_cp_mapping (cp, nodo_id)
-SELECT cp, (SELECT id FROM nodos WHERE nombre = 'Carabanchel')
+INSERT INTO sindicato_inq.nodos_cp_mapping (cp, nodo_id)
+SELECT cp, (SELECT id FROM sindicato_inq.nodos WHERE nombre = 'Carabanchel')
 FROM (VALUES (28047), (28019), (28025)) AS data(cp)
 ON CONFLICT (cp) DO NOTHING;
 
 -- Nodo: Usera-Villaverde
-INSERT INTO nodos_cp_mapping (cp, nodo_id)
-SELECT cp, (SELECT id FROM nodos WHERE nombre = 'Usera-Villaverde')
+INSERT INTO sindicato_inq.nodos_cp_mapping (cp, nodo_id)
+SELECT cp, (SELECT id FROM sindicato_inq.nodos WHERE nombre = 'Usera-Villaverde')
 FROM (VALUES (28021), (28026), (28041)) AS data(cp)
 ON CONFLICT (cp) DO NOTHING;
 
 -- Nodo: Este
-INSERT INTO nodos_cp_mapping (cp, nodo_id)
-SELECT cp, (SELECT id FROM nodos WHERE nombre = 'Este')
+INSERT INTO sindicato_inq.nodos_cp_mapping (cp, nodo_id)
+SELECT cp, (SELECT id FROM sindicato_inq.nodos WHERE nombre = 'Este')
 FROM (VALUES
     (28017), (28022), (28027), (28030), (28032), (28033),
     (28037), (28043), (28052)
 ) AS data(cp) ON CONFLICT (cp) DO NOTHING;
 
 -- Nodo: Sur
-INSERT INTO nodos_cp_mapping (cp, nodo_id)
-SELECT cp, (SELECT id FROM nodos WHERE nombre = 'Sur')
+INSERT INTO sindicato_inq.nodos_cp_mapping (cp, nodo_id)
+SELECT cp, (SELECT id FROM sindicato_inq.nodos WHERE nombre = 'Sur')
 FROM (VALUES
     (28054), (28300), (28312), (28320), (28340), (28341), (28342),
     (28343), (28600), (28609), (28911), (28912), (28913), (28914),
@@ -77,8 +77,8 @@ FROM (VALUES
 ) AS data(cp) ON CONFLICT (cp) DO NOTHING;
 
 -- Nodo: Corredor
-INSERT INTO nodos_cp_mapping (cp, nodo_id)
-SELECT cp, (SELECT id FROM nodos WHERE nombre = 'Corredor')
+INSERT INTO sindicato_inq.nodos_cp_mapping (cp, nodo_id)
+SELECT cp, (SELECT id FROM sindicato_inq.nodos WHERE nombre = 'Corredor')
 FROM (VALUES
     (28801), (28802), (28803), (28804), (28805), (28806), (28807),
     (28811), (28812), (28814), (28815), (28816), (28817), (28818),
@@ -87,8 +87,8 @@ FROM (VALUES
 ) AS data(cp) ON CONFLICT (cp) DO NOTHING;
 
 -- Nodo: Sierra Norte
-INSERT INTO nodos_cp_mapping (cp, nodo_id)
-SELECT cp, (SELECT id FROM nodos WHERE nombre = 'Sierra Norte')
+INSERT INTO sindicato_inq.nodos_cp_mapping (cp, nodo_id)
+SELECT cp, (SELECT id FROM sindicato_inq.nodos WHERE nombre = 'Sierra Norte')
 FROM (VALUES
     (28180), (28189), (28190), (28191), (28192), (28193), (28194),
     (28195), (28196), (28720), (28721), (28722), (28729), (28730),

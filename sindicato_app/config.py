@@ -26,6 +26,21 @@ class Config:
 # - 'child_relations': Defines child relationships (tables that have a foreign key to this table).
 
 TABLE_INFO = {
+    "nodos": {
+        "display_name": "Nodos Territoriales",
+        "id_field": "id",
+        "child_relations": [
+            {"table": "nodos_cp_mapping", "foreign_key": "nodo_id"},
+            {"table": "bloques", "foreign_key": "nodo_id"},
+        ],
+    },
+    "nodos_cp_mapping": {
+        "display_name": "Mapeo CP-Nodos",
+        "id_field": "cp", # Note: Primary key is 'cp' not 'id'
+        "relations": {
+            "nodo_id": {"view": "nodos", "display_field": "nombre"}
+        },
+    },
     "entramado_empresas": {
         "display_name": "Entramado de Empresas",
         "id_field": "id",
@@ -35,7 +50,6 @@ TABLE_INFO = {
         "display_name": "Empresas",
         "id_field": "id",
         "relations": {
-            # This table has a foreign key 'entramado_id' to 'entramado_empresas'.
             "entramado_id": {"view": "entramado_empresas", "display_field": "nombre"}
         },
         "child_relations": {"table": "bloques", "foreign_key": "empresa_id"},
@@ -44,8 +58,9 @@ TABLE_INFO = {
         "display_name": "Bloques",
         "id_field": "id",
         "relations": {
-            # This table has a foreign key 'empresa_id' to 'empresas'.
-            "empresa_id": {"view": "empresas", "display_field": "nombre"}
+            "empresa_id": {"view": "empresas", "display_field": "nombre"},
+            # ENHANCEMENT: Added relation to the new nodos table
+            "nodo_id": {"view": "nodos", "display_field": "nombre"},
         },
         "child_relations": {"table": "pisos", "foreign_key": "bloque_id"},
     },
@@ -53,7 +68,6 @@ TABLE_INFO = {
         "display_name": "Pisos",
         "id_field": "id",
         "relations": {
-            # This table has a foreign key 'bloque_id' to 'bloques'.
             "bloque_id": {"view": "bloques", "display_field": "direccion"}
         },
         "child_relations": {"table": "afiliadas", "foreign_key": "piso_id"},
@@ -61,7 +75,6 @@ TABLE_INFO = {
     "usuarios": {
         "display_name": "Usuarios",
         "id_field": "id",
-        # Users can be related to multiple other tables as children.
         "child_relations": [
             {"table": "asesorias", "foreign_key": "tecnica_id"},
             {"table": "conflictos", "foreign_key": "usuario_responsable_id"},
@@ -71,10 +84,8 @@ TABLE_INFO = {
         "display_name": "Afiliadas",
         "id_field": "id",
         "relations": {
-            # This table has a foreign key 'piso_id' to 'pisos'.
             "piso_id": {"view": "pisos", "display_field": "direccion"}
         },
-        # 'Afiliadas' can be parents to multiple other records.
         "child_relations": [
             {"table": "facturacion", "foreign_key": "afiliada_id"},
             {"table": "asesorias", "foreign_key": "afiliada_id"},
@@ -85,7 +96,6 @@ TABLE_INFO = {
         "display_name": "Facturación",
         "id_field": "id",
         "relations": {
-            # This table has a foreign key 'afiliada_id' to 'afiliadas'.
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"}
         },
     },
@@ -93,7 +103,6 @@ TABLE_INFO = {
         "display_name": "Asesorías",
         "id_field": "id",
         "relations": {
-            # This table has foreign keys to both 'afiliadas' and 'usuarios'.
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
             "tecnica_id": {"view": "usuarios", "display_field": "alias"},
         },
@@ -102,7 +111,6 @@ TABLE_INFO = {
         "display_name": "Conflictos",
         "id_field": "id",
         "relations": {
-            # This table is linked to both 'afiliadas' and 'usuarios'.
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
             "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"},
         },
@@ -115,19 +123,13 @@ TABLE_INFO = {
         "display_name": "Diario de Conflictos",
         "id_field": "id",
         "relations": {
-            # A journal entry belongs to a single conflict.
             "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
-            # ENHANCEMENT: Added this relation based on the 'ConflictNoteDialog' logic,
-            # which allows associating a journal entry with an 'afiliada'.
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
         },
-        # FIX: Removed the incorrect 'child_relations' that created a circular dependency.
-        # A journal entry is a child and cannot be a parent to the main 'conflictos' table.
     },
     "solicitudes": {
         "display_name": "Solicitudes",
         "id_field": "id",
-        # No relations are defined as its structure is simple.
     },
 }
 
@@ -142,6 +144,8 @@ VIEW_INFO = {
     "v_diario_conflictos_con_afiliada": {
         "display_name": "Diario de Conflictos con Info de Afiliada"
     },
+    # ENHANCEMENT: Added the new view for conflicts with nodo info
+    "v_conflictos_con_nodo": {"display_name": "Conflictos con Info de Nodo"},
 }
 
 config = Config()
