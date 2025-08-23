@@ -4,9 +4,13 @@
 SET search_path TO sindicato_inq, public;
 
 -- 1. Se mantienen la tabla 'nodos' y la tabla de mapeo como fuente de la verdad.
+
+DROP TABLE IF EXISTS nodos;
+DROP TABLE IF EXISTS nodos_cp_mapping;
 CREATE TABLE nodos (
     id SERIAL PRIMARY KEY,
-    nombre TEXT UNIQUE NOT NULL
+    nombre TEXT UNIQUE NOT NULL,
+    descripcion TEXT
 );
 
 CREATE TABLE nodos_cp_mapping (
