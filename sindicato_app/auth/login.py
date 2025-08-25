@@ -39,7 +39,7 @@ def create_login_page(api_client: APIClient):
 
             if pwd_context.verify(password.value, stored_hash):
                 app.storage.user.update({
-                    'username': user['email'],
+                    'username': user['alias'],
                     'user_id': user_id,
                     'authenticated': True,
                     'roles': user.get('roles', '').split(',')
