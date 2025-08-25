@@ -20,41 +20,27 @@ from auth.login import create_login_page
 
 # ---------------------------------------------------------------------
 # 1. AUTHENTICATION MIDDLEWARE
-# This efficiently protects all pages before they are loaded.
 # ---------------------------------------------------------------------
 
-# Define routes that do not require a login
 unrestricted_page_routes = {'/login'}
 
 class AuthMiddleware(BaseHTTPMiddleware):
     """
     This middleware efficiently checks authentication for every request.
-    It runs before any of your page code, preventing unauthorized access
-    at the earliest possible moment.
     """
     async def dispatch(self, request: Request, call_next):
-        # Allow NiceGUI's internal routes to pass through unrestricted
-        if request.url.path.startswith('/_nicegui'):
+        if request.url.path.startswith('/_nicegui') or request.url.path in unrestricted_page_routes:
             return await call_next(request)
 
-        # Allow access to pages specifically marked as unrestricted
-        if request.url.path in unrestricted_page_routes:
-            return await call_next(request)
-
-        # For all other pages, check if the user is authenticated in their session
         if not app.storage.user.get('authenticated', False):
-            # If not authenticated, redirect to the login page
             return RedirectResponse(f'/login?redirect_to={request.url.path}')
 
-        # If authenticated, proceed to the requested page
         return await call_next(request)
 
-# Add the middleware to the NiceGUI application
 app.add_middleware(AuthMiddleware)
 
 # ---------------------------------------------------------------------
 # 2. YOUR ORIGINAL APPLICATION CLASS
-# This remains the same as in your original project.
 # ---------------------------------------------------------------------
 
 class Application:
@@ -123,12 +109,9 @@ class Application:
 
 # ---------------------------------------------------------------------
 # 3. APPLICATION ENTRY POINTS AND SHUTDOWN
-# The main UI is now built only *after* authentication is confirmed.
 # ---------------------------------------------------------------------
 
 app_instance = None
-
-# Create a single APIClient instance to be shared across the application
 api_singleton = APIClient(config.API_BASE_URL)
 
 @ui.page('/')
@@ -138,8 +121,7 @@ def main_page_entry():
     The AuthMiddleware ensures this function only runs if the user is logged in.
     """
     global app_instance
-    ui.context.client.clear()
-    # Pass the shared API client to the main application
+    # THE FIX IS HERE: The incorrect line 'ui.context.client.clear()' has been removed.
     app_instance = Application(api_client=api_singleton)
     app_instance.create_header()
     app_instance.create_views()
@@ -152,16 +134,12 @@ async def shutdown_handler():
     global app_instance
     if app_instance:
         await app_instance.cleanup()
-    # The login page's client is the same singleton, so it will be closed by the cleanup above.
-    # If the user never logs in, we still need to close it.
     elif not api_singleton.client is None:
          await api_singleton.close()
-
 
 app.on_shutdown(shutdown_handler)
 
 if __name__ in {"__main__", "__mp_main__"}:
-    # IMPORTANT: A storage_secret is required for secure, encrypted user sessions.
     ui.run(
         host=config.APP_HOST,
         port=config.APP_PORT,
