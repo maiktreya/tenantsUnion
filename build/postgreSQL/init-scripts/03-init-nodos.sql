@@ -7,6 +7,7 @@ SET search_path TO sindicato_inq, public;
 
 DROP TABLE IF EXISTS sindicato_inq.nodos;
 DROP TABLE IF EXISTS sindicato_inq.nodos_cp_mapping;
+
 CREATE TABLE sindicato_inq.nodos (
     id SERIAL PRIMARY KEY,
     nombre TEXT UNIQUE NOT NULL,

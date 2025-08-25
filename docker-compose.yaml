@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:15
+    image: postgres:17
     ports:
       - "5432:5432"
     environment:
@@ -43,7 +43,7 @@ services:
     command: >
       sh -c "
         pip install --root-user-action=ignore --upgrade pip  &&
-        pip install --root-user-action=ignore nicegui httpx  &&
+        pip install --root-user-action=ignore nicegui httpx passlib  &&
         python main.py
       "
     depends_on:

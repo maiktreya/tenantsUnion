@@ -237,6 +237,16 @@ CREATE TABLE staging_usuarios (
     grupos TEXT,
     roles TEXT
 );
+-- =====================================================================
+-- PARTE B.1: MEJORA DE LA TABLA DE USUARIOS
+-- =====================================================================
+-- Se añaden campos para el estado del usuario.
+ALTER TABLE usuarios
+ADD COLUMN is_active BOOLEAN DEFAULT TRUE,
+ADD COLUMN created_at TIMESTAMP
+WITH
+    TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+
 
 -- 2.2. Copiar datos desde CSV
 COPY staging_afiliadas

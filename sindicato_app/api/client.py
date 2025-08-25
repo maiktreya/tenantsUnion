@@ -3,22 +3,32 @@ import httpx
 from nicegui import ui
 
 class APIClient:
-    """PostgREST API client with singleton pattern"""
+    """PostgREST API client with a more robust singleton pattern."""
 
     _instance = None
+    _initialized = False # Add an initialization flag
 
-    def __new__(cls, base_url: str):
+    def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.base_url = base_url
-            cls._instance.client = None
         return cls._instance
 
+    def __init__(self, base_url: str):
+        # The __init__ method is called every time you do APIClient(),
+        # so we use a flag to ensure it only runs once.
+        if self._initialized:
+            return
+        self.base_url = base_url
+        self.client: Optional[httpx.AsyncClient] = None
+        self._initialized = True
+
+
     def _ensure_client(self) -> httpx.AsyncClient:
-        if self.client is None:
+        if self.client is None or self.client.is_closed:
             self.client = httpx.AsyncClient(timeout=30.0)
         return self.client
 
+    # ... all other methods (get_records, create_record, etc.) remain exactly the same ...
     async def get_records(
         self,
         table: str,
@@ -52,8 +62,23 @@ class APIClient:
 
     async def get_record(self, table: str, record_id: int) -> Optional[Dict]:
         """Get a single record by ID"""
-        records = await self.get_records(table, {'id': f'eq.{record_id}'})
-        return records[0] if records else None
+        # This implementation can be slightly optimized
+        # records = await self.get_records(table, {'id': f'eq.{record_id}'})
+        # return records[0] if records else None
+        client = self._ensure_client()
+        url = f"{self.base_url}/{table}"
+        params = {'id': f'eq.{record_id}'}
+        try:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            records = response.json()
+            return records[0] if records else None
+        except httpx.HTTPStatusError as e:
+            ui.notify(f'Error HTTP {e.response.status_code}: {e.response.text}', type='negative')
+            return None
+        except Exception as e:
+            ui.notify(f'Error al obtener registro: {str(e)}', type='negative')
+            return None
 
     async def create_record(self, table: str, data: Dict) -> Optional[Dict]:
         """Create a new record"""
@@ -73,6 +98,9 @@ class APIClient:
     async def update_record(self, table: str, record_id: int, data: Dict) -> Optional[Dict]:
         """Update an existing record"""
         client = self._ensure_client()
+        # The primary key column might not always be 'id'.
+        # A more robust implementation could fetch this from TABLE_INFO
+        # but for now, this is fine.
         url = f"{self.base_url}/{table}?id=eq.{record_id}"
         headers = {"Prefer": "return=representation"}
 
@@ -100,6 +128,6 @@ class APIClient:
 
     async def close(self):
         """Close the HTTP client"""
-        if self.client:
+        if self.client and not self.client.is_closed:
             await self.client.aclose()
             self.client = None

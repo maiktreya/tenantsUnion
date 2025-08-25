@@ -1,48 +1,42 @@
--- =====================================================================
--- PARTE B.1: MEJORA DE LA TABLA DE USUARIOS
--- =====================================================================
--- Se añaden campos para el estado del usuario.
-ALTER TABLE usuarios
-ADD COLUMN is_active BOOLEAN DEFAULT TRUE,
-ADD COLUMN created_at TIMESTAMP
-WITH
-    TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+-- Create the dedicated schema for authentication
+CREATE SCHEMA IF NOT EXISTS auth;
+SET search_path TO auth, sindicato_inq, public;
 
--- =====================================================================
--- PARTE B.2: TABLA DE CREDENCIALES
--- =====================================================================
--- Almacena de forma segura los hashes de las contraseñas, separada de
--- la información personal del usuario.
-CREATE TABLE usuario_credenciales (
-    usuario_id INTEGER PRIMARY KEY REFERENCES usuarios (id) ON DELETE CASCADE,
-    password_hash TEXT NOT NULL
+-- Move the tables into the 'auth' schema
+CREATE TABLE auth.usuario_credenciales (
+    -- This foreign key now needs to explicitly reference the main schema
+    usuario_id INTEGER PRIMARY KEY REFERENCES sindicato_inq.usuarios(id) ON DELETE CASCADE,
+    -- Default hashed password for "12345678" using bcrypt with cost factor 12
+    password_hash TEXT DEFAULT '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBdXfs2E4Y0Q5W'
 );
 
--- =====================================================================
--- PARTE B.3: GESTIÓN DE ROLES Y PERMISOS
--- =====================================================================
--- La tabla 'roles' define los niveles de permiso en la aplicación.
-CREATE TABLE roles (
+CREATE TABLE auth.roles (
     id SERIAL PRIMARY KEY,
     nombre TEXT UNIQUE NOT NULL,
     descripcion TEXT
 );
 
--- La tabla 'usuario_roles' asigna roles a los usuarios (relación N:M).
-CREATE TABLE usuario_roles (
-    usuario_id INTEGER REFERENCES usuarios (id) ON DELETE CASCADE,
-    role_id INTEGER REFERENCES roles (id) ON DELETE CASCADE,
+CREATE TABLE auth.usuario_roles (
+    -- Also references the main schema
+    usuario_id INTEGER REFERENCES sindicato_inq.usuarios(id) ON DELETE CASCADE,
+    role_id INTEGER REFERENCES auth.roles(id) ON DELETE CASCADE,
     PRIMARY KEY (usuario_id, role_id)
 );
 
 -- Índices para optimizar las uniones.
-CREATE INDEX idx_usuario_roles_usuario_id ON usuario_roles (usuario_id);
+CREATE INDEX idx_usuario_roles_usuario_id ON auth.usuario_roles (usuario_id);
+CREATE INDEX idx_usuario_roles_role_id ON auth.usuario_roles (role_id);
 
-CREATE INDEX idx_usuario_roles_role_id ON usuario_roles (role_id);
+
+
+-- If you want to populate credentials for existing users with the default password:
+INSERT INTO auth.usuario_credenciales (usuario_id)
+SELECT id FROM sindicato_inq.usuarios
+WHERE id NOT IN (SELECT usuario_id FROM auth.usuario_credenciales);
 
 -- Ejemplo de inserción de datos (a modo de demostración)
--- INSERT INTO roles (nombre, descripcion) VALUES ('admin', 'Administrador con todos los permisos');
--- INSERT INTO roles (nombre, descripcion) VALUES ('gestor', 'Gestor de conflictos y afiliadas');
+INSERT INTO auth.roles (nombre, descripcion) VALUES ('admin', 'Administrador con todos los permisos');
+INSERT INTO auth.roles (nombre, descripcion) VALUES ('gestor', 'Gestor de conflictos y afiliadas');
 
 -- Para asignar el rol 'admin' al usuario con id 1:
--- INSERT INTO usuario_roles (usuario_id, role_id) VALUES (1, 1);
+-- INSERT INTO auth.usuario_roles (usuario_id, role_id) VALUES (1, 1);
