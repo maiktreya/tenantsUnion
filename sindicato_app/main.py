@@ -85,8 +85,6 @@ class Application:
 
                 # Role-aware navigation buttons
                 with ui.row().classes("gap-2"):
-                    ui.button("Inicio", on_click=lambda: self.show_view("home")).props("flat color=red-600")
-
                     if self.has_role('admin', 'sistemas'):
                         ui.button("admin BBDD", on_click=lambda: self.show_view("admin")).props("flat color=red-600")
 
