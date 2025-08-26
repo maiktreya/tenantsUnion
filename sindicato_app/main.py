@@ -168,7 +168,7 @@ async def shutdown_handler():
 # ---------------------------------------------------------------------
 
 if __name__ in {"__main__", "__mp_main__"}:
-    storage_secret = os.environ.get('NICEGUI_STORAGE_SECRET', 'CHANGE_THIS_TO_A_LONG_AND_RANDOM_SECRET_KEY')
+    storage_secret = os.environ.get('NICEGUI_STORAGE_SECRET', 'QTEGUR912430I10U')
 
     ui.run(
         host=config.APP_HOST,
