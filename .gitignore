@@ -11,6 +11,7 @@ __pycache__/
 .venv
 .vscode
 
-# other local folders
+# other local folders & files
 back
 dev
+utils/debuggger_main.py
