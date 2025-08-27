@@ -75,7 +75,7 @@ class ConflictsView:
             if self.conflict_select:
                 self.conflict_select.set_options(options)
 
-            ui.notify(f"Se cargaron {len(conflicts)} conflictos", type="positive")
+            # ui.notify(f"Se cargaron {len(conflicts)} conflictos", type="positive")
         except Exception as e:
             ui.notify(f"Error al cargar conflictos: {str(e)}", type="negative")
 

@@ -74,7 +74,7 @@ class UserManagementView:
             self.roles_list = await self.api.get_records('roles', order='nombre.asc')
 
             self._display_users()
-            ui.notify(f'Se cargaron {len(self.users_list)} usuarios y {len(self.roles_list)} roles', type='positive')
+            # ui.notify(f'Se cargaron {len(self.users_list)} usuarios y {len(self.roles_list)} roles', type='positive')
         except Exception as e:
             ui.notify(f'Error al cargar datos: {str(e)}', type='negative')
 
