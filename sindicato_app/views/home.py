@@ -42,6 +42,14 @@ class HomeView:
                     on_click=lambda: self.navigate("conflicts"),
                 )
 
+                # New User Management card
+                self._create_card(
+                    icon="people",
+                    title="Gestión de Usuarios",
+                    description="Crear usuarios y administrar roles del sistema",
+                    on_click=lambda: self.navigate("user_management"),
+                )
+
         return container
 
     def _create_card(self, icon: str, title: str, description: str, on_click: Callable):

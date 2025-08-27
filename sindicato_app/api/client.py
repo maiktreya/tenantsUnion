@@ -73,7 +73,15 @@ class APIClient:
     async def update_record(self, table: str, record_id: int, data: Dict) -> Optional[Dict]:
         """Update an existing record"""
         client = self._ensure_client()
-        url = f"{self.base_url}/{table}?id=eq.{record_id}"
+
+        # Handle special case for tables with different primary key names
+        if table == 'usuario_credenciales':
+            url = f"{self.base_url}/{table}?usuario_id=eq.{record_id}"
+        elif table == 'nodos_cp_mapping':
+            url = f"{self.base_url}/{table}?cp=eq.{record_id}"
+        else:
+            url = f"{self.base_url}/{table}?id=eq.{record_id}"
+
         headers = {"Prefer": "return=representation"}
 
         try:

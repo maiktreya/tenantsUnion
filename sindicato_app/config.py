@@ -59,7 +59,6 @@ TABLE_INFO = {
         "id_field": "id",
         "relations": {
             "empresa_id": {"view": "empresas", "display_field": "nombre"},
-            # ENHANCEMENT: Added relation to the new nodos table
             "nodo_id": {"view": "nodos", "display_field": "nombre"},
         },
         "child_relations": {"table": "pisos", "foreign_key": "bloque_id"},
@@ -78,8 +77,36 @@ TABLE_INFO = {
         "child_relations": [
             {"table": "asesorias", "foreign_key": "tecnica_id"},
             {"table": "conflictos", "foreign_key": "usuario_responsable_id"},
+            # --- NEWLY ADDED CHILD RELATIONS ---
+            {"table": "usuario_credenciales", "foreign_key": "usuario_id"},
+            {"table": "usuario_roles", "foreign_key": "usuario_id"},
         ],
     },
+    # --- NEWLY ADDED TABLES FOR AUTHENTICATION ---
+    "roles": {
+        "display_name": "Roles de Usuario",
+        "id_field": "id",
+        "child_relations": {
+            "table": "usuario_roles",
+            "foreign_key": "role_id"
+        },
+    },
+    "usuario_roles": {
+        "display_name": "Roles Asignados",
+        "id_field": "usuario_id,role_id", # Composite primary key
+        "relations": {
+            "usuario_id": {"view": "usuarios", "display_field": "alias"},
+            "role_id": {"view": "roles", "display_field": "nombre"},
+        },
+    },
+    "usuario_credenciales": {
+        "display_name": "Credenciales de Usuario",
+        "id_field": "usuario_id",
+        "relations": {
+            "usuario_id": {"view": "usuarios", "display_field": "alias"}
+        },
+    },
+    # --- END OF NEW TABLES ---
     "afiliadas": {
         "display_name": "Afiliadas",
         "id_field": "id",
@@ -124,7 +151,7 @@ TABLE_INFO = {
         "id_field": "id",
         "relations": {
             "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
+            # The 'afiliada_id' is not a direct foreign key in the final schema, so it's removed.
         },
     },
     "solicitudes": {
@@ -144,8 +171,8 @@ VIEW_INFO = {
     "v_diario_conflictos_con_afiliada": {
         "display_name": "Diario de Conflictos con Info de Afiliada"
     },
-    # ENHANCEMENT: Added the new view for conflicts with nodo info
-    "v_conflictos_con_nodo": {"display_name": "Conflictos con Info de Nodo"},
+    # ENHANCEMENT: Added the new view for conflicts with nodo info (if it exists)
+    # "v_conflictos_con_nodo": {"display_name": "Conflictos con Info de Nodo"},
 }
 
 config = Config()

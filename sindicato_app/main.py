@@ -14,6 +14,8 @@ from views.admin import AdminView
 from views.views_explorer import ViewsExplorerView
 from views.conflicts import ConflictsView
 from auth.login import create_login_page
+from auth.user_management import UserManagementView
+from auth.user_profile import UserProfileView
 
 # ---------------------------------------------------------------------
 # 1. AUTHENTICATION MIDDLEWARE
@@ -87,11 +89,12 @@ class Application:
                 with ui.row().classes("gap-2"):
                     if self.has_role('admin', 'sistemas'):
                         ui.button("admin BBDD", on_click=lambda: self.show_view("admin")).props("flat color=red-600")
-
-                    ui.button("Vistas", on_click=lambda: self.show_view("views")).props("flat color=red-600")
+                        ui.button("admin Usuarios", on_click=lambda: self.show_view("user_management")).props("flat color=red-600")
 
                     if self.has_role('admin', 'gestor', 'sistemas'):
+                        ui.button("Vistas", on_click=lambda: self.show_view("views")).props("flat color=red-600")
                         ui.button("Conflictos", on_click=lambda: self.show_view("conflicts")).props("flat color=red-600")
+
 
                 ui.space()
 
@@ -99,7 +102,10 @@ class Application:
                 with ui.row().classes('items-center'):
                     username = app.storage.user.get('username', '...')
                     roles = ", ".join(app.storage.user.get('roles', []))
-                    ui.label(f"User: {username} ({roles})").classes('mr-2 text-gray-600 text-xs')
+
+                    with ui.element().classes('cursor-pointer hover:bg-gray-100 px-2 py-1 rounded').on('click', lambda: self.show_view('user_profile')):
+                        ui.label(f"User: {username} ({roles})").classes('mr-2 text-gray-600 text-xs')
+                        ui.icon('person', size='sm').classes('text-gray-500').tooltip('Ver mi perfil')
 
                     def logout():
                         app.storage.user.clear()
@@ -113,9 +119,13 @@ class Application:
             # HomeView constructor takes only one argument, so we don't pass roles here.
             self.views["home"] = HomeView(self.show_view)
             self.views["views"] = ViewsExplorerView(self.api_client)
+        # ADD THIS LINE - All users can access their profile
+            self.views["user_profile"] = UserProfileView(self.api_client)
 
             if self.has_role('admin', 'sistemas'):
                 self.views["admin"] = AdminView(self.api_client)
+                self.views["user_management"] = UserManagementView(self.api_client)
+
             if self.has_role('admin', 'gestor', 'sistemas'):
                 self.views["conflicts"] = ConflictsView(self.api_client)
 
