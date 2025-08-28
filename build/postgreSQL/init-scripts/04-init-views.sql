@@ -58,37 +58,6 @@ FROM conflictos c
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id;
 
 -- View for diary entries with the affiliate's full name
--- Note: It assumes 'afectada' stores the affiliate's ID as text.
-CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
-SELECT
-    d.*,
-    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo
-FROM
-    diario_conflictos d
-LEFT JOIN
-    afiliadas a ON d.afectada::integer = a.id;
-
-CREATE OR REPLACE VIEW v_conflictos_con_afiliada AS
-SELECT
-    c.*,
-    -- Concatenate the affiliate's first and last names for a full name.
-    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
-
-    -- Get the alias of the user responsible for the conflict.
-    u.alias AS usuario_responsable_alias,
-
-    -- Get the name of the territorial node associated with the conflict's location.
-    n.nombre AS nodo_nombre
-FROM
-    conflictos c
-    -- Join to get affiliate information.
-    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
-    -- Join to get the name of the user responsible.
-    LEFT JOIN usuarios u ON c.usuario_responsable_id = u.id
-    -- Join path to find the territorial node.
-    LEFT JOIN pisos p ON a.piso_id = p.id
-    LEFT JOIN bloques b ON p.bloque_id = b.id
-    LEFT JOIN nodos n ON b.nodo_id = n.id;
 
 CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
 SELECT
@@ -96,11 +65,11 @@ SELECT
     -- Get the full name of the affiliate related to the conflict.
     a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
 
-    -- Get the alias of the user who created the diary entry.
-    u.alias AS autor_nota_alias,
+-- Get the alias of the user who created the diary entry.
+u.alias AS autor_nota_alias,
 
-    -- Get the name of the action performed.
-    ac.nombre AS accion_nombre
+-- Get the name of the action performed.
+ac.nombre AS accion_nombre
 FROM
     diario_conflictos d
     -- Join to get the conflict (and from there, the affiliate).
@@ -115,14 +84,14 @@ SELECT
     -- Get the full name of the affiliate involved in the conflict.
     a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
 
-    -- Get the alias of the user responsible for managing the conflict.
-    u.alias AS usuario_responsable_alias,
+-- Get the alias of the user responsible for managing the conflict.
+u.alias AS usuario_responsable_alias,
 
-    -- Get the name of the territorial node associated with the conflict's location.
-    n.nombre AS nodo_nombre,
+-- Get the name of the territorial node associated with the conflict's location.
+n.nombre AS nodo_nombre,
 
-    -- Include the full address of the property for context.
-    p.direccion AS direccion_piso
+-- Include the full address of the property for context.
+p.direccion AS direccion_piso
 FROM
     sindicato_inq.conflictos c
     -- Join path to find the territorial node from the conflict.
@@ -131,4 +100,60 @@ FROM
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
     LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id
     -- Join to get the user responsible for the conflict.
+    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
+
+-- Create an enhanced view that includes all the information we need
+CREATE OR REPLACE VIEW sindicato_inq.v_conflictos_enhanced AS
+SELECT c.id, c.estado, c.ambito, c.causa, c.fecha_apertura, c.fecha_cierre, c.descripcion, c.resolucion, c.afiliada_id, c.usuario_responsable_id,
+
+-- Afiliada info
+a.nombre AS afiliada_nombre,
+a.apellidos AS afiliada_apellidos,
+CONCAT(a.nombre, ' ', a.apellidos) AS afiliada_nombre_completo,
+a.num_afiliada,
+
+-- Piso info
+p.id AS piso_id,
+p.direccion AS piso_direccion,
+p.municipio AS piso_municipio,
+p.cp AS piso_cp,
+
+-- Bloque info
+b.id AS bloque_id, b.direccion AS bloque_direccion,
+
+-- Nodo info (from both sources - direct bloque relation and CP mapping)
+COALESCE(n1.id, n2.id) AS nodo_id,
+COALESCE(n1.nombre, n2.nombre) AS nodo_nombre,
+
+-- Usuario responsable
+u.alias AS usuario_responsable_alias,
+
+-- Create a comprehensive label for selection
+CONCAT(
+    'ID ',
+    c.id,
+    ' - ',
+    COALESCE(
+        p.direccion,
+        b.direccion,
+        'Sin dirección'
+    ),
+    ' | ',
+    COALESCE(
+        a.nombre || ' ' || a.apellidos,
+        'Sin afiliada'
+    ),
+    CASE
+        WHEN c.estado IS NOT NULL THEN ' [' || c.estado || ']'
+        ELSE ''
+    END
+) AS conflict_label
+FROM
+    sindicato_inq.conflictos c
+    LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
+    LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
+    LEFT JOIN sindicato_inq.nodos n1 ON b.nodo_id = n1.id
+    LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id
     LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;

@@ -96,15 +96,15 @@ CREATE TABLE asesorias (
 -- ✅ MEJORA: Se elimina la columna redundante `afectada`.
 CREATE TABLE conflictos (
     id SERIAL PRIMARY KEY,
+    afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
+    usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
     estado TEXT DEFAULT NULL,
     ambito TEXT,
     causa TEXT,
     fecha_apertura DATE,
     fecha_cierre DATE,
     descripcion TEXT,
-    resolucion TEXT,
-    afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
-    usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL
+    resolucion TEXT
 );
 
 -- Create the new table to store the types of actions.
@@ -116,14 +116,14 @@ CREATE TABLE acciones (
 
 CREATE TABLE diario_conflictos (
     id SERIAL PRIMARY KEY,
-    conflicto_id INTEGER NOT NULL REFERENCES conflictos(id) ON DELETE CASCADE,
-    accion_id INTEGER REFERENCES acciones(id) ON DELETE SET NULL,
+    conflicto_id INTEGER NOT NULL REFERENCES conflictos (id) ON DELETE CASCADE,
+    usuario_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
+    accion_id INTEGER REFERENCES acciones (id) ON DELETE SET NULL,
     estado TEXT,
     ambito TEXT,
     notas TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
 
 -- =====================================================================
 -- PARTE 1.5: CREACIÓN DE ÍNDICES PARA MEJORAR EL RENDIMIENTO
@@ -131,17 +131,28 @@ CREATE TABLE diario_conflictos (
 -- ✅ MEJORA: Se añaden índices a todas las claves foráneas.
 
 CREATE INDEX idx_empresas_entramado_id ON empresas (entramado_id);
+
 CREATE INDEX idx_bloques_empresa_id ON bloques (empresa_id);
+
 CREATE INDEX idx_pisos_bloque_id ON pisos (bloque_id);
+
 CREATE INDEX idx_afiliadas_piso_id ON afiliadas (piso_id);
+
 CREATE INDEX idx_facturacion_afiliada_id ON facturacion (afiliada_id);
+
 CREATE INDEX idx_asesorias_afiliada_id ON asesorias (afiliada_id);
+
 CREATE INDEX idx_asesorias_tecnica_id ON asesorias (tecnica_id);
+
 CREATE INDEX idx_conflictos_afiliada_id ON conflictos (afiliada_id);
+
 CREATE INDEX idx_conflictos_usuario_responsable_id ON conflictos (usuario_responsable_id);
-CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos(conflicto_id);
-CREATE INDEX idx_diario_conflictos_accion_id ON diario_conflictos(accion_id);
-CREATE INDEX idx_diario_conflictos_usuario_id ON diario_conflictos(usuario_id);
+
+CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
+
+CREATE INDEX idx_diario_conflictos_accion_id ON diario_conflictos (accion_id);
+
+CREATE INDEX idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 -- =====================================================================
 -- PARTE 2: LÓGICA DE IMPORTACIÓN CON TABLAS STAGING
 -- (El proceso de staging no se modifica para no romper la importación)
@@ -243,7 +254,6 @@ ADD COLUMN is_active BOOLEAN DEFAULT TRUE,
 ADD COLUMN created_at TIMESTAMP
 WITH
     TIME ZONE DEFAULT CURRENT_TIMESTAMP;
-
 
 -- 2.2. Copiar datos desde CSV
 COPY staging_afiliadas
