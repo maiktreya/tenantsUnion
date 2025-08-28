@@ -52,17 +52,19 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - POSTGREST_API_URL=${POSTGRES_API_URL}
-
   nginx:
     image: nginx:latest
     profiles:
       - Secured
+    # ADD THIS ENVIRONMENT SECTION
+    environment:
+      - HOSTNAME=${HOSTNAME}
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./build/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
-      # CORRECTED VOLUME: Point to the parent certbot directory
+      # This path should be the parent certbot directory
       - ./build/nginx/certbot:/etc/letsencrypt
       - ./build/nginx/certbot/www:/var/www/certbot
     command: >

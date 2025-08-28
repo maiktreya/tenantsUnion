@@ -44,9 +44,6 @@ echo "-> Allowing SSH connections on port $SSH_PORT..."
 echo "-> Allowing HTTP traffic on port 80..."
  ufw allow 80/tcp comment 'Allow HTTP traffic for Nginx'
 
-echo "-> Allowing HTTP traffic on port 8081..."
- ufw allow 8081/tcp comment 'Allow SSH traffic for Nginx' # for testing without HTTPS
-
 echo "-> Allowing HTTPS traffic on port 443..."
  ufw allow 443/tcp comment 'Allow HTTPS traffic for Nginx'
 
