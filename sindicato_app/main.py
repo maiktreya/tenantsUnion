@@ -74,10 +74,11 @@ class Application:
             container.visible = (name == view_name)
 
     def create_header(self):
-        """Creates the header with role-based navigation."""
-        with ui.header().classes("bg-white shadow-lg"):
+        """Creates the header with role-based navigation and adds hide-on-scroll logic."""
+
+        # --- HEADER WITH ID ---
+        with ui.header().classes("bg-white shadow-lg").props('id=main-header'):
             with ui.row().classes("w-full items-center p-2 gap-4"):
-                # Corrected logo rendering with a context manager
                 with ui.element("div").classes("w-1/5 min-w-[200px] max-w-[280px] cursor-pointer").on("click", lambda: self.show_view("home")):
                     ui.image("/assets/images/logo.png")
 
@@ -85,7 +86,6 @@ class Application:
                 ui.label("Sistema de Gestión").classes("text-xl font-italic text-gray-400")
                 ui.space()
 
-                # Role-aware navigation buttons
                 with ui.row().classes("gap-2"):
                     if self.has_role('admin', 'sistemas'):
                         ui.button("admin BBDD", on_click=lambda: self.show_view("admin")).props("flat color=red-600")
@@ -95,10 +95,8 @@ class Application:
                         ui.button("Vistas", on_click=lambda: self.show_view("views")).props("flat color=red-600")
                         ui.button("Conflictos", on_click=lambda: self.show_view("conflicts")).props("flat color=red-600")
 
-
                 ui.space()
 
-                # User info and logout
                 with ui.row().classes('items-center'):
                     username = app.storage.user.get('username', '...')
                     roles = ", ".join(app.storage.user.get('roles', []))
@@ -113,13 +111,43 @@ class Application:
 
                     ui.button(on_click=logout, icon='logout').props('flat dense round color=red-600').tooltip('Cerrar sesión')
 
+        # --- HEADER HIDE-ON-SCROLL CSS ---
+        ui.add_head_html("""
+        <style>
+        #main-header {
+            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+            z-index: 100;
+            position: sticky;
+            top: 0;
+        }
+        .hide-on-scroll {
+            transform: translateY(-100%);
+        }
+        </style>
+        """)
+
+        # --- HEADER HIDE-ON-SCROLL JAVASCRIPT ---
+        ui.run_javascript("""
+        let lastScroll = 0;
+        const header = document.getElementById('main-header');
+        window.addEventListener('scroll', function() {
+            const currScroll = window.scrollY;
+            if (currScroll > lastScroll && currScroll > 50) {
+                // Scrolling down
+                header.classList.add('hide-on-scroll');
+            } else {
+                // Scrolling up
+                header.classList.remove('hide-on-scroll');
+            }
+            lastScroll = currScroll;
+        });
+        """)
+
     def create_views(self):
         """Creates only the application views authorized for the current user's role."""
         try:
-            # HomeView constructor takes only one argument, so we don't pass roles here.
             self.views["home"] = HomeView(self.show_view)
             self.views["views"] = ViewsExplorerView(self.api_client)
-        # ADD THIS LINE - All users can access their profile
             self.views["user_profile"] = UserProfileView(self.api_client)
 
             if self.has_role('admin', 'sistemas'):
@@ -132,7 +160,6 @@ class Application:
             with ui.column().classes("w-full min-h-screen bg-gray-50"):
                 for name, view in self.views.items():
                     self.view_containers[name] = container = ui.column().classes("w-full")
-                    # Initially hide all containers except the one we will show
                     container.visible = False
                     with container:
                         view.create()
@@ -140,7 +167,6 @@ class Application:
             self.show_view("home")
         except Exception as e:
             ui.notify(f"Error fatal al crear las vistas: {e}", type='negative')
-
 
     async def cleanup(self):
         """Closes the API client on shutdown."""
@@ -164,7 +190,6 @@ def main_page_entry():
 
 create_login_page(api_client=api_singleton)
 
-# Using the cleaner decorator syntax for the shutdown handler
 @app.on_shutdown
 async def shutdown_handler():
     """Handle application shutdown gracefully."""
