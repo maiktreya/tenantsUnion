@@ -21,6 +21,7 @@
 set -e # Exit immediately if a command exits with a non-zero status.
 
 # --- Variables ---
+IP=135.181.155.12
 DOMAIN=$1
 EMAIL=$2
 PROJECT_DIR="tenantsUnion"
