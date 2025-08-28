@@ -33,7 +33,7 @@ class BaseTableState:
         # A list of tuples: (column_name, ascending_boolean)
         self.sort_criteria: List[Tuple[str, bool]] = []
         self.current_page = ReactiveValue(1)
-        self.page_size = ReactiveValue(10)
+        self.page_size = ReactiveValue(5)
 
         # UI element references
         self.filter_container = None
