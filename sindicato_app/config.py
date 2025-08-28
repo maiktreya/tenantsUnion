@@ -167,6 +167,7 @@ VIEW_INFO = {
     "v_conflictos_con_afiliada": {"display_name": "Conflictos con Info de Afiliada"},
     "v_diario_conflictos_con_afiliada": {"display_name": "Diario de Conflictos con Info de Afiliada"},
     "v_conflictos_con_nodo": {"display_name": "Diario de Conflictos con Info para Nodos"},
+    "v_conflictos_enhanced": {"display_name": "Conflictos con Info Completa y Nodos"},
 }
 
 config = Config()

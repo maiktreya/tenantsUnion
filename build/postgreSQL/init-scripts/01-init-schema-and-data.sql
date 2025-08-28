@@ -113,46 +113,17 @@ CREATE TABLE acciones (
     nombre TEXT UNIQUE NOT NULL,
     descripcion TEXT -- An optional field for more details if needed in the future.
 );
----- ✅ MEJORA: Las entradas del diario se eliminan si se elimina el conflicto.
---CREATE TABLE diario_conflictos (
---    id SERIAL PRIMARY KEY,
---    estado TEXT DEFAULT NULL,
---    ambito TEXT,
---    afectada TEXT,
---    causa TEXT,
---    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
---    conflicto_id INTEGER REFERENCES conflictos (id) ON DELETE CASCADE
---);
--- =====================================================================
--- SUGGESTED UPDATE FOR: diario_conflictos
--- =====================================================================
--- This version corrects the data types, adds foreign key constraints for
--- data integrity, and includes a field to track the author of the note.
 
--- The final, complete definition for the conflict diary table.
 CREATE TABLE diario_conflictos (
     id SERIAL PRIMARY KEY,
-
-    -- Foreign key to the main conflict entry.
     conflicto_id INTEGER NOT NULL REFERENCES conflictos(id) ON DELETE CASCADE,
-
-    -- Foreign key to the new 'acciones' table to categorize the entry.
     accion_id INTEGER REFERENCES acciones(id) ON DELETE SET NULL,
-
-    -- Fields to track the state of the conflict at the time of this entry.
     estado TEXT,
     ambito TEXT,
-
-    -- The main content of the note or update.
     notas TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos(conflicto_id);
-CREATE INDEX idx_diario_conflictos_accion_id ON diario_conflictos(accion_id);
-CREATE INDEX idx_diario_conflictos_usuario_id ON diario_conflictos(usuario_id);
-
--- Add indexes for faster lookups on foreign keys.
 
 -- =====================================================================
 -- PARTE 1.5: CREACIÓN DE ÍNDICES PARA MEJORAR EL RENDIMIENTO

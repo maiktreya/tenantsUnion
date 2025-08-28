@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Dict
 from nicegui import ui
 from api.client import APIClient
 from state.conflicts_state import ConflictsState
@@ -6,7 +6,7 @@ from components.dialogs import ConflictNoteDialog
 
 
 class ConflictsView:
-    """Conflicts management view"""
+    """Enhanced conflicts management view with address display and node filtering"""
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
@@ -14,40 +14,91 @@ class ConflictsView:
         self.conflict_select = None
         self.info_container = None
         self.history_container = None
+        self.all_conflicts = []  # Store all conflicts for filtering
+        self.filtered_conflicts = []  # Store filtered results
+        self.nodos_list = []  # Store available nodes
+        self.filter_nodo = None
+        self.filter_estado = None
+        self.filter_text = None
 
     def create(self) -> ui.column:
-        """Create the conflicts view UI"""
+        """Create the enhanced conflicts view UI"""
         container = ui.column().classes("w-full p-4 gap-4")
 
         with container:
-            ui.label("Toma de actas").classes("text-h4")
+            ui.label("Toma de Actas - Gestión de Conflictos").classes("text-h4")
+
+            # Filter Section
+            with ui.expansion("Filtros", icon="filter_list").classes("w-full mb-4").props("default-opened"):
+                with ui.row().classes("w-full gap-4 flex-wrap"):
+                    # Node filter
+                    self.filter_nodo = ui.select(
+                        options={},
+                        label="Filtrar por Nodo",
+                        on_change=self._apply_filters,
+                        clearable=True
+                    ).classes("w-64")
+
+                    # State filter
+                    self.filter_estado = ui.select(
+                        options={
+                            "": "Todos los estados",
+                            "Abierto": "Abierto",
+                            "En proceso": "En proceso",
+                            "Resuelto": "Resuelto",
+                            "Cerrado": "Cerrado"
+                        },
+                        label="Filtrar por Estado",
+                        value="",
+                        on_change=self._apply_filters
+                    ).classes("w-48")
+
+                    # Text search
+                    self.filter_text = ui.input(
+                        label="Buscar en dirección o descripción",
+                        on_change=self._apply_filters
+                    ).classes("w-64").props("clearable")
+
+                    # Clear filters button
+                    ui.button(
+                        "Limpiar Filtros",
+                        icon="clear_all",
+                        on_click=self._clear_filters
+                    ).props("flat color=orange-600")
 
             with ui.row().classes("w-full gap-4"):
                 # Left panel - Selection and info
                 with ui.column().classes("w-96 gap-4"):
-                    # Conflict selector
+                    # Conflict selector with enhanced display
                     with ui.row().classes("w-full gap-2"):
                         self.conflict_select = ui.select(
                             options={},
                             label="Seleccionar Conflicto",
-                            on_change=lambda e: ui.timer(
-                                0.1,
-                                lambda: self._on_conflict_change(e.value),
-                                once=True,
-                            ),
-                        ).classes("flex-grow")
+                            on_change=lambda e: self._on_conflict_change(e.value)
+                        ).classes("flex-grow").props("use-input")
 
                         ui.button(
                             icon="refresh",
-                            on_click=lambda: ui.timer(
-                                0.1, self._load_conflicts, once=True
-                            ),
+                            on_click=self._load_conflicts
                         ).props("flat")
 
-                    # Add note button
-                    ui.button(
-                        "Añadir Nota", icon="add_comment", on_click=self._add_note
-                    ).props("color=orange-600").classes("w-full")
+                    # Statistics card
+                    self.stats_card = ui.card().classes("w-full p-4")
+                    self._display_statistics()
+
+                    # Action buttons
+                    with ui.row().classes("w-full gap-2"):
+                        ui.button(
+                            "Añadir Nota",
+                            icon="add_comment",
+                            on_click=self._add_note
+                        ).props("color=orange-600").classes("flex-grow")
+
+                        ui.button(
+                            "Crear Conflicto",
+                            icon="add_circle",
+                            on_click=self._create_conflict
+                        ).props("color=green-600").classes("flex-grow")
 
                     # Conflict info container
                     self.info_container = ui.column().classes("w-full")
@@ -56,28 +107,181 @@ class ConflictsView:
                 with ui.column().classes("flex-grow"):
                     self.history_container = ui.column().classes("w-full gap-4")
 
-        # Load conflicts on startup
-        ui.timer(0.5, self._load_conflicts, once=True)
+        # Load data on startup
+        ui.timer(0.5, self._initialize_data, once=True)
 
         return container
 
-    async def _load_conflicts(self):
-        """Load all conflicts"""
+    async def _initialize_data(self):
+        """Initialize all necessary data"""
+        await self._load_nodos()
+        await self._load_conflicts()
+
+    async def _load_nodos(self):
+        """Load available nodes for filtering"""
         try:
-            # Fetch from the view that includes nodo information
+            nodos = await self.api.get_records("nodos", order="nombre.asc")
+            self.nodos_list = nodos
+
+            # Update filter options
+            nodo_options = {"": "Todos los nodos"}
+            for nodo in nodos:
+                nodo_options[nodo["id"]] = nodo["nombre"]
+
+            if self.filter_nodo:
+                self.filter_nodo.set_options(nodo_options)
+                self.filter_nodo.value = ""
+
+        except Exception as e:
+            ui.notify(f"Error al cargar nodos: {str(e)}", type="negative")
+
+    async def _load_conflicts(self):
+        """Load all conflicts with enhanced information"""
+        try:
+            # Use the enhanced view for complete information
             conflicts = await self.api.get_records(
-                "v_conflictos_con_nodo", order="id.desc"
+                "v_conflictos_enhanced",
+                order="id.desc"
             )
+
+            self.all_conflicts = conflicts
+            self.filtered_conflicts = conflicts
             self.state.set_conflicts(conflicts)
 
-            # Update select options
-            options = self.state.get_conflict_options()
-            if self.conflict_select:
-                self.conflict_select.set_options(options)
+            # Apply existing filters if any
+            await self._apply_filters()
 
-            # ui.notify(f"Se cargaron {len(conflicts)} conflictos", type="positive")
+            self._display_statistics()
+
         except Exception as e:
             ui.notify(f"Error al cargar conflictos: {str(e)}", type="negative")
+
+    def _get_conflict_options(self, conflicts: List[Dict]) -> Dict[int, str]:
+        """Generate conflict options with address for select dropdown"""
+        options = {}
+        for conflict in conflicts:
+            # Use the pre-computed label from the view, or build it
+            if conflict.get("conflict_label"):
+                label = conflict["conflict_label"]
+            else:
+                # Fallback label construction
+                conflict_id = conflict["id"]
+                direccion = (
+                    conflict.get("piso_direccion") or
+                    conflict.get("bloque_direccion") or
+                    "Sin dirección"
+                )
+                afiliada = conflict.get("afiliada_nombre_completo", "Sin afiliada")
+                estado = conflict.get("estado", "")
+
+                label = f"ID {conflict_id} - {direccion}"
+                if afiliada != "Sin afiliada":
+                    label += f" | {afiliada}"
+                if estado:
+                    label += f" [{estado}]"
+
+            options[conflict["id"]] = label
+
+        return options
+
+    async def _apply_filters(self):
+        """Apply all active filters to the conflicts list"""
+        filtered = self.all_conflicts.copy()
+
+        # Filter by node
+        if self.filter_nodo and self.filter_nodo.value:
+            nodo_id = self.filter_nodo.value
+            filtered = [
+                c for c in filtered
+                if c.get("nodo_id") == nodo_id
+            ]
+
+        # Filter by state
+        if self.filter_estado and self.filter_estado.value:
+            estado = self.filter_estado.value
+            filtered = [
+                c for c in filtered
+                if c.get("estado") == estado
+            ]
+
+        # Filter by text search
+        if self.filter_text and self.filter_text.value:
+            search_text = self.filter_text.value.lower()
+            filtered = [
+                c for c in filtered
+                if (
+                    search_text in str(c.get("piso_direccion", "")).lower() or
+                    search_text in str(c.get("bloque_direccion", "")).lower() or
+                    search_text in str(c.get("descripcion", "")).lower() or
+                    search_text in str(c.get("afiliada_nombre_completo", "")).lower() or
+                    search_text in str(c.get("causa", "")).lower()
+                )
+            ]
+
+        self.filtered_conflicts = filtered
+        self.state.set_conflicts(filtered)
+
+        # Update select options
+        options = self._get_conflict_options(filtered)
+        if self.conflict_select:
+            self.conflict_select.set_options(options)
+
+            # Clear selection if current selection is filtered out
+            if self.state.selected_conflict_id.value not in options:
+                self.conflict_select.value = None
+                self.state.set_selected_conflict(None)
+                self._clear_displays()
+
+        self._display_statistics()
+
+        # Show filter results
+        total = len(self.all_conflicts)
+        filtered_count = len(filtered)
+        if filtered_count < total:
+            ui.notify(f"Mostrando {filtered_count} de {total} conflictos", type="info")
+
+    def _clear_filters(self):
+        """Clear all filters and show all conflicts"""
+        if self.filter_nodo:
+            self.filter_nodo.value = ""
+        if self.filter_estado:
+            self.filter_estado.value = ""
+        if self.filter_text:
+            self.filter_text.value = ""
+
+        self._apply_filters()
+
+    def _display_statistics(self):
+        """Display conflict statistics in the stats card"""
+        if not self.stats_card:
+            return
+
+        self.stats_card.clear()
+
+        with self.stats_card:
+            ui.label("Estadísticas").classes("text-h6 mb-2")
+
+            total = len(self.filtered_conflicts)
+
+            # Count by status
+            status_counts = {}
+            for conflict in self.filtered_conflicts:
+                estado = conflict.get("estado", "Sin estado")
+                status_counts[estado] = status_counts.get(estado, 0) + 1
+
+            # Display counts
+            with ui.row().classes("w-full gap-4 flex-wrap"):
+                ui.chip(f"Total: {total}", color="blue", icon="inventory")
+
+                for estado, count in status_counts.items():
+                    color_map = {
+                        "Abierto": "red",
+                        "En proceso": "orange",
+                        "Resuelto": "green",
+                        "Cerrado": "gray"
+                    }
+                    color = color_map.get(estado, "blue")
+                    ui.chip(f"{estado}: {count}", color=color)
 
     async def _on_conflict_change(self, conflict_id: Optional[int]):
         """Handle conflict selection change"""
@@ -93,7 +297,7 @@ class ConflictsView:
             await self._load_conflict_history()
 
     async def _display_conflict_info(self):
-        """Display information about the selected conflict with location details"""
+        """Display enhanced conflict information"""
         if not self.info_container or not self.state.selected_conflict:
             return
 
@@ -107,15 +311,26 @@ class ConflictsView:
             with ui.card().classes("w-full mb-2"):
                 ui.label("Datos del Conflicto").classes("text-subtitle2 font-bold mb-2")
 
+                # Status badge
+                if conflict.get("estado"):
+                    color_map = {
+                        "Abierto": "red",
+                        "En proceso": "orange",
+                        "Resuelto": "green",
+                        "Cerrado": "gray"
+                    }
+                    color = color_map.get(conflict["estado"], "blue")
+                    ui.badge(conflict["estado"], color=color).props("outline")
+
                 info_items = [
                     ("ID", conflict.get("id", "N/A")),
-                    ("Estado", conflict.get("estado", "N/A")),
                     ("Afiliada", conflict.get("afiliada_nombre_completo", "N/A")),
+                    ("Nº Afiliada", conflict.get("num_afiliada", "N/A")),
                     ("Ámbito", conflict.get("ambito", "N/A")),
                     ("Causa", conflict.get("causa", "N/A")),
-                    ("Fecha de Apertura", conflict.get("fecha_apertura", "N/A")),
-                    ("Fecha de Cierre", conflict.get("fecha_cierre", "N/A")),
-                    ("Usuario Responsable", conflict.get("usuario_responsable_alias", "N/A")),
+                    ("Fecha Apertura", conflict.get("fecha_apertura", "N/A")),
+                    ("Fecha Cierre", conflict.get("fecha_cierre", "N/A")),
+                    ("Responsable", conflict.get("usuario_responsable_alias", "N/A")),
                 ]
 
                 for label, value in info_items:
@@ -123,55 +338,29 @@ class ConflictsView:
                         ui.label(f"{label}:").classes("font-bold w-32")
                         ui.label(str(value) if value else "N/A").classes("flex-grow")
 
-                # Description in a separate section if it exists
+                # Description
                 if conflict.get("descripcion"):
                     ui.separator().classes("my-2")
                     ui.label("Descripción:").classes("font-bold")
                     ui.label(conflict.get("descripcion")).classes("text-gray-700")
 
-            # Location information card
+                # Resolution
+                if conflict.get("resolucion"):
+                    ui.separator().classes("my-2")
+                    ui.label("Resolución:").classes("font-bold")
+                    ui.label(conflict.get("resolucion")).classes("text-green-700")
+
+            # Location card with complete information
             with ui.card().classes("w-full"):
                 ui.label("Información de Ubicación").classes("text-subtitle2 font-bold mb-2")
 
-                # Try to get additional location info if the affiliate has a piso_id
                 location_items = [
                     ("Nodo Territorial", conflict.get("nodo_nombre", "N/A")),
-                    ("Dirección del Piso", conflict.get("direccion_piso", "N/A")),
+                    ("Dirección Piso", conflict.get("piso_direccion", "N/A")),
+                    ("Dirección Bloque", conflict.get("bloque_direccion", "N/A")),
+                    ("Municipio", conflict.get("piso_municipio", "N/A")),
+                    ("Código Postal", conflict.get("piso_cp", "N/A")),
                 ]
-
-                # If we have a piso direction, try to extract more info
-                if conflict.get("direccion_piso"):
-                    try:
-                        # Try to fetch piso details for CP and municipality
-                        if conflict.get("afiliada_id"):
-                            afiliada_records = await self.api.get_records(
-                                "afiliadas",
-                                {"id": f"eq.{conflict['afiliada_id']}"}
-                            )
-                            if afiliada_records and afiliada_records[0].get("piso_id"):
-                                piso_records = await self.api.get_records(
-                                    "pisos",
-                                    {"id": f"eq.{afiliada_records[0]['piso_id']}"}
-                                )
-                                if piso_records:
-                                    piso = piso_records[0]
-                                    location_items.extend([
-                                        ("Municipio", piso.get("municipio", "N/A")),
-                                        ("Código Postal", piso.get("cp", "N/A")),
-                                    ])
-
-                                    # Try to get block info
-                                    if piso.get("bloque_id"):
-                                        bloque_records = await self.api.get_records(
-                                            "bloques",
-                                            {"id": f"eq.{piso['bloque_id']}"}
-                                        )
-                                        if bloque_records:
-                                            location_items.append(
-                                                ("Bloque", bloque_records[0].get("direccion", "N/A"))
-                                            )
-                    except Exception as e:
-                        print(f"Error fetching location details: {e}")
 
                 for label, value in location_items:
                     with ui.row().classes("mb-1"):
@@ -179,14 +368,13 @@ class ConflictsView:
                         ui.label(str(value) if value else "N/A").classes("flex-grow")
 
     async def _load_conflict_history(self):
-        """Load history for selected conflict with user and note details"""
+        """Load history for selected conflict"""
         if not self.history_container or not self.state.selected_conflict:
             return
 
         self.history_container.clear()
 
         try:
-            # Fetch from the view that includes user and action information
             history = await self.api.get_records(
                 "v_diario_conflictos_con_afiliada",
                 {"conflicto_id": f'eq.{self.state.selected_conflict["id"]}'},
@@ -209,19 +397,17 @@ class ConflictsView:
             ui.notify(f"Error al cargar el historial: {str(e)}", type="negative")
 
     def _create_history_entry(self, entry: dict):
-        """Create an enhanced history entry card with notes and user info"""
+        """Create history entry card"""
         with ui.card().classes("w-full mb-2"):
-            # Header with timestamp and actions
+            # Header
             with ui.row().classes("w-full justify-between items-center mb-2"):
                 with ui.column():
-                    # Timestamp and author
                     with ui.row().classes("items-center gap-2"):
                         ui.icon("schedule", size="sm").classes("text-gray-500")
                         ui.label(entry.get("created_at", "Sin fecha")).classes(
                             "text-caption text-gray-600"
                         )
 
-                    # Author of the note
                     if entry.get("autor_nota_alias"):
                         with ui.row().classes("items-center gap-2 mt-1"):
                             ui.icon("person", size="sm").classes("text-gray-500")
@@ -229,7 +415,7 @@ class ConflictsView:
                                 "text-caption text-blue-600"
                             )
 
-                # Edit and delete buttons
+                # Actions
                 with ui.row().classes("gap-2"):
                     ui.button(
                         icon="edit",
@@ -241,7 +427,7 @@ class ConflictsView:
                         on_click=lambda e=entry: self._delete_note(e)
                     ).props("size=sm flat dense color=negative").tooltip("Eliminar nota")
 
-            # Status badges
+            # Badges
             with ui.row().classes("gap-2 mb-2"):
                 if entry.get("estado"):
                     color_map = {
@@ -259,7 +445,7 @@ class ConflictsView:
                 if entry.get("ambito"):
                     ui.badge(f"Ámbito: {entry['ambito']}", color="indigo").props("outline")
 
-            # Main note content
+            # Note content
             if entry.get("notas"):
                 ui.separator().classes("my-2")
                 with ui.row().classes("w-full"):
@@ -268,13 +454,6 @@ class ConflictsView:
                         ui.label("Nota:").classes("font-semibold text-sm")
                         ui.label(entry["notas"]).classes("text-gray-700 whitespace-pre-wrap")
 
-            # Show affiliate name if different from main conflict
-            if entry.get("afiliada_nombre_completo") and entry.get("afiliada_nombre_completo") != self.state.selected_conflict.get("afiliada_nombre_completo"):
-                ui.separator().classes("my-2")
-                with ui.row().classes("items-center gap-2"):
-                    ui.icon("person_outline", size="sm").classes("text-gray-500")
-                    ui.label(f"Afiliada: {entry['afiliada_nombre_completo']}").classes("text-caption")
-
     async def _add_note(self):
         """Add a new note to the selected conflict"""
         if not self.state.selected_conflict:
@@ -282,7 +461,6 @@ class ConflictsView:
             return
 
         async def on_note_added():
-            """Callback after note is added"""
             await self._load_conflicts()
             await self._on_conflict_change(self.state.selected_conflict["id"])
 
@@ -294,11 +472,25 @@ class ConflictsView:
         )
         await dialog.open()
 
+    async def _create_conflict(self):
+        """Open dialog to create a new conflict"""
+        from components.dialogs import EnhancedRecordDialog
+
+        async def on_conflict_created():
+            await self._load_conflicts()
+            ui.notify("Conflicto creado exitosamente", type="positive")
+
+        dialog = EnhancedRecordDialog(
+            api=self.api,
+            table="conflictos",
+            mode="create",
+            on_success=on_conflict_created
+        )
+        await dialog.open()
+
     async def _edit_note(self, note: dict):
         """Edit an existing note"""
-
         async def on_note_updated():
-            """Callback after note is updated"""
             await self._load_conflict_history()
 
         dialog = ConflictNoteDialog(
@@ -320,10 +512,13 @@ class ConflictsView:
                 "text-body2 text-gray-600"
             )
 
-            # Show a preview of the note
             if note.get("notas"):
                 ui.separator().classes("my-2")
-                note_preview = note["notas"][:100] + "..." if len(note["notas"]) > 100 else note["notas"]
+                note_preview = (
+                    note["notas"][:100] + "..."
+                    if len(note["notas"]) > 100
+                    else note["notas"]
+                )
                 ui.label(f'Nota: "{note_preview}"').classes("text-caption text-gray-500")
 
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
