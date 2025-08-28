@@ -4,7 +4,7 @@ from api.client import APIClient
 from state.views_state import ViewsState
 from components.data_table import DataTable
 from components.filters import FilterPanel
-from utils.export import export_to_csv
+from components.exporter import export_to_csv
 from config import VIEW_INFO
 
 class ViewsExplorerView:
