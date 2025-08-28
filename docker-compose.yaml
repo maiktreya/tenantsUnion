@@ -60,12 +60,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      # Mount the template file to a temporary location
       - ./build/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
-      # Keep the certbot volumes
       - ./build/nginx/certbot/conf:/etc/letsencrypt
       - ./build/nginx/certbot/www:/var/www/certbot
-    # This command runs on container startup
     command: >
       sh -c "envsubst '$$HOSTNAME' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
              nginx -g 'daemon off;'"
