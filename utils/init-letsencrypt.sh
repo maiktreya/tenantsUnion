@@ -21,7 +21,7 @@ fi
 # --- CONFIGURATION ---
 domain="${HOSTNAME:-inquilinato.duckdns.org}"
 email="${EMAIL:-garciaduchm@gmail.com}"
-duckdns_token="${DUCKDNS_TOKEN}"
+duckdns_token="${DUCKDNS_TOKEN:-566ab832-c328-4750-865e-6cd9d979f68d}"
 data_path="./build/nginx/certbot"
 rsa_key_size=4096
 staging=0 # Set to 1 to use staging environment for testing
@@ -67,13 +67,12 @@ echo "### Creating dummy certificate for $domain ..."
 path="/etc/letsencrypt/live/$domain"
 mkdir -p "$data_path/conf/live/$domain"
 
-# Create dummy certificate
-docker compose run --rm --entrypoint "\
+# Dummy creation
+docker compose --profile Secured run --rm --entrypoint "\
     openssl req -x509 -nodes -newkey rsa:$rsa_key_size -days 1 \
     -keyout '$path/privkey.pem' \
     -out '$path/fullchain.pem' \
     -subj '/CN=localhost'" certbot
-echo
 
 # --- START NGINX ---
 echo "### Starting nginx with dummy certificates ..."
@@ -85,7 +84,8 @@ sleep 5
 
 # --- CLEANUP DUMMY CERTIFICATES ---
 echo "### Deleting dummy certificate for $domain ..."
-docker compose run --rm --entrypoint "\
+# Dummy deletion
+docker compose --profile Secured run --rm --entrypoint "\
     rm -Rf /etc/letsencrypt/live/$domain && \
     rm -Rf /etc/letsencrypt/archive/$domain && \
     rm -Rf /etc/letsencrypt/renewal/$domain.conf" certbot
@@ -113,9 +113,9 @@ echo "dns_duckdns_token = $duckdns_token" > "$data_path/duckdns_credentials.ini"
 chmod 600 "$data_path/duckdns_credentials.ini"
 
 # Request certificate using DNS-01 challenge
-docker compose run --rm --entrypoint "\
+docker compose --profile Secured run --rm --entrypoint "\
     certbot certonly \
-    --dns-duckdns \
+    --authenticator dns-duckdns \
     --dns-duckdns-credentials /etc/letsencrypt/duckdns_credentials.ini \
     --dns-duckdns-propagation-seconds 120 \
     $staging_arg \

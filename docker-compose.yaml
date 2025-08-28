@@ -58,7 +58,7 @@ services:
     profiles:
       - Secured
     ports:
-      - "80:80"    # Only nginx exposed externally
+      - "80:80"
       - "443:443"
     volumes:
       - ./build/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
@@ -68,19 +68,15 @@ services:
       sh -c "envsubst '$$HOSTNAME' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
              nginx -g 'daemon off;'"
     depends_on:
-      - nicegui-app
-      - server
+      - server  # Keep dependency on server if needed; remove nicegui-app
     restart: unless-stopped
 
   # Certbot service for SSL certificate management
   certbot:
-    image: certbot/dns-duckdns:latest
+    image: certbot/certbot:latest
     profiles:
       - Secured
     volumes:
       - ./build/nginx/certbot/conf:/etc/letsencrypt
       - ./build/nginx/certbot/www:/var/www/certbot
-    environment:
-      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
-    # This will run as a one-time service, not continuously
     restart: "no"
