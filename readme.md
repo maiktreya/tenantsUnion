@@ -17,8 +17,8 @@ graph TD
 
     subgraph "Servidor Dockerizado (Host Único)"
         B[Nginx Reverse Proxy <br> Puertos 80/443]
-        C[NiceGUI Frontend <br> (Python)]
-        D[PostgREST API <br> (Generada desde BBDD)]
+        C[NiceGUI Frontend <br> Python]
+        D[PostgREST API <br> Generada desde BBDD]
         E[PostgreSQL Database]
     end
 
