@@ -65,14 +65,16 @@ fi
 # --- DUMMY CERTIFICATE CREATION ---
 echo "### Creating dummy certificate for $domain ..."
 path="/etc/letsencrypt/live/$domain"
-mkdir -p "$data_path/conf/live/$domain"
 
-# Dummy creation
+# Dummy creation - a single, robust command
 docker compose --profile Secured run --rm --entrypoint "\
+  sh -c '
+    mkdir -p /etc/letsencrypt/live/$domain && \
     openssl req -x509 -nodes -newkey rsa:$rsa_key_size -days 1 \
-    -keyout '$path/privkey.pem' \
-    -out '$path/fullchain.pem' \
-    -subj '/CN=localhost'" certbot
+      -keyout \"$path/privkey.pem\" \
+      -out \"$path/fullchain.pem\" \
+      -subj \"/CN=localhost\"
+  '" certbot
 
 # --- START NGINX ---
 echo "### Starting nginx with dummy certificates ..."

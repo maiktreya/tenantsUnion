@@ -62,21 +62,24 @@ services:
       - "443:443"
     volumes:
       - ./build/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
-      - ./build/nginx/certbot/conf:/etc/letsencrypt
+      # CORRECTED VOLUME: Point to the parent certbot directory
+      - ./build/nginx/certbot:/etc/letsencrypt
       - ./build/nginx/certbot/www:/var/www/certbot
     command: >
       sh -c "envsubst '$$HOSTNAME' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
              nginx -g 'daemon off;'"
     depends_on:
-      - server  # Keep dependency on server if needed; remove nicegui-app
+      - server
     restart: unless-stopped
 
-  # Certbot service for SSL certificate management
   certbot:
-    image: certbot/certbot:latest
+    # UPDATED: Use the build context instead of a pre-built image
+    build:
+      context: ./build/certbot
     profiles:
       - Secured
     volumes:
-      - ./build/nginx/certbot/conf:/etc/letsencrypt
+      # CORRECTED VOLUME: Point to the parent certbot directory
+      - ./build/nginx/certbot:/etc/letsencrypt
       - ./build/nginx/certbot/www:/var/www/certbot
     restart: "no"
