@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Any
 from nicegui import ui
 from api.client import APIClient
 from state.views_state import ViewsState
@@ -8,7 +8,7 @@ from components.exporter import export_to_csv
 from config import VIEW_INFO
 
 class ViewsExplorerView:
-    """Views explorer for materialized views"""
+    """Views explorer with enhanced client-side filtering and multi-sorting."""
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
@@ -17,7 +17,7 @@ class ViewsExplorerView:
         self.filter_panel = None
 
     def create(self) -> ui.column:
-        """Create the views explorer UI"""
+        """Create the views explorer UI."""
         container = ui.column().classes('w-full p-4 gap-4')
 
         with container:
@@ -49,9 +49,8 @@ class ViewsExplorerView:
                     on_click=self._export_data
                 ).props('color=orange-600')
 
-            # Filters
-            with ui.expansion('Filtros y Búsqueda', icon='filter_list').classes('w-full').props('default-opened'):
-                self.state.filter_container = ui.column().classes('w-full')
+            # Container for the dynamic filter panel
+            self.state.filter_container = ui.column().classes('w-full')
 
             # Data table (without edit/delete actions for views)
             self.data_table = DataTable(
@@ -63,55 +62,61 @@ class ViewsExplorerView:
         return container
 
     async def _load_view_data(self, view_name: str = None):
-        """Load data for the selected view"""
+        """Load data, then set up the client-side filters and table."""
         view = view_name or self.state.selected_view.value
         if not view:
             return
 
+        # Create a spinner and control its visibility manually
+        spinner = ui.spinner(size='lg', color='orange-600').classes('absolute-center')
         try:
-            records = await self.api.get_records(view)
+            records = await self.api.get_records(view, limit=5000)
             self.state.set_records(records)
             self._setup_filters()
             self.data_table.refresh()
             ui.notify(f'Se cargaron {len(records)} registros de la vista', type='positive')
         except Exception as e:
             ui.notify(f'Error al cargar datos de la vista: {str(e)}', type='negative')
+        finally:
+            # ALWAYS ensure the spinner is destroyed
+            spinner.delete()
 
     def _setup_filters(self):
-        """Setup filter panel"""
+        """Setup the dynamic filter panel."""
         if not self.state.filter_container or not self.state.records:
+            # Clear previous filters if no new records are loaded
+            if self.state.filter_container:
+                self.state.filter_container.clear()
             return
 
         self.state.filter_container.clear()
-        columns = list(self.state.records[0].keys())
-
         with self.state.filter_container:
             self.filter_panel = FilterPanel(
-                columns=columns,
-                on_filter_change=self._update_filter,
-                on_clear=self._clear_filters
+                records=self.state.records,
+                on_filter_change=self._update_filter
             )
             self.filter_panel.create()
 
-    def _update_filter(self, column: str, value: str):
-        """Update filter for a column"""
+    def _update_filter(self, column: str, value: Any):
+        """Callback from FilterPanel to update state and refresh the table."""
         self.state.filters[column] = value
-        self.state.apply_filters()
+        self.state.apply_filters_and_sort()
         self.data_table.refresh()
 
     def _clear_filters(self):
-        """Clear all filters"""
-        self.state.clear_filters()
+        """Clear filters in the state and the UI panel."""
+        self.state.filters.clear()
         if self.filter_panel:
             self.filter_panel.clear()
+        self.state.apply_filters_and_sort()
         self.data_table.refresh()
 
     async def _refresh_data(self):
-        """Refresh current view data"""
+        """Refresh current view data."""
         await self._load_view_data()
 
     def _export_data(self):
-        """Export filtered data to CSV"""
+        """Export filtered data to CSV."""
         if self.state.selected_view.value:
             export_to_csv(
                 self.state.filtered_records,

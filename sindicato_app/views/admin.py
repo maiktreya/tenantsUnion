@@ -1,4 +1,4 @@
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Any
 from nicegui import ui
 from api.client import APIClient
 from state.admin_state import AdminState
@@ -6,7 +6,7 @@ from components.data_table import DataTable
 from components.dialogs import EnhancedRecordDialog
 from components.exporter import export_to_csv
 from components.importer import CSVImporterDialog
-from components.filters import FilterPanel # Import the updated filter panel
+from components.filters import FilterPanel
 from config import config, TABLE_INFO
 
 class AdminView:
@@ -17,7 +17,7 @@ class AdminView:
         self.state = AdminState()
         self.data_table = None
         self.detail_container = None
-        self.filter_panel = None # Add a reference to the filter panel
+        self.filter_panel = None
 
     def create(self) -> ui.column:
         """Create the enhanced CRUD view UI."""
@@ -26,7 +26,6 @@ class AdminView:
         with container:
             ui.label("Administración de Tablas y Registros BBDD").classes("text-h6 font-italic")
 
-            # Toolbar (remains the same)
             with ui.row().classes("w-full gap-4 items-center"):
                 ui.select(
                     options=list(TABLE_INFO.keys()),
@@ -39,7 +38,6 @@ class AdminView:
                 ui.button("Exportar CSV", icon="download", on_click=self._export_data).props("color=orange-600")
                 ui.button("Importar CSV", icon="upload", on_click=self._open_import_dialog).props("color=orange-600")
 
-            # NEW: Container for the dynamic filter panel
             self.state.filter_container = ui.column().classes("w-full")
 
             self.data_table = DataTable(
@@ -56,7 +54,7 @@ class AdminView:
         return container
 
     async def _load_table_data(self, table_name: str = None):
-        """Load data, then set up the client-side filters and table."""
+        """Load data with robust spinner handling."""
         if self.detail_container:
             self.detail_container.clear()
 
@@ -64,22 +62,25 @@ class AdminView:
         if not table:
             return
 
+        # FIX: Manually control spinner for robust handling
+        spinner = ui.spinner(size='lg', color='orange-600').classes('absolute-center')
         try:
-            with ui.spinner(size='lg', color='orange-600'):
-                records = await self.api.get_records(table, limit=5000) # Load a large set for client-side ops
-
-            # This now triggers the client-side filtering and sorting
+            records = await self.api.get_records(table, limit=5000)
             self.state.set_records(records)
-
-            self._setup_filters() # Create the filter panel based on the loaded data
-            self.data_table.refresh() # Refresh the table to show the data
+            self._setup_filters()
+            self.data_table.refresh()
             ui.notify(f"Se cargaron {len(records)} registros", type="positive")
         except Exception as e:
             ui.notify(f"Error al cargar datos: {str(e)}", type="negative")
+        finally:
+            # This block ensures the spinner is always removed
+            spinner.delete()
 
     def _setup_filters(self):
         """Setup the dynamic filter panel."""
         if not self.state.filter_container or not self.state.records:
+            if self.state.filter_container:
+                self.state.filter_container.clear()
             return
 
         self.state.filter_container.clear()
@@ -90,7 +91,7 @@ class AdminView:
             )
             self.filter_panel.create()
 
-    def _update_filter(self, column: str, value: any):
+    def _update_filter(self, column: str, value: Any):
         """Callback from FilterPanel to update state and refresh the table."""
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
@@ -108,14 +109,11 @@ class AdminView:
         """Refresh current table data."""
         await self._load_table_data()
 
-    # The rest of the methods (_on_row_click, _create_record, etc.) remain unchanged.
-    # ... (paste the rest of your original AdminView methods here) ...
     def _open_import_dialog(self):
         """Opens the CSV import dialog."""
         if not self.state.selected_table.value:
             ui.notify("Por favor, seleccione una tabla primero", type="warning")
             return
-
         dialog = CSVImporterDialog(
             api=self.api,
             table_name=self.state.selected_table.value,
@@ -124,22 +122,15 @@ class AdminView:
         dialog.open()
 
     async def _on_row_click(self, record: Dict):
-        """
-        Handles a click on a row to show related 'child' records.
-        This version correctly handles both a single relation (dict) and
-        multiple relations (list of dicts) in the config.
-        """
+        """Handles a click on a row to show related 'child' records."""
         self.detail_container.clear()
         selected_table_name = self.state.selected_table.value
         table_info = TABLE_INFO.get(selected_table_name, {})
-
-        # Get child relations, which can be a dict or a list of dicts
         child_relations = table_info.get("child_relations")
 
         if not child_relations:
             return
 
-        # Ensure child_relations is always a list to simplify processing
         if isinstance(child_relations, dict):
             child_relations = [child_relations]
 
@@ -148,27 +139,16 @@ class AdminView:
             return
 
         with self.detail_container:
-            # Iterate through each defined child relation and fetch its data
             for relation in child_relations:
                 child_table = relation["table"]
                 foreign_key = relation["foreign_key"]
-
-                ui.label(
-                    f"Registros de '{child_table}' relacionados con '{selected_table_name}' (ID: {record_id})"
-                ).classes("text-h6 mb-2")
-
+                ui.label(f"Registros de '{child_table}' relacionados con '{selected_table_name}' (ID: {record_id})").classes("text-h6 mb-2")
                 try:
                     filters = {foreign_key: f"eq.{record_id}"}
-                    related_records = await self.api.get_records(
-                        child_table, filters=filters
-                    )
-
+                    related_records = await self.api.get_records(child_table, filters=filters)
                     if not related_records:
-                        ui.label("No se encontraron registros relacionados.").classes(
-                            "text-gray-500"
-                        )
-                        continue # Move to the next relation
-
+                        ui.label("No se encontraron registros relacionados.").classes("text-gray-500")
+                        continue
                     with ui.grid(columns=2).classes("w-full gap-4 mb-4"):
                         for rel_record in related_records:
                             with ui.card().classes("w-full"):
@@ -176,18 +156,14 @@ class AdminView:
                                     with ui.row().classes("w-full"):
                                         ui.label(f"{key}:").classes("font-semibold w-32")
                                         ui.label(str(value)).classes("flex-grow")
-
                 except Exception as e:
-                    ui.notify(
-                        f"Error al cargar datos de '{child_table}': {str(e)}", type="negative"
-                    )
+                    ui.notify(f"Error al cargar datos de '{child_table}': {str(e)}", type="negative")
 
     async def _create_record(self):
         """Create a new record using the enhanced dialog."""
         if not self.state.selected_table.value:
             ui.notify("Por favor, seleccione una tabla primero", type="warning")
             return
-
         dialog = EnhancedRecordDialog(
             api=self.api,
             table=self.state.selected_table.value,
@@ -210,27 +186,18 @@ class AdminView:
     async def _delete_record(self, record: Dict):
         """Delete a record with confirmation"""
         record_id = record.get("id")
-
         with ui.dialog() as dialog, ui.card():
             ui.label(f"¿Eliminar registro #{record_id}?").classes("text-h6")
-            ui.label("Esta acción no se puede deshacer.").classes(
-                "text-body2 text-gray-600"
-            )
-
+            ui.label("Esta acción no se puede deshacer.").classes("text-body2 text-gray-600")
             with ui.row().classes("w-full justify-end gap-2"):
                 ui.button("Cancelar", on_click=dialog.close).props("flat")
-
                 async def confirm():
-                    success = await self.api.delete_record(
-                        self.state.selected_table.value, record_id
-                    )
+                    success = await self.api.delete_record(self.state.selected_table.value, record_id)
                     if success:
                         ui.notify("Registro eliminado con éxito", type="positive")
                         dialog.close()
                         await self._refresh_data()
-
                 ui.button("Eliminar", on_click=confirm).props("color=negative")
-
         dialog.open()
 
     def _export_data(self):
