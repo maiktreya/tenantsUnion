@@ -14,10 +14,10 @@
 domains=($1)
 email="$2"
 data_path="./certbot"
-rsa_key_size=4096
+rsa_key_size=4096A
 staging=0 # Set to 1 to use the Let's Encrypt staging environment for testing
 
-# --- VALIDATION ---
+# --- VALIDATION ---A
 if [ -z "$1" ] || [ -z "$2" ]; then
   echo "Usage: $0 <domain> <email>"
   exit 1

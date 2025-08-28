@@ -1,0 +1,86 @@
+# Updated docker-compose.yaml
+services:
+  db:
+    image: postgres:17
+    expose:
+      - "5432"  # Internal only - no external access
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./build/postgreSQL/init-scripts:/docker-entrypoint-initdb.d
+      - ./dev/back/SI_MAD/db_fork:/csv-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  server:
+    image: postgrest/postgrest:v12.2.8
+    expose:
+      - "3000"  # Internal only - no external access
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PGRST_OPENAPI_SERVER_PROXY_URI: ${POSTGRES_API_URL}
+      PGRST_DB_ANON_ROLE: ${POSTGRES_USER}
+      PGRST_DB_SCHEMA: ${POSTGRES_DB_SCHEMA}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nicegui-app:
+    image: python:3.11-slim
+    profiles:
+      - Frontend
+    expose:
+      - "8081"  # Internal only - no external access
+    volumes:
+      - ./build/niceGUI:/app:ro
+    working_dir: /app
+    command: >
+      sh -c "pip install --upgrade pip &&
+             pip install --root-user-action=ignore passlib==1.7.4 bcrypt==4.0.1 nicegui httpx &&
+             python main.py"
+    depends_on:
+      - server
+      - db
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - POSTGREST_API_URL=${POSTGRES_API_URL}
+
+  nginx:
+    image: nginx:latest
+    profiles:
+      - Secured
+    ports:
+      - "80:80"    # Only nginx exposed externally
+      - "443:443"
+    volumes:
+      - ./build/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
+      - ./build/nginx/certbot/conf:/etc/letsencrypt
+      - ./build/nginx/certbot/www:/var/www/certbot
+    command: >
+      sh -c "envsubst '$$HOSTNAME' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
+             nginx -g 'daemon off;'"
+    depends_on:
+      - nicegui-app
+      - server
+    restart: unless-stopped
+
+  # Certbot service for SSL certificate management
+  certbot:
+    image: certbot/dns-duckdns:latest
+    profiles:
+      - Secured
+    volumes:
+      - ./build/nginx/certbot/conf:/etc/letsencrypt
+      - ./build/nginx/certbot/www:/var/www/certbot
+    environment:
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
+    # This will run as a one-time service, not continuously
+    restart: "no"
