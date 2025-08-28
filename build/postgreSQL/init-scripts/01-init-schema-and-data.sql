@@ -107,18 +107,52 @@ CREATE TABLE conflictos (
     usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL
 );
 
--- ✅ MEJORA: Las entradas del diario se eliminan si se elimina el conflicto.
+-- Create the new table to store the types of actions.
+CREATE TABLE acciones (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT UNIQUE NOT NULL,
+    descripcion TEXT -- An optional field for more details if needed in the future.
+);
+---- ✅ MEJORA: Las entradas del diario se eliminan si se elimina el conflicto.
+--CREATE TABLE diario_conflictos (
+--    id SERIAL PRIMARY KEY,
+--    estado TEXT DEFAULT NULL,
+--    ambito TEXT,
+--    afectada TEXT,
+--    causa TEXT,
+--    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--    conflicto_id INTEGER REFERENCES conflictos (id) ON DELETE CASCADE
+--);
+-- =====================================================================
+-- SUGGESTED UPDATE FOR: diario_conflictos
+-- =====================================================================
+-- This version corrects the data types, adds foreign key constraints for
+-- data integrity, and includes a field to track the author of the note.
+
+-- The final, complete definition for the conflict diary table.
 CREATE TABLE diario_conflictos (
     id SERIAL PRIMARY KEY,
-    estado TEXT DEFAULT NULL,
+
+    -- Foreign key to the main conflict entry.
+    conflicto_id INTEGER NOT NULL REFERENCES conflictos(id) ON DELETE CASCADE,
+
+    -- Foreign key to the new 'acciones' table to categorize the entry.
+    accion_id INTEGER REFERENCES acciones(id) ON DELETE SET NULL,
+
+    -- Fields to track the state of the conflict at the time of this entry.
+    estado TEXT,
     ambito TEXT,
-    afectada TEXT,
-    causa TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    conflicto_id INTEGER REFERENCES conflictos (id) ON DELETE CASCADE
+
+    -- The main content of the note or update.
+    notas TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE solicitudes (id SERIAL PRIMARY KEY);
+CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos(conflicto_id);
+CREATE INDEX idx_diario_conflictos_accion_id ON diario_conflictos(accion_id);
+CREATE INDEX idx_diario_conflictos_usuario_id ON diario_conflictos(usuario_id);
+
+-- Add indexes for faster lookups on foreign keys.
 
 -- =====================================================================
 -- PARTE 1.5: CREACIÓN DE ÍNDICES PARA MEJORAR EL RENDIMIENTO
@@ -126,25 +160,17 @@ CREATE TABLE solicitudes (id SERIAL PRIMARY KEY);
 -- ✅ MEJORA: Se añaden índices a todas las claves foráneas.
 
 CREATE INDEX idx_empresas_entramado_id ON empresas (entramado_id);
-
 CREATE INDEX idx_bloques_empresa_id ON bloques (empresa_id);
-
 CREATE INDEX idx_pisos_bloque_id ON pisos (bloque_id);
-
 CREATE INDEX idx_afiliadas_piso_id ON afiliadas (piso_id);
-
 CREATE INDEX idx_facturacion_afiliada_id ON facturacion (afiliada_id);
-
 CREATE INDEX idx_asesorias_afiliada_id ON asesorias (afiliada_id);
-
 CREATE INDEX idx_asesorias_tecnica_id ON asesorias (tecnica_id);
-
 CREATE INDEX idx_conflictos_afiliada_id ON conflictos (afiliada_id);
-
 CREATE INDEX idx_conflictos_usuario_responsable_id ON conflictos (usuario_responsable_id);
-
-CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
-
+CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos(conflicto_id);
+CREATE INDEX idx_diario_conflictos_accion_id ON diario_conflictos(accion_id);
+CREATE INDEX idx_diario_conflictos_usuario_id ON diario_conflictos(usuario_id);
 -- =====================================================================
 -- PARTE 2: LÓGICA DE IMPORTACIÓN CON TABLAS STAGING
 -- (El proceso de staging no se modifica para no romper la importación)

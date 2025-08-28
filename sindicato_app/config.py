@@ -153,11 +153,8 @@ TABLE_INFO = {
             "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
             # The 'afiliada_id' is not a direct foreign key in the final schema, so it's removed.
         },
-    },
-    "solicitudes": {
-        "display_name": "Solicitudes",
-        "id_field": "id",
-    },
+    }
+
 }
 
 # =====================================================================
@@ -168,11 +165,8 @@ VIEW_INFO = {
     "v_bloques": {"display_name": "Info de Bloques"},
     "v_empresas": {"display_name": "Info completa de Empresas"},
     "v_conflictos_con_afiliada": {"display_name": "Conflictos con Info de Afiliada"},
-    "v_diario_conflictos_con_afiliada": {
-        "display_name": "Diario de Conflictos con Info de Afiliada"
-    },
-    # ENHANCEMENT: Added the new view for conflicts with nodo info (if it exists)
-    # "v_conflictos_con_nodo": {"display_name": "Conflictos con Info de Nodo"},
+    "v_diario_conflictos_con_afiliada": {"display_name": "Diario de Conflictos con Info de Afiliada"},
+    "v_conflictos_con_nodo": {"display_name": "Diario de Conflictos con Info para Nodos"},
 }
 
 config = Config()

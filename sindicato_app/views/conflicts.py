@@ -64,9 +64,9 @@ class ConflictsView:
     async def _load_conflicts(self):
         """Load all conflicts"""
         try:
-            # Fetch from the new view instead of the table
+            # Fetch from the view that includes nodo information
             conflicts = await self.api.get_records(
-                "v_conflictos_con_afiliada", order="id.asc"
+                "v_conflictos_con_nodo", order="id.desc"
             )
             self.state.set_conflicts(conflicts)
 
@@ -93,7 +93,7 @@ class ConflictsView:
             await self._load_conflict_history()
 
     async def _display_conflict_info(self):
-        """Display information about the selected conflict"""
+        """Display information about the selected conflict with location details"""
         if not self.info_container or not self.state.selected_conflict:
             return
 
@@ -103,17 +103,19 @@ class ConflictsView:
         with self.info_container:
             ui.label("Información del Conflicto").classes("text-h6 mb-2")
 
-            with ui.card().classes("w-full"):
+            # Main conflict information card
+            with ui.card().classes("w-full mb-2"):
+                ui.label("Datos del Conflicto").classes("text-subtitle2 font-bold mb-2")
+
                 info_items = [
                     ("ID", conflict.get("id", "N/A")),
                     ("Estado", conflict.get("estado", "N/A")),
-                    # Display the full name from the view
                     ("Afiliada", conflict.get("afiliada_nombre_completo", "N/A")),
                     ("Ámbito", conflict.get("ambito", "N/A")),
                     ("Causa", conflict.get("causa", "N/A")),
                     ("Fecha de Apertura", conflict.get("fecha_apertura", "N/A")),
                     ("Fecha de Cierre", conflict.get("fecha_cierre", "N/A")),
-                    ("Descripción", conflict.get("descripcion", "N/A")),
+                    ("Usuario Responsable", conflict.get("usuario_responsable_alias", "N/A")),
                 ]
 
                 for label, value in info_items:
@@ -121,23 +123,79 @@ class ConflictsView:
                         ui.label(f"{label}:").classes("font-bold w-32")
                         ui.label(str(value) if value else "N/A").classes("flex-grow")
 
+                # Description in a separate section if it exists
+                if conflict.get("descripcion"):
+                    ui.separator().classes("my-2")
+                    ui.label("Descripción:").classes("font-bold")
+                    ui.label(conflict.get("descripcion")).classes("text-gray-700")
+
+            # Location information card
+            with ui.card().classes("w-full"):
+                ui.label("Información de Ubicación").classes("text-subtitle2 font-bold mb-2")
+
+                # Try to get additional location info if the affiliate has a piso_id
+                location_items = [
+                    ("Nodo Territorial", conflict.get("nodo_nombre", "N/A")),
+                    ("Dirección del Piso", conflict.get("direccion_piso", "N/A")),
+                ]
+
+                # If we have a piso direction, try to extract more info
+                if conflict.get("direccion_piso"):
+                    try:
+                        # Try to fetch piso details for CP and municipality
+                        if conflict.get("afiliada_id"):
+                            afiliada_records = await self.api.get_records(
+                                "afiliadas",
+                                {"id": f"eq.{conflict['afiliada_id']}"}
+                            )
+                            if afiliada_records and afiliada_records[0].get("piso_id"):
+                                piso_records = await self.api.get_records(
+                                    "pisos",
+                                    {"id": f"eq.{afiliada_records[0]['piso_id']}"}
+                                )
+                                if piso_records:
+                                    piso = piso_records[0]
+                                    location_items.extend([
+                                        ("Municipio", piso.get("municipio", "N/A")),
+                                        ("Código Postal", piso.get("cp", "N/A")),
+                                    ])
+
+                                    # Try to get block info
+                                    if piso.get("bloque_id"):
+                                        bloque_records = await self.api.get_records(
+                                            "bloques",
+                                            {"id": f"eq.{piso['bloque_id']}"}
+                                        )
+                                        if bloque_records:
+                                            location_items.append(
+                                                ("Bloque", bloque_records[0].get("direccion", "N/A"))
+                                            )
+                    except Exception as e:
+                        print(f"Error fetching location details: {e}")
+
+                for label, value in location_items:
+                    with ui.row().classes("mb-1"):
+                        ui.label(f"{label}:").classes("font-bold w-32")
+                        ui.label(str(value) if value else "N/A").classes("flex-grow")
+
     async def _load_conflict_history(self):
-        """Load history for selected conflict"""
+        """Load history for selected conflict with user and note details"""
         if not self.history_container or not self.state.selected_conflict:
             return
 
         self.history_container.clear()
 
         try:
-            # Fetch from the new view instead of the table
+            # Fetch from the view that includes user and action information
             history = await self.api.get_records(
                 "v_diario_conflictos_con_afiliada",
                 {"conflicto_id": f'eq.{self.state.selected_conflict["id"]}'},
+                order="created_at.desc"
             )
             self.state.set_history(history)
 
             with self.history_container:
-                ui.label("Historial").classes("text-h6 mb-2")
+                ui.label("Historial de Notas").classes("text-h6 mb-2")
 
                 if self.state.history:
                     for entry in self.state.history:
@@ -151,39 +209,71 @@ class ConflictsView:
             ui.notify(f"Error al cargar el historial: {str(e)}", type="negative")
 
     def _create_history_entry(self, entry: dict):
-        """Create a history entry card"""
+        """Create an enhanced history entry card with notes and user info"""
         with ui.card().classes("w-full mb-2"):
-            with ui.row().classes("w-full justify-between items-center"):
+            # Header with timestamp and actions
+            with ui.row().classes("w-full justify-between items-center mb-2"):
                 with ui.column():
-                    ui.label(entry.get("created_at", "Sin fecha")).classes(
-                        "text-caption text-gray-600"
-                    )
-                    if entry.get("estado"):
-                        ui.label(f"Estado: {entry['estado']}").classes("text-caption")
+                    # Timestamp and author
+                    with ui.row().classes("items-center gap-2"):
+                        ui.icon("schedule", size="sm").classes("text-gray-500")
+                        ui.label(entry.get("created_at", "Sin fecha")).classes(
+                            "text-caption text-gray-600"
+                        )
 
+                    # Author of the note
+                    if entry.get("autor_nota_alias"):
+                        with ui.row().classes("items-center gap-2 mt-1"):
+                            ui.icon("person", size="sm").classes("text-gray-500")
+                            ui.label(f"Por: {entry['autor_nota_alias']}").classes(
+                                "text-caption text-blue-600"
+                            )
+
+                # Edit and delete buttons
                 with ui.row().classes("gap-2"):
                     ui.button(
-                        icon="edit", on_click=lambda e=entry: self._edit_note(e)
-                    ).props("size=sm flat dense")
+                        icon="edit",
+                        on_click=lambda e=entry: self._edit_note(e)
+                    ).props("size=sm flat dense").tooltip("Editar nota")
+
                     ui.button(
-                        icon="delete", on_click=lambda e=entry: self._delete_note(e)
-                    ).props("size=sm flat dense color=negative")
+                        icon="delete",
+                        on_click=lambda e=entry: self._delete_note(e)
+                    ).props("size=sm flat dense color=negative").tooltip("Eliminar nota")
 
-            if entry.get("causa"):
-                with ui.row().classes("mb-1"):
-                    ui.label("Nota:").classes("font-semibold mr-2")
-                    ui.label(entry["causa"])
+            # Status badges
+            with ui.row().classes("gap-2 mb-2"):
+                if entry.get("estado"):
+                    color_map = {
+                        "Abierto": "red",
+                        "En proceso": "orange",
+                        "Resuelto": "green",
+                        "Cerrado": "gray"
+                    }
+                    color = color_map.get(entry["estado"], "blue")
+                    ui.badge(f"Estado: {entry['estado']}", color=color).props("outline")
 
-            # Display the full name from the view
-            if entry.get("afiliada_nombre_completo"):
-                with ui.row().classes("mb-1"):
-                    ui.label("Afiliada:").classes("font-semibold mr-2")
-                    ui.label(entry["afiliada_nombre_completo"])
+                if entry.get("accion_nombre"):
+                    ui.badge(f"Acción: {entry['accion_nombre']}", color="purple").props("outline")
 
-            if entry.get("ambito"):
-                with ui.row().classes("mb-1"):
-                    ui.label("Ámbito:").classes("font-semibold mr-2")
-                    ui.label(entry["ambito"])
+                if entry.get("ambito"):
+                    ui.badge(f"Ámbito: {entry['ambito']}", color="indigo").props("outline")
+
+            # Main note content
+            if entry.get("notas"):
+                ui.separator().classes("my-2")
+                with ui.row().classes("w-full"):
+                    ui.icon("notes", size="sm").classes("text-gray-500 mt-1")
+                    with ui.column().classes("flex-grow ml-2"):
+                        ui.label("Nota:").classes("font-semibold text-sm")
+                        ui.label(entry["notas"]).classes("text-gray-700 whitespace-pre-wrap")
+
+            # Show affiliate name if different from main conflict
+            if entry.get("afiliada_nombre_completo") and entry.get("afiliada_nombre_completo") != self.state.selected_conflict.get("afiliada_nombre_completo"):
+                ui.separator().classes("my-2")
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("person_outline", size="sm").classes("text-gray-500")
+                    ui.label(f"Afiliada: {entry['afiliada_nombre_completo']}").classes("text-caption")
 
     async def _add_note(self):
         """Add a new note to the selected conflict"""
@@ -202,7 +292,7 @@ class ConflictsView:
             on_success=on_note_added,
             mode="create",
         )
-        dialog.open()
+        await dialog.open()
 
     async def _edit_note(self, note: dict):
         """Edit an existing note"""
@@ -218,7 +308,7 @@ class ConflictsView:
             on_success=on_note_updated,
             mode="edit",
         )
-        dialog.open()
+        await dialog.open()
 
     async def _delete_note(self, note: dict):
         """Delete a note with confirmation"""
@@ -230,7 +320,13 @@ class ConflictsView:
                 "text-body2 text-gray-600"
             )
 
-            with ui.row().classes("w-full justify-end gap-2"):
+            # Show a preview of the note
+            if note.get("notas"):
+                ui.separator().classes("my-2")
+                note_preview = note["notas"][:100] + "..." if len(note["notas"]) > 100 else note["notas"]
+                ui.label(f'Nota: "{note_preview}"').classes("text-caption text-gray-500")
+
+            with ui.row().classes("w-full justify-end gap-2 mt-4"):
                 ui.button("Cancelar", on_click=dialog.close).props("flat")
 
                 async def confirm():

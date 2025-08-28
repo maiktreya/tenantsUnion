@@ -28,15 +28,17 @@ class Conflict:
             if v is not None
         }
 
+
 @dataclass
 class ConflictNote:
     """Conflict note/history entry"""
     id: Optional[int] = None
     conflicto_id: Optional[int] = None
+    accion_id: Optional[int] = None
+    usuario_id: Optional[int] = None
     estado: Optional[str] = None
     ambito: Optional[str] = None
-    afectada: Optional[str] = None
-    causa: Optional[str] = None
+    notas: Optional[str] = None
     created_at: Optional[str] = None
 
     @classmethod

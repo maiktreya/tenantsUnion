@@ -95,3 +95,23 @@ FROM (VALUES
     (28737), (28739), (28740), (28742), (28743), (28749), (28751),
     (28752), (28754), (28755), (28756), (28792)
 ) AS data(cp) ON CONFLICT (cp) DO NOTHING;
+
+
+
+
+-- Populate the 'acciones' table with the predefined values.
+INSERT INTO sindicato_inq.acciones (nombre) VALUES
+    ('nota simple'),
+    ('nota localización propiedades'),
+    ('deposito fianza'),
+    ('puerta a puerta'),
+    ('comunicación enviada'),
+    ('llamada'),
+    ('acción'),
+    ('reunión de negociación'),
+    ('informe vulnerabilidad'),
+    ('MASC'),
+    ('justicia gratuita'),
+    ('demanda'),
+    ('sentencia')
+ON CONFLICT (nombre) DO NOTHING;

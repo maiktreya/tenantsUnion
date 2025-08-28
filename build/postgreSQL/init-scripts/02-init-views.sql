@@ -67,3 +67,68 @@ FROM
     diario_conflictos d
 LEFT JOIN
     afiliadas a ON d.afectada::integer = a.id;
+
+CREATE OR REPLACE VIEW v_conflictos_con_afiliada AS
+SELECT
+    c.*,
+    -- Concatenate the affiliate's first and last names for a full name.
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
+
+    -- Get the alias of the user responsible for the conflict.
+    u.alias AS usuario_responsable_alias,
+
+    -- Get the name of the territorial node associated with the conflict's location.
+    n.nombre AS nodo_nombre
+FROM
+    conflictos c
+    -- Join to get affiliate information.
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
+    -- Join to get the name of the user responsible.
+    LEFT JOIN usuarios u ON c.usuario_responsable_id = u.id
+    -- Join path to find the territorial node.
+    LEFT JOIN pisos p ON a.piso_id = p.id
+    LEFT JOIN bloques b ON p.bloque_id = b.id
+    LEFT JOIN nodos n ON b.nodo_id = n.id;
+
+CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
+SELECT
+    d.*,
+    -- Get the full name of the affiliate related to the conflict.
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
+
+    -- Get the alias of the user who created the diary entry.
+    u.alias AS autor_nota_alias,
+
+    -- Get the name of the action performed.
+    ac.nombre AS accion_nombre
+FROM
+    diario_conflictos d
+    -- Join to get the conflict (and from there, the affiliate).
+    LEFT JOIN conflictos c ON d.conflicto_id = c.id
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN usuarios u ON d.usuario_id = u.id
+    LEFT JOIN acciones ac ON d.accion_id = ac.id;
+
+CREATE OR REPLACE VIEW sindicato_inq.v_conflictos_con_nodo AS
+SELECT
+    c.*,
+    -- Get the full name of the affiliate involved in the conflict.
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
+
+    -- Get the alias of the user responsible for managing the conflict.
+    u.alias AS usuario_responsable_alias,
+
+    -- Get the name of the territorial node associated with the conflict's location.
+    n.nombre AS nodo_nombre,
+
+    -- Include the full address of the property for context.
+    p.direccion AS direccion_piso
+FROM
+    sindicato_inq.conflictos c
+    -- Join path to find the territorial node from the conflict.
+    LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
+    LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
+    LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id
+    -- Join to get the user responsible for the conflict.
+    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;

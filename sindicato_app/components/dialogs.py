@@ -1,5 +1,5 @@
 from typing import Dict, Optional, Callable
-from nicegui import ui
+from nicegui import ui, app
 from api.client import APIClient
 from config import TABLE_INFO  # Import TABLE_INFO to get relation metadata
 
@@ -192,8 +192,10 @@ class EnhancedRecordDialog(RecordDialog):
                 ).classes("w-full")
 
 
+
+
 class ConflictNoteDialog:
-    """Dialog for adding notes to conflicts"""
+    """Dialog para añadir o editar notas en conflictos, compatible con la nueva tabla diario_conflictos"""
 
     def __init__(
         self,
@@ -209,10 +211,19 @@ class ConflictNoteDialog:
         self.record = record or {}
         self.mode = mode
         self.dialog = None
+        self.acciones_options = {}
 
-    def open(self):
-        """Open the dialog"""
+    async def open(self):
+        """Abre el diálogo (ahora async porque carga acciones)"""
         from datetime import datetime
+
+        # Cargar acciones
+        try:
+            acciones = await self.api.get_records("acciones", order="id.asc")
+            self.acciones_options = {accion["id"]: accion.get("nombre", f"Acción #{accion['id']}") for accion in acciones}
+        except Exception as e:
+            ui.notify(f"Error al cargar acciones: {e}", type="negative")
+            self.acciones_options = {}
 
         self.dialog = ui.dialog()
 
@@ -224,107 +235,100 @@ class ConflictNoteDialog:
             )
             ui.label(title).classes("text-h6")
 
-            # Input fields
-            initial_estado = (
-                self.record.get("estado")
-                if self.mode == "edit"
-                else self.conflict.get("estado", "")
-            )
+            # Inputs de la nueva estructura
+            # Estado
+            initial_estado = self.record.get("estado") if self.mode == "edit" else self.conflict.get("estado", "")
             estado_input = ui.select(
                 options=["Abierto", "En proceso", "Resuelto", "Cerrado"],
                 label="Estado",
                 value=initial_estado,
             ).classes("w-full")
 
+            # Ámbito
             ambito_input = ui.input(
                 "Ámbito",
-                value=(
-                    self.record.get("ambito")
-                    if self.mode == "edit"
-                    else self.conflict.get("ambito", "")
-                ),
+                value=self.record.get("ambito") if self.mode == "edit" else self.conflict.get("ambito", ""),
             ).classes("w-full")
 
-            afectada_input = ui.input(
-                "Afectada",
+            # Acción (nuevo campo obligatorio)
+            accion_input = ui.select(
+                options=self.acciones_options,
+                label="Acción realizada",
+                value=self.record.get("accion_id") if self.mode == "edit" else None,
+            ).classes("w-full")
+
+            # Afiliada (puede venir del conflicto o de la nota previa)
+            afiliada_input = ui.number(
+                "ID Afiliada (opcional)",
                 value=(
-                    self.record.get("afectada")
+                    self.record.get("afiliada_id")
                     if self.mode == "edit"
                     else self.conflict.get("afiliada_id", "")
                 ),
-            ).classes("w-full")
+                ).classes("w-full")
 
+            # Notas (nuevo campo obligatorio)
             notas_input = ui.textarea(
-                "Actualización/Notas", value=self.record.get("causa", "")
+                "Actualización/Notas",
+                value=self.record.get("notas", "")
             ).classes("w-full")
 
-            # Action buttons
+            # Botones
             with ui.row().classes("w-full justify-end gap-2"):
                 ui.button("Cancelar", on_click=self.dialog.close).props("flat")
 
                 async def save_note():
                     try:
+                        # Usuario actual
+                        user_id = app.storage.user.get("user_id")
+                        if not user_id:
+                            ui.notify("Error: usuario no identificado", type="negative")
+                            return
+
                         note_data = {
                             "conflicto_id": self.conflict["id"],
+                            "accion_id": accion_input.value,
+                            "usuario_id": user_id,
                             "estado": estado_input.value or None,
                             "ambito": ambito_input.value or None,
-                            "afectada": afectada_input.value or None,
-                            "causa": notas_input.value or None,
-                        }
-                        if self.mode == "create":
-                            note_data["created_at"] = datetime.now().isoformat()
-
-                        note_data = {
-                            k: v for k, v in note_data.items() if v is not None
+                            "notas": notas_input.value or None,
                         }
 
-                        # Save the diary note (create or update)
+
+                        note_data = {k: v for k, v in note_data.items() if v is not None}
+
+                        # Guardar la nota (insertar o editar)
                         if self.mode == "create":
-                            result = await self.api.create_record(
-                                "diario_conflictos", note_data
-                            )
+                            result = await self.api.create_record("diario_conflictos", note_data)
                         else:
-                            result = await self.api.update_record(
-                                "diario_conflictos", self.record["id"], note_data
-                            )
+                            result = await self.api.update_record("diario_conflictos", self.record["id"], note_data)
 
-                        # --- MODIFIED SECTION START ---
                         if result:
+
+                            result = await self.api.create_record("diario_conflictos", note_data)
+                            # Si cambiamos el estado general, actualizamos el conflicto principal
                             conflict_update_data = {}
                             new_estado = estado_input.value
-
-                            # Check if the conflict's main status needs updating
                             if new_estado and new_estado != self.conflict.get("estado"):
                                 conflict_update_data["estado"] = new_estado
-
-                            # If the new status is "Cerrado", set the closing date
+                            # Si cerramos, guardamos la fecha
                             if new_estado == "Cerrado":
-                                conflict_update_data["fecha_cierre"] = (
-                                    datetime.now().strftime("%Y-%m-%d")
-                                )
-
-                            # If there's anything to update in the main conflict record, make the API call
+                                conflict_update_data["fecha_cierre"] = datetime.now().strftime("%Y-%m-%d")
                             if conflict_update_data:
-                                await self.api.update_record(
-                                    "conflictos",
-                                    self.conflict["id"],
-                                    conflict_update_data,
-                                )
+                                await self.api.update_record("conflictos", self.conflict["id"], conflict_update_data)
 
                             ui.notify(
                                 f"Nota {'añadida' if self.mode == 'create' else 'actualizada'} con éxito",
                                 type="positive",
                             )
                             self.dialog.close()
-
                             if self.on_success:
                                 await self.on_success()
-                        # --- MODIFIED SECTION END ---
-
+                        else:
+                            print("DEBUG note_data:", note_data)
+                            ui.notify("Error al guardar la nota", type="negative")
                     except Exception as e:
-                        ui.notify(
-                            f"Error al guardar la nota: {str(e)}", type="negative"
-                        )
+                        ui.notify(f"Error al guardar la nota: {str(e)}", type="negative")
 
                 ui.button(
                     "Guardar", on_click=lambda: ui.timer(0.1, save_note, once=True)
