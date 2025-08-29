@@ -653,81 +653,33 @@ VALUES (
     );
 
 -- Contraseña para todos los usuarios: "password"
--- Hashed con bcrypt: $2b$12$D.o4b4..i8G8V.8.L0fG/eGnJ4p.eKz5p.E/e5n.C.e.B.d.a.a
+-- Ejemplo de inserción de datos (a modo de demostración)
 INSERT INTO
-    usuario_credenciales (usuario_id, password_hash)
+    sindicato_inq.roles (nombre, descripcion)
 VALUES (
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'test_admin'
-        ),
-        '$2b$12$D.o4b4..i8G8V.8.L0fG/eGnJ4p.eKz5p.E/e5n.C.e.B.d.a.a'
-    ),
-    (
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'test_gestor'
-        ),
-        '$2b$12$D.o4b4..i8G8V.8.L0fG/eGnJ4p.eKz5p.E/e5n.C.e.B.d.a.a'
-    ),
-    (
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'test_user'
-        ),
-        '$2b$12$D.o4b4..i8G8V.8.L0fG/eGnJ4p.eKz5p.E/e5n.C.e.B.d.a.a'
+        'admin',
+        'Administrador con todos los permisos'
     );
 
 INSERT INTO
-    usuario_roles (usuario_id, role_id)
+    sindicato_inq.roles (nombre, descripcion)
 VALUES (
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'test_admin'
-        ),
-        (
-            SELECT id
-            FROM roles
-            WHERE
-                nombre = 'admin'
-        )
-    ),
-    (
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'test_admin'
-        ),
-        (
-            SELECT id
-            FROM roles
-            WHERE
-                nombre = 'sistemas'
-        )
-    ),
-    (
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'test_gestor'
-        ),
-        (
-            SELECT id
-            FROM roles
-            WHERE
-                nombre = 'gestor'
-        )
+        'gestor',
+        'Gestor de conflictos y afiliadas'
     );
+
+-- Para asignar el rol 'admin' al usuario con id 1:
+-- INSERT INTO sindicato_inq.usuario_roles (usuario_id, role_id) VALUES (1, 1);
+
+UPDATE sindicato_inq.usuario_credenciales
+SET
+    password_hash = '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
+WHERE
+    usuario_id = 1;
+
+INSERT INTO
+    sindicato_inq.usuario_roles (usuario_id, role_id)
+VALUES (1, 1);
 
 INSERT INTO
     afiliadas (
