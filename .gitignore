@@ -10,6 +10,7 @@ __pycache__/
 # Environment and IDE
 .venv
 .vscode
+.pytest_cache
 
 # other local folders & files
 back
