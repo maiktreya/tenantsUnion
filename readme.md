@@ -77,6 +77,7 @@ La aplicación se organiza en módulos funcionales clave, accesibles según los 
 | **Proxy Inverso**    | Nginx                                              | Punto de entrada único, terminación SSL y seguridad.      |
 | **Certificados SSL** | Let's Encrypt con Certbot                          | Cifrado HTTPS gratuito y automatizado.                    |
 | **DNS Dinámico**     | DuckDNS                                            | Gestión de dominio para el certificado SSL.               |
+| **Unix Firewall**    | UFW                                                | Firewall Unix denegando acceso por defecto.               |
 
 ## 🛠️ Despliegue y Ejecución
 
@@ -102,9 +103,9 @@ Este proceso describe el despliegue completo en un único host con SSL.
 
     ```dotenv
     # Credenciales de la base de datos (puedes dejarlas o cambiarlas)
-    POSTGRES_USER=app_user
-    POSTGRES_PASSWORD=password
-    POSTGRES_DB=mydb
+    POSTGRES_USER=usuario
+    POSTGRES_PASSWORD=user_pass
+    POSTGRES_DB=your_db
 
     # Secreto para la sesión de NiceGUI (¡cambia esto!)
     NICEGUI_STORAGE_SECRET=un-secreto-muy-largo-y-seguro-aqui
