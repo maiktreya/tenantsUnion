@@ -64,12 +64,6 @@ SET
 WHERE
     usuario_id = 1;
 
-UPDATE sindicato_inq.usuario_credenciales
-SET
-    password_hash = '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-WHERE
-    usuario_id = 1;
-
 INSERT INTO
     sindicato_inq.usuario_roles (usuario_id, role_id)
 VALUES (1, 1);

@@ -463,7 +463,7 @@ INSERT INTO
         roles
     )
 VALUES (
-        'test_admin',
+        'sumate',
         'Admin',
         'de Sistemas',
         'admin@example.com',
