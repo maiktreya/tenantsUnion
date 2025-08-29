@@ -648,22 +648,6 @@ VALUES (
         NULL
     );
 
--- Contraseña para todos los usuarios: "password"
--- Para asignar el rol 'admin' al usuario con id 1:
--- INSERT INTO sindicato_inq.usuario_roles (usuario_id, role_id) VALUES (1, 1);
-
-UPDATE sindicato_inq.usuario_credenciales
-SET
-    password_hash = '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-WHERE
-    usuario_id = 1;
-
-INSERT INTO
-    sindicato_inq.usuario_roles (usuario_id, role_id)
-VALUES (1, 1);
-
-----------------------------
-
 INSERT INTO
     afiliadas (
         piso_id,
@@ -898,3 +882,23 @@ VALUES (
         'Se envía burofax al propietario reclamando la devolución de la fianza.',
         '2024-11-20 12:30:00'
     );
+
+-- Contraseña para todos los usuarios: "password"
+-- Para asignar el rol 'admin' al usuario con id 1:
+-- INSERT INTO sindicato_inq.usuario_roles (usuario_id, role_id) VALUES (1, 1);
+
+-- Insert the credential record first
+INSERT INTO
+    sindicato_inq.usuario_credenciales (usuario_id, password_hash)
+VALUES (1, '$2b$12$temp_hash') ON CONFLICT (usuario_id) DO NOTHING;
+
+-- Then update it
+UPDATE sindicato_inq.usuario_credenciales
+SET
+    password_hash = '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
+WHERE
+    usuario_id = 1;
+
+INSERT INTO
+    sindicato_inq.usuario_roles (usuario_id, role_id)
+VALUES (1, 1);
