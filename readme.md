@@ -15,7 +15,7 @@ graph TD
         A[Usuario en Navegador Web]
     end
 
-    subgraph "Docker compose (SingleHost)"
+    subgraph "(Dockerize SingleHost)"
         B[UFW firewall <br> Puertos 22/80/443]
         C[Nginx Reverse Proxy <br> Puertos 80/443]
         D[NiceGUI Frontend <br> Python]
