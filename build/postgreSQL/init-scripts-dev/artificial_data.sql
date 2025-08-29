@@ -399,10 +399,6 @@ VALUES (
     (
         'gestor',
         'Gestor de conflictos y afiliadas'
-    ),
-    (
-        'sistemas',
-        'Acceso de superusuario para mantenimiento'
     ) ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO
@@ -632,7 +628,7 @@ INSERT INTO
     )
 VALUES (
         'sumate',
-        'Admin',
+        'sumate',
         'de Sistemas',
         'admin@example.com',
         'sistemas'
@@ -653,21 +649,6 @@ VALUES (
     );
 
 -- Contraseña para todos los usuarios: "password"
--- Ejemplo de inserción de datos (a modo de demostración)
-INSERT INTO
-    sindicato_inq.roles (nombre, descripcion)
-VALUES (
-        'admin',
-        'Administrador con todos los permisos'
-    );
-
-INSERT INTO
-    sindicato_inq.roles (nombre, descripcion)
-VALUES (
-        'gestor',
-        'Gestor de conflictos y afiliadas'
-    );
-
 -- Para asignar el rol 'admin' al usuario con id 1:
 -- INSERT INTO sindicato_inq.usuario_roles (usuario_id, role_id) VALUES (1, 1);
 
@@ -680,6 +661,8 @@ WHERE
 INSERT INTO
     sindicato_inq.usuario_roles (usuario_id, role_id)
 VALUES (1, 1);
+
+----------------------------
 
 INSERT INTO
     afiliadas (
