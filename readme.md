@@ -16,17 +16,19 @@ graph TD
     end
 
     subgraph "Servidor Dockerizado (Host Único)"
-        B[Nginx Reverse Proxy <br> Puertos 80/443]
-        C[NiceGUI Frontend <br> Python]
-        D[PostgREST API <br> Generada desde BBDD]
-        E[PostgreSQL Database]
+        B[UFW firewall <br> Puertos 22/80/443]
+        C[Nginx Reverse Proxy <br> Puertos 80/443]
+        D[NiceGUI Frontend <br> Python]
+        E[PostgREST API <br> Generada desde BBDD]
+        F[PostgreSQL Database]
     end
 
     A --> B
     B --> C
-    B --"/api/"--> D
-    C --> D
-    D <--> E
+    B --> C
+    C --"/api/"--> E
+    D --> E
+    E <--> F
 ```
 
   * **Capa de Datos (PostgreSQL):** Una base de datos relacional robusta que actúa como la única fuente de verdad. La lógica de negocio, como la sincronización de nodos, se implementa directamente en la BBDD mediante triggers y vistas para centralizar la lógica.
@@ -66,15 +68,15 @@ La aplicación se organiza en módulos funcionales clave, accesibles según los 
 
 ## 🚀 Tecnologías Utilizadas
 
-| Componente          | Tecnología                                                               | Propósito                                                 |
-| ------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------- |
-| **Frontend** | [NiceGUI](https://nicegui.io/) (basado en FastAPI)                       | Interfaz de usuario web rápida y reactiva en Python.      |
-| **API** | [PostgREST](http://postgrest.org/)                                      | Generación automática de API RESTful desde la BBDD.       |
-| **Base de Datos** | PostgreSQL                                                               | Almacenamiento de datos relacional y fuente de verdad.    |
-| **Contenerización** | Docker y Docker Compose                                                  | Orquestación de servicios para portabilidad y despliegue. |
-| **Proxy Inverso** | Nginx                                                                    | Punto de entrada único, terminación SSL y seguridad.      |
-| **Certificados SSL**| Let's Encrypt con Certbot                                                | Cifrado HTTPS gratuito y automatizado.                    |
-| **DNS Dinámico** | DuckDNS                                                                  | Gestión de dominio para el certificado SSL.               |
+| Componente           | Tecnología                                         | Propósito                                                 |
+| -------------------- | -------------------------------------------------- | --------------------------------------------------------- |
+| **Frontend**         | [NiceGUI](https://nicegui.io/) (basado en FastAPI) | Interfaz de usuario web rápida y reactiva en Python.      |
+| **API**              | [PostgREST](http://postgrest.org/)                 | Generación automática de API RESTful desde la BBDD.       |
+| **Base de Datos**    | PostgreSQL                                         | Almacenamiento de datos relacional y fuente de verdad.    |
+| **Contenerización**  | Docker y Docker Compose                            | Orquestación de servicios para portabilidad y despliegue. |
+| **Proxy Inverso**    | Nginx                                              | Punto de entrada único, terminación SSL y seguridad.      |
+| **Certificados SSL** | Let's Encrypt con Certbot                          | Cifrado HTTPS gratuito y automatizado.                    |
+| **DNS Dinámico**     | DuckDNS                                            | Gestión de dominio para el certificado SSL.               |
 
 ## 🛠️ Despliegue y Ejecución
 

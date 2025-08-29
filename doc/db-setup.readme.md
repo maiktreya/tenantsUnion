@@ -2,13 +2,18 @@
 
 # Guía de Construcción del Esquema de la Base de Datos
 
-Este documento describe el proceso paso a paso utilizado para construir y poblar el esquema de la base de datos PostgreSQL para el Sistema de Gestión del Sindicato de Inquilinas. El proceso está automatizado a través de una serie de scripts SQL ordenados ubicados en el directorio `/build/postgreSQL/init-scripts/`.
-
 ---
+Este documento describe el proceso paso a paso utilizado para construir y poblar el esquema de la base de datos PostgreSQL de la app. El proceso está automatizado a través de una serie de scripts SQL ordenados ubicados en el directorio `/build/postgreSQL/init-scripts/`.
+
+
+(**NOTA:** Muchas de las tablas de la versión interior se han ignorado directamente por ser **a) innecesarias** o redundantes **b) inconsistentes** desde el punto de vista de la integridad relacional de los datos **c) vulnerables** desde el punto de vista de la seguridad, como el almacenamiento en texto plano de passwords).
+
+* **El paso 1** se limita a **migrar y replicar parcialmente** la estructura y los datos ya existentes en la BBDD anterior.
+* Los **pasos 2 a 5** definen **nuevas tablas y relaciones** no existentes en la versión actual de la BBDD
 
 ## Paso 1: Esquema Central y Migración de Datos (`01-init-schema-and-data.sql`)
 
-Este es el script fundamental que establece la estructura de la base de datos y realiza la migración inicial de datos desde los archivos CSV heredados.
+Este es el script fundamental que establece la estructura de la base de datos y realiza la migración inicial de datos desde los archivos CSV heredados. Desde la antigua base de datos
 
 1.  **Creación del Esquema**: Comienza creando el esquema principal, `sindicato_inq`, para encapsular todos los objetos de la base de datos.
 2.  **Definición de Tablas**: El script define las tablas finales y normalizadas para la aplicación, incluyendo `empresas`, `bloques`, `pisos`, `afiliadas`, `conflictos` y `usuarios`. La integridad referencial se establece mediante el uso de claves foráneas.

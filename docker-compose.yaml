@@ -1,9 +1,8 @@
-# Updated docker-compose.yaml
 services:
   db:
     image: postgres:17
     expose:
-      - "5432"  # Internal only - no external access
+      - "5432" # Internal only - no external access
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -21,7 +20,7 @@ services:
   server:
     image: postgrest/postgrest:v12.2.8
     expose:
-      - "3000"  # Internal only - no external access
+      - "3000" # Internal only - no external access
     environment:
       PGRST_DB_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PGRST_OPENAPI_SERVER_PROXY_URI: ${POSTGRES_API_URL}
@@ -37,7 +36,7 @@ services:
     profiles:
       - Frontend
     expose:
-      - "8081"  # Internal only - no external access
+      - "8081" # Internal only - no external access
     volumes:
       - ./build/niceGUI:/app:ro
     working_dir: /app
@@ -56,15 +55,13 @@ services:
     image: nginx:latest
     profiles:
       - Secured
-    # ADD THIS ENVIRONMENT SECTION
     environment:
       - HOSTNAME=${HOSTNAME}
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:80" # HTTP EntryPoint
+      - "443:443" # HTTPs EntryPoint
     volumes:
       - ./build/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
-      # This path should be the parent certbot directory
       - ./build/nginx/certbot:/etc/letsencrypt
       - ./build/nginx/certbot/www:/var/www/certbot
     command: >
@@ -75,13 +72,11 @@ services:
     restart: unless-stopped
 
   certbot:
-    # UPDATED: Use the build context instead of a pre-built image
     build:
-      context: ./build/certbot
+      context: ./build/certbot # custom image with duckdns integration
     profiles:
       - Secured
     volumes:
-      # CORRECTED VOLUME: Point to the parent certbot directory
       - ./build/nginx/certbot:/etc/letsencrypt
       - ./build/nginx/certbot/www:/var/www/certbot
     restart: "no"
