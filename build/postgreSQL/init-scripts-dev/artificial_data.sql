@@ -1,27 +1,29 @@
 -- =====================================================================
 -- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (VERSIÓN COMPLETA Y AUTÓNOMA)
 -- =====================================================================
--- Este script crea el esquema completo, define las tablas, crea índices
--- y puebla la base de datos con un conjunto de datos amplio y artificial
--- para permitir pruebas exhaustivas del sistema.
+-- Este script crea el esquema completo, define las tablas, crea índices,
+-- configura la autenticación, genera las vistas y puebla la base de
+-- datos con un conjunto de datos amplio y artificial.
 -- =====================================================================
 
--- CREACIÓN DEL ESQUEMA
+-- =====================================================================
+-- PASO 0: CREACIÓN DEL ESQUEMA
+-- =====================================================================
 CREATE SCHEMA IF NOT EXISTS sindicato_inq;
 
 SET search_path TO sindicato_inq, public;
 
 -- =====================================================================
--- PARTE 1: DEFINICIÓN DE LAS TABLAS FINALES Y NORMALIZADAS
+-- PASO 1: DEFINICIÓN DE TABLAS E ÍNDICES (de 01-init-schema-and-data.sql)
 -- =====================================================================
 
-CREATE TABLE entramado_empresas (
+CREATE TABLE IF NOT EXISTS entramado_empresas (
     id SERIAL PRIMARY KEY,
     nombre TEXT UNIQUE,
     descripcion TEXT
 );
 
-CREATE TABLE empresas (
+CREATE TABLE IF NOT EXISTS empresas (
     id SERIAL PRIMARY KEY,
     entramado_id INTEGER REFERENCES entramado_empresas (id) ON DELETE SET NULL,
     nombre TEXT,
@@ -31,7 +33,7 @@ CREATE TABLE empresas (
     direccion_fiscal TEXT
 );
 
-CREATE TABLE bloques (
+CREATE TABLE IF NOT EXISTS bloques (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
     direccion TEXT UNIQUE,
@@ -39,7 +41,7 @@ CREATE TABLE bloques (
     api TEXT
 );
 
-CREATE TABLE pisos (
+CREATE TABLE IF NOT EXISTS pisos (
     id SERIAL PRIMARY KEY,
     bloque_id INTEGER REFERENCES bloques (id) ON DELETE SET NULL,
     direccion TEXT NOT NULL UNIQUE,
@@ -50,7 +52,7 @@ CREATE TABLE pisos (
     por_habitaciones BOOLEAN
 );
 
-CREATE TABLE usuarios (
+CREATE TABLE IF NOT EXISTS usuarios (
     id SERIAL PRIMARY KEY,
     alias TEXT UNIQUE,
     nombre TEXT,
@@ -59,7 +61,7 @@ CREATE TABLE usuarios (
     roles TEXT
 );
 
-CREATE TABLE afiliadas (
+CREATE TABLE IF NOT EXISTS afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
     num_afiliada TEXT UNIQUE,
@@ -72,7 +74,7 @@ CREATE TABLE afiliadas (
     fecha_alta DATE
 );
 
-CREATE TABLE facturacion (
+CREATE TABLE IF NOT EXISTS facturacion (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE CASCADE,
     cuota DECIMAL(8, 2),
@@ -81,7 +83,7 @@ CREATE TABLE facturacion (
     iban TEXT
 );
 
-CREATE TABLE asesorias (
+CREATE TABLE IF NOT EXISTS asesorias (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
     tecnica_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
@@ -92,7 +94,7 @@ CREATE TABLE asesorias (
     resultado TEXT
 );
 
-CREATE TABLE conflictos (
+CREATE TABLE IF NOT EXISTS conflictos (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
     usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
@@ -105,13 +107,13 @@ CREATE TABLE conflictos (
     resolucion TEXT
 );
 
-CREATE TABLE acciones (
+CREATE TABLE IF NOT EXISTS acciones (
     id SERIAL PRIMARY KEY,
     nombre TEXT UNIQUE NOT NULL,
     descripcion TEXT
 );
 
-CREATE TABLE diario_conflictos (
+CREATE TABLE IF NOT EXISTS diario_conflictos (
     id SERIAL PRIMARY KEY,
     conflicto_id INTEGER NOT NULL REFERENCES conflictos (id) ON DELETE CASCADE,
     usuario_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
@@ -122,16 +124,11 @@ CREATE TABLE diario_conflictos (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- MEJORA DE LA TABLA DE USUARIOS
 ALTER TABLE usuarios
 ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
 ADD COLUMN IF NOT EXISTS created_at TIMESTAMP
 WITH
     TIME ZONE DEFAULT CURRENT_TIMESTAMP;
-
--- =====================================================================
--- PARTE 2: CREACIÓN DE ÍNDICES PARA MEJORAR EL RENDIMIENTO
--- =====================================================================
 
 CREATE INDEX IF NOT EXISTS idx_empresas_entramado_id ON empresas (entramado_id);
 
@@ -158,31 +155,221 @@ CREATE INDEX IF NOT EXISTS idx_diario_conflictos_accion_id ON diario_conflictos 
 CREATE INDEX IF NOT EXISTS idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 
 -- =====================================================================
--- PARTE 3: POBLACIÓN DE DATOS ARTIFICIALES
+-- PASO 2: INTEGRACIÓN DE NODOS (de 02-init-nodos.sql)
 -- =====================================================================
 
--- Limpiar datos existentes para evitar conflictos
-DELETE FROM diario_conflictos;
+CREATE TABLE IF NOT EXISTS sindicato_inq.nodos (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT UNIQUE NOT NULL,
+    descripcion TEXT
+);
 
-DELETE FROM conflictos;
+CREATE TABLE IF NOT EXISTS sindicato_inq.nodos_cp_mapping (
+    cp INTEGER PRIMARY KEY,
+    nodo_id INTEGER REFERENCES nodos (id) ON DELETE CASCADE NOT NULL
+);
 
-DELETE FROM asesorias;
+CREATE INDEX IF NOT EXISTS idx_nodos_cp_mapping_nodo_id ON sindicato_inq.nodos_cp_mapping (nodo_id);
 
-DELETE FROM facturacion;
+ALTER TABLE sindicato_inq.bloques
+ADD COLUMN IF NOT EXISTS nodo_id INTEGER REFERENCES sindicato_inq.nodos (id) ON DELETE SET NULL;
 
-DELETE FROM afiliadas;
+CREATE INDEX IF NOT EXISTS idx_bloques_nodo_id ON sindicato_inq.bloques (nodo_id);
 
-DELETE FROM usuarios;
+CREATE OR REPLACE FUNCTION sync_bloque_nodo()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE sindicato_inq.bloques
+    SET nodo_id = (SELECT nodo_id FROM sindicato_inq.nodos_cp_mapping WHERE cp = NEW.cp)
+    WHERE id = NEW.bloque_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-DELETE FROM pisos;
+DROP TRIGGER IF EXISTS trigger_sync_bloque_nodo ON sindicato_inq.pisos;
 
-DELETE FROM bloques;
+CREATE TRIGGER trigger_sync_bloque_nodo
+AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
+FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
 
-DELETE FROM empresas;
+-- =====================================================================
+-- PASO 3: AUTENTICACIÓN Y AUTORIZACIÓN (de 03-init-userAuth.sql)
+-- =====================================================================
 
-DELETE FROM entramado_empresas;
+CREATE TABLE IF NOT EXISTS sindicato_inq.usuario_credenciales (
+    usuario_id INTEGER PRIMARY KEY REFERENCES sindicato_inq.usuarios (id) ON DELETE CASCADE,
+    password_hash TEXT NOT NULL
+);
 
-DELETE FROM acciones;
+CREATE TABLE IF NOT EXISTS sindicato_inq.roles (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT UNIQUE NOT NULL,
+    descripcion TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sindicato_inq.usuario_roles (
+    usuario_id INTEGER REFERENCES sindicato_inq.usuarios (id) ON DELETE CASCADE,
+    role_id INTEGER REFERENCES sindicato_inq.roles (id) ON DELETE CASCADE,
+    PRIMARY KEY (usuario_id, role_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_usuario_roles_usuario_id ON sindicato_inq.usuario_roles (usuario_id);
+
+CREATE INDEX IF NOT EXISTS idx_usuario_roles_role_id ON sindicato_inq.usuario_roles (role_id);
+
+-- =====================================================================
+-- PASO 4: VISTAS PARA PRESENTACIÓN DE DATOS (de 04-init-views.sql)
+-- =====================================================================
+
+CREATE OR REPLACE VIEW v_afiliadas AS
+SELECT a.num_afiliada, a.nombre, a.apellidos, a.cif, a.genero,
+    TRIM(CONCAT_WS(', ', p.direccion, p.municipio, p.cp::text)) AS "Dirección",
+    f.cuota,
+    CASE f.periodicidad WHEN 1 THEN 'Mensual' WHEN 3 THEN 'Trimestral' WHEN 6 THEN 'Semestral' WHEN 12 THEN 'Anual' ELSE 'Otra' END AS "Frecuencia de Pago",
+    f.forma_pago, f.iban, a.regimen, a.estado, e.api, e.nombre AS "Propiedad", ee.nombre AS "Entramado"
+FROM afiliadas a
+LEFT JOIN facturacion f ON a.id = f.afiliada_id
+LEFT JOIN pisos p ON a.piso_id = p.id
+LEFT JOIN bloques b ON p.bloque_id = b.id
+LEFT JOIN empresas e ON b.empresa_id = e.id
+LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id;
+
+CREATE OR REPLACE VIEW v_empresas AS
+SELECT e.nombre, e.cif_nif_nie, ee.nombre AS "Entramado", e.directivos, e.api, e.direccion_fiscal, COUNT(DISTINCT a.id) AS "Núm.Afiliadas"
+FROM
+    empresas e
+    LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
+    LEFT JOIN bloques b ON e.id = b.empresa_id
+    LEFT JOIN pisos p ON b.id = p.bloque_id
+    LEFT JOIN afiliadas a ON p.id = a.piso_id
+GROUP BY
+    e.id,
+    ee.nombre;
+
+CREATE OR REPLACE VIEW v_bloques AS
+SELECT b.direccion, b.estado, b.api, e.nombre AS "Propiedad", ee.nombre AS "Entramado", COUNT(DISTINCT a.id) AS "Núm.Afiliadas"
+FROM
+    bloques b
+    LEFT JOIN empresas e ON b.empresa_id = e.id
+    LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
+    LEFT JOIN pisos p ON b.id = p.bloque_id
+    LEFT JOIN afiliadas a ON p.id = a.piso_id
+GROUP BY
+    b.id,
+    e.nombre,
+    ee.nombre;
+
+CREATE OR REPLACE VIEW v_conflictos_con_afiliada AS
+SELECT
+    c.*,
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo
+FROM conflictos c
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id;
+
+CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
+SELECT
+    d.*,
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
+    u.alias AS autor_nota_alias,
+    ac.nombre AS accion_nombre
+FROM
+    diario_conflictos d
+    LEFT JOIN conflictos c ON d.conflicto_id = c.id
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN usuarios u ON d.usuario_id = u.id
+    LEFT JOIN acciones ac ON d.accion_id = ac.id;
+
+CREATE OR REPLACE VIEW v_conflictos_con_nodo AS
+SELECT
+    c.*,
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
+    u.alias AS usuario_responsable_alias,
+    n.nombre AS nodo_nombre,
+    p.direccion AS direccion_piso
+FROM
+    conflictos c
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN pisos p ON a.piso_id = p.id
+    LEFT JOIN bloques b ON p.bloque_id = b.id
+    LEFT JOIN nodos n ON b.nodo_id = n.id
+    LEFT JOIN usuarios u ON c.usuario_responsable_id = u.id;
+
+CREATE OR REPLACE VIEW v_conflictos_enhanced AS
+SELECT
+    c.id,
+    c.estado,
+    c.ambito,
+    c.causa,
+    c.fecha_apertura,
+    c.fecha_cierre,
+    c.descripcion,
+    c.resolucion,
+    c.afiliada_id,
+    c.usuario_responsable_id,
+    a.nombre AS afiliada_nombre,
+    a.apellidos AS afiliada_apellidos,
+    CONCAT(a.nombre, ' ', a.apellidos) AS afiliada_nombre_completo,
+    a.num_afiliada,
+    p.id AS piso_id,
+    p.direccion AS piso_direccion,
+    p.municipio AS piso_municipio,
+    p.cp AS piso_cp,
+    b.id AS bloque_id,
+    b.direccion AS bloque_direccion,
+    COALESCE(n1.id, n2.id) AS nodo_id,
+    COALESCE(n1.nombre, n2.nombre) AS nodo_nombre,
+    u.alias AS usuario_responsable_alias,
+    CONCAT(
+        'ID ',
+        c.id,
+        ' - ',
+        COALESCE(
+            p.direccion,
+            b.direccion,
+            'Sin dirección'
+        ),
+        ' | ',
+        COALESCE(
+            a.nombre || ' ' || a.apellidos,
+            'Sin afiliada'
+        ),
+        CASE
+            WHEN c.estado IS NOT NULL THEN ' [' || c.estado || ']'
+            ELSE ''
+        END
+    ) AS conflict_label
+FROM
+    conflictos c
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN pisos p ON a.piso_id = p.id
+    LEFT JOIN bloques b ON p.bloque_id = b.id
+    LEFT JOIN nodos n1 ON b.nodo_id = n1.id
+    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN nodos n2 ON ncm.nodo_id = n2.id
+    LEFT JOIN usuarios u ON c.usuario_responsable_id = u.id;
+
+-- =====================================================================
+-- PASO 5: POBLACIÓN DE DATOS ESTÁTICOS Y ARTIFICIALES (de 05 y artificial)
+-- =====================================================================
+
+-- Limpiar datos existentes para evitar conflictos de claves primarias
+TRUNCATE TABLE diario_conflictos,
+conflictos,
+asesorias,
+facturacion,
+afiliadas,
+usuarios,
+pisos,
+bloques,
+empresas,
+entramado_empresas,
+acciones,
+nodos,
+nodos_cp_mapping,
+roles,
+usuario_credenciales,
+usuario_roles
+RESTART IDENTITY;
 
 -- Datos Estáticos (necesarios para la aplicación)
 INSERT INTO
@@ -203,7 +390,67 @@ VALUES ('nota simple'),
     ('demanda'),
     ('sentencia') ON CONFLICT (nombre) DO NOTHING;
 
--- Entramados Empresariales Ficticios
+INSERT INTO
+    roles (nombre, descripcion)
+VALUES (
+        'admin',
+        'Administrador con todos los permisos'
+    ),
+    (
+        'gestor',
+        'Gestor de conflictos y afiliadas'
+    ),
+    (
+        'sistemas',
+        'Acceso de superusuario para mantenimiento'
+    ) ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO
+    nodos (nombre, descripcion)
+VALUES (
+        'Centro-Arganzuela-Retiro',
+        'Agrupa los distritos de Centro, Arganzuela, Retiro, Moncloa y Chamberí.'
+    ),
+    (
+        'Latina',
+        'Nodo del distrito de Latina.'
+    ),
+    (
+        'Este',
+        'Agrupa los distritos del este de Madrid.'
+    );
+
+INSERT INTO
+    nodos_cp_mapping (cp, nodo_id)
+VALUES (
+        28080,
+        (
+            SELECT id
+            FROM nodos
+            WHERE
+                nombre = 'Centro-Arganzuela-Retiro'
+        )
+    ),
+    (
+        28081,
+        (
+            SELECT id
+            FROM nodos
+            WHERE
+                nombre = 'Latina'
+        )
+    ),
+    (
+        28082,
+        (
+            SELECT id
+            FROM nodos
+            WHERE
+                nombre = 'Este'
+        )
+    );
+
+-- Población de Datos Artificiales
 INSERT INTO
     entramado_empresas (nombre, descripcion)
 VALUES (
@@ -217,17 +464,8 @@ VALUES (
     (
         'Viviendas del Futuro S.L.',
         'Una promotora especializada en la construcción y alquiler de viviendas sostenibles.'
-    ),
-    (
-        'Patrimonio Urbano SOCIMI',
-        'SOCIMI dedicada a la adquisición y gestión de edificios residenciales en centros urbanos.'
-    ),
-    (
-        'Propiedades Familiares Castellanas',
-        'Un grupo familiar con una cartera diversificada de inmuebles en alquiler.'
     );
 
--- Empresas Ficticias
 INSERT INTO
     empresas (
         entramado_id,
@@ -275,30 +513,8 @@ VALUES (
         'Sofía Gómez, David Fernández',
         'No',
         'Avenida de América, 5, Madrid, España'
-    ),
-    (
-        (
-            SELECT id
-            FROM entramado_empresas
-            WHERE
-                nombre = 'Patrimonio Urbano SOCIMI'
-        ),
-        'Urbe Alquileres S.A.',
-        'A88888888',
-        'Miguel Torres',
-        'Sí',
-        'Calle Goya, 55, Madrid, España'
-    ),
-    (
-        NULL,
-        'Inmobiliaria Hermanos López',
-        'B99999999',
-        'Lucía López, Marcos López',
-        'No',
-        'Plaza Mayor, 2, Madrid, España'
     );
 
--- Bloques Ficticios
 INSERT INTO
     bloques (
         empresa_id,
@@ -338,31 +554,8 @@ VALUES (
         'Plaza de la Creatividad, 5, 28082, Madrid',
         'En renovación',
         'No'
-    ),
-    (
-        (
-            SELECT id
-            FROM empresas
-            WHERE
-                nombre = 'Urbe Alquileres S.A.'
-        ),
-        'Calle del Ejemplo, 15, 28083, Madrid',
-        'Activo',
-        'Sí'
-    ),
-    (
-        (
-            SELECT id
-            FROM empresas
-            WHERE
-                nombre = 'Inmobiliaria Hermanos López'
-        ),
-        'Calle Ficticia, 1, 28084, Getafe',
-        'Activo',
-        'No'
     );
 
--- Pisos Ficticios
 INSERT INTO
     pisos (
         bloque_id,
@@ -414,46 +607,21 @@ VALUES (
         'Sí',
         true,
         false
-    ),
-    (
-        (
-            SELECT id
-            FROM bloques
-            WHERE
-                direccion = 'Plaza de la Creatividad, 5, 28082, Madrid'
-        ),
-        'Plaza de la Creatividad, 5, 3ºD, 28082, Madrid',
-        'Madrid',
-        28082,
-        'No',
-        false,
-        true
-    ),
-    (
-        (
-            SELECT id
-            FROM bloques
-            WHERE
-                direccion = 'Calle del Ejemplo, 15, 28083, Madrid'
-        ),
-        'Calle del Ejemplo, 15, 4º Izquierda, 28083, Madrid',
-        'Madrid',
-        28083,
-        'Sí',
-        true,
-        false
-    ),
-    (
-        NULL,
-        'Calle Solitaria, 33, 1º, 28085, Móstoles',
-        'Móstoles',
-        28085,
-        'No',
-        false,
-        false
     );
 
--- Usuarios Ficticios
+-- Forzar la actualización del nodo_id en bloques a través del trigger
+UPDATE pisos
+SET
+    cp = 28080
+WHERE
+    direccion = 'Calle de la Invención, 10, 1ºA, 28080, Madrid';
+
+UPDATE pisos
+SET
+    cp = 28081
+WHERE
+    direccion = 'Avenida de la Imaginación, 20, Bajo C, 28081, Madrid';
+
 INSERT INTO
     usuarios (
         alias,
@@ -467,31 +635,100 @@ VALUES (
         'Admin',
         'de Sistemas',
         'admin@example.com',
-        'Sistemas'
+        'sistemas'
     ),
     (
         'test_gestor',
         'Gestor',
         'de Casos',
         'gestor@example.com',
-        'Gestor'
+        'gestor'
     ),
     (
         'test_user',
         'Usuario',
         'de Prueba',
         'user@example.com',
-        'Usuario'
-    ),
-    (
-        'ana_tecnica',
-        'Ana',
-        'Fernández',
-        'ana.f@example.com',
-        'Gestor'
+        NULL
     );
 
--- Afiliadas Ficticias
+-- Contraseña para todos los usuarios: "password"
+-- Hashed con bcrypt: $2b$12$D.o4b4..i8G8V.8.L0fG/eGnJ4p.eKz5p.E/e5n.C.e.B.d.a.a
+INSERT INTO
+    usuario_credenciales (usuario_id, password_hash)
+VALUES (
+        (
+            SELECT id
+            FROM usuarios
+            WHERE
+                alias = 'test_admin'
+        ),
+        '$2b$12$D.o4b4..i8G8V.8.L0fG/eGnJ4p.eKz5p.E/e5n.C.e.B.d.a.a'
+    ),
+    (
+        (
+            SELECT id
+            FROM usuarios
+            WHERE
+                alias = 'test_gestor'
+        ),
+        '$2b$12$D.o4b4..i8G8V.8.L0fG/eGnJ4p.eKz5p.E/e5n.C.e.B.d.a.a'
+    ),
+    (
+        (
+            SELECT id
+            FROM usuarios
+            WHERE
+                alias = 'test_user'
+        ),
+        '$2b$12$D.o4b4..i8G8V.8.L0fG/eGnJ4p.eKz5p.E/e5n.C.e.B.d.a.a'
+    );
+
+INSERT INTO
+    usuario_roles (usuario_id, role_id)
+VALUES (
+        (
+            SELECT id
+            FROM usuarios
+            WHERE
+                alias = 'test_admin'
+        ),
+        (
+            SELECT id
+            FROM roles
+            WHERE
+                nombre = 'admin'
+        )
+    ),
+    (
+        (
+            SELECT id
+            FROM usuarios
+            WHERE
+                alias = 'test_admin'
+        ),
+        (
+            SELECT id
+            FROM roles
+            WHERE
+                nombre = 'sistemas'
+        )
+    ),
+    (
+        (
+            SELECT id
+            FROM usuarios
+            WHERE
+                alias = 'test_gestor'
+        ),
+        (
+            SELECT id
+            FROM roles
+            WHERE
+                nombre = 'gestor'
+        )
+    );
+
 INSERT INTO
     afiliadas (
         piso_id,
@@ -551,41 +788,8 @@ VALUES (
         'Alquiler',
         'Baja',
         '2023-03-25'
-    ),
-    (
-        (
-            SELECT id
-            FROM pisos
-            WHERE
-                direccion = 'Plaza de la Creatividad, 5, 3ºD, 28082, Madrid'
-        ),
-        'A0004',
-        'David',
-        'Gómez Ruiz',
-        '22334455D',
-        'Hombre',
-        'Alquiler por habitaciones',
-        'Alta',
-        '2023-04-10'
-    ),
-    (
-        (
-            SELECT id
-            FROM pisos
-            WHERE
-                direccion = 'Calle del Ejemplo, 15, 4º Izquierda, 28083, Madrid'
-        ),
-        'A0005',
-        'Elena',
-        'Jiménez Moreno',
-        '33445566E',
-        'Mujer',
-        'Alquiler',
-        'Alta',
-        '2023-05-12'
     );
 
--- Facturación Ficticia
 INSERT INTO
     facturacion (
         afiliada_id,
@@ -617,45 +821,8 @@ VALUES (
         12,
         'Domiciliación',
         'ES9021000418450200051333'
-    ),
-    (
-        (
-            SELECT id
-            FROM afiliadas
-            WHERE
-                num_afiliada = 'A0003'
-        ),
-        10.00,
-        1,
-        'Transferencia',
-        'ES8921000418450200051334'
-    ),
-    (
-        (
-            SELECT id
-            FROM afiliadas
-            WHERE
-                num_afiliada = 'A0004'
-        ),
-        30.00,
-        3,
-        'Domiciliación',
-        'ES8821000418450200051335'
-    ),
-    (
-        (
-            SELECT id
-            FROM afiliadas
-            WHERE
-                num_afiliada = 'A0005'
-        ),
-        10.00,
-        1,
-        'Efectivo',
-        NULL
     );
 
--- Asesorías Ficticias
 INSERT INTO
     asesorias (
         afiliada_id,
@@ -684,47 +851,8 @@ VALUES (
         'Afiliada',
         'Asesoría Gratuita',
         'Duda resuelta'
-    ),
-    (
-        (
-            SELECT id
-            FROM afiliadas
-            WHERE
-                num_afiliada = 'A0002'
-        ),
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'test_gestor'
-        ),
-        'En proceso',
-        '2024-06-15',
-        'Afiliada',
-        'Asesoría Jurídica',
-        'Pendiente de documentación'
-    ),
-    (
-        (
-            SELECT id
-            FROM afiliadas
-            WHERE
-                num_afiliada = 'A0004'
-        ),
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'ana_tecnica'
-        ),
-        'Resuelto',
-        '2024-07-01',
-        'Afiliada',
-        'Asesoría Gratuita',
-        'Información proporcionada sobre derechos en alquiler por habitaciones.'
     );
 
--- Conflictos Ficticios
 INSERT INTO
     conflictos (
         afiliada_id,
@@ -775,29 +903,8 @@ VALUES (
         '2024-11-19',
         'El propietario no devuelve la fianza alegando daños inexistentes.',
         'Se recuperó la fianza tras la mediación.'
-    ),
-    (
-        (
-            SELECT id
-            FROM afiliadas
-            WHERE
-                num_afiliada = 'A0005'
-        ),
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'ana_tecnica'
-        ),
-        'En proceso',
-        'Colectivo',
-        'Subida abusiva de alquiler',
-        '2025-02-01',
-        'La propiedad ha comunicado una subida del 30% a todos los inquilinos del bloque.',
-        NULL
     );
 
--- Diario de Conflictos Ficticio
 INSERT INTO
     diario_conflictos (
         conflicto_id,
@@ -837,30 +944,6 @@ VALUES (
             SELECT id
             FROM conflictos
             WHERE
-                causa = 'No renovación'
-        ),
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'test_gestor'
-        ),
-        (
-            SELECT id
-            FROM acciones
-            WHERE
-                nombre = 'comunicación enviada'
-        ),
-        'Abierto',
-        'Afiliada',
-        'Se envía burofax a la propiedad solicitando la motivación de la no renovación.',
-        '2025-01-20 13:00:00'
-    ),
-    (
-        (
-            SELECT id
-            FROM conflictos
-            WHERE
                 causa = 'Fianza'
         ),
         (
@@ -879,52 +962,4 @@ VALUES (
         'Afiliada',
         'Se envía burofax al propietario reclamando la devolución de la fianza.',
         '2024-11-20 12:30:00'
-    ),
-    (
-        (
-            SELECT id
-            FROM conflictos
-            WHERE
-                causa = 'Fianza'
-        ),
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'test_gestor'
-        ),
-        (
-            SELECT id
-            FROM acciones
-            WHERE
-                nombre = 'reunión de negociación'
-        ),
-        'Resuelto',
-        'Afiliada',
-        'Acuerdo con el propietario para la devolución del 90% de la fianza.',
-        '2024-12-05 16:00:00'
-    ),
-    (
-        (
-            SELECT id
-            FROM conflictos
-            WHERE
-                causa = 'Subida abusiva de alquiler'
-        ),
-        (
-            SELECT id
-            FROM usuarios
-            WHERE
-                alias = 'ana_tecnica'
-        ),
-        (
-            SELECT id
-            FROM acciones
-            WHERE
-                nombre = 'puerta a puerta'
-        ),
-        'En proceso',
-        'Colectivo',
-        'Se realiza un puerta a puerta en el bloque para informar a los vecinos y organizar una asamblea.',
-        '2025-02-03 18:00:00'
     );
