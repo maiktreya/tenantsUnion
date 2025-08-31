@@ -26,7 +26,6 @@ graph TD
     A --> B
     B --> C
     C --> D
-    C --"/api/"--> E
     D --> E
     E <--> F
 ```

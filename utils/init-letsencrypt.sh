@@ -7,9 +7,9 @@
 # USAGE:
 # 1. Make this script executable: chmod +x init-letsencrypt-duckdns.sh
 # 2. Set your environment variables in .env file:
-#    - HOSTNAME=inquilinato.duckdns.org
-#    - DUCKDNS_TOKEN=566ab832-c328-4750-865e-6cd9d979f68d
-#    - EMAIL=garciaduchm@gmail.com (or your preferred email)
+#    - HOSTNAME
+#    - DUCKDNS_TOKEN
+#    - EMAIL
 # 3. Run it: ./init-letsencrypt-duckdns.sh
 # ========================================================================================
 
@@ -19,9 +19,9 @@ if [ -f .env ]; then
 fi
 
 # --- CONFIGURATION ---
-domain="${HOSTNAME:-inquilinato.duckdns.org}"
-email="${EMAIL:-garciaduchm@gmail.com}"
-duckdns_token="${DUCKDNS_TOKEN:-566ab832-c328-4750-865e-6cd9d979f68d}"
+domain="${HOSTNAME}"
+email="${EMAIL}"
+duckdns_token="${DUCKDNS_TOKEN}"
 data_path="./build/nginx/certbot"
 rsa_key_size=4096
 staging=0 # Set to 1 to use staging environment for testing
