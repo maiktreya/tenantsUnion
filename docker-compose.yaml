@@ -30,15 +30,15 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
-
   nicegui-app:
     image: python:3.11-slim
-    profiles:
-      - Frontend
+    profiles: ["Frontend", "Secured"]
     expose:
-      - "${NICEGUI_PORT_MAPPING:-127.0.0.1:8081:8081}" # Expose just for dev deployments
+      - "8081"
+    ports:
+      - "${DEV_MODE:+${NICEGUI_PORT_MAPPING:-127.0.0.1:8081:8081}}"
     volumes:
-      - ./build/niceGUI:/app:ro
+      - ./build/niceGUI:/app${DEV_MODE:+:rw}${DEV_MODE:-:ro}
     working_dir: /app
     command: >
       sh -c "pip install --upgrade pip &&
@@ -53,8 +53,7 @@ services:
       - POSTGREST_API_URL=${POSTGRES_API_URL}
   nginx:
     image: nginx:latest
-    profiles:
-      - Secured
+    profiles: ["Secured"]
     environment:
       - HOSTNAME=${HOSTNAME}
     ports:
@@ -79,4 +78,4 @@ services:
     volumes:
       - ./build/nginx/certbot:/etc/letsencrypt
       - ./build/nginx/certbot/www:/var/www/certbot
-    restart: "no"
+    restart: no
