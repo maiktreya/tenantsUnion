@@ -36,10 +36,8 @@ TABLE_INFO = {
     },
     "nodos_cp_mapping": {
         "display_name": "Mapeo CP-Nodos",
-        "id_field": "cp", # Note: Primary key is 'cp' not 'id'
-        "relations": {
-            "nodo_id": {"view": "nodos", "display_field": "nombre"}
-        },
+        "id_field": "cp",  # Note: Primary key is 'cp' not 'id'
+        "relations": {"nodo_id": {"view": "nodos", "display_field": "nombre"}},
     },
     "entramado_empresas": {
         "display_name": "Entramado de Empresas",
@@ -66,9 +64,7 @@ TABLE_INFO = {
     "pisos": {
         "display_name": "Pisos",
         "id_field": "id",
-        "relations": {
-            "bloque_id": {"view": "bloques", "display_field": "direccion"}
-        },
+        "relations": {"bloque_id": {"view": "bloques", "display_field": "direccion"}},
         "child_relations": {"table": "afiliadas", "foreign_key": "piso_id"},
     },
     "usuarios": {
@@ -86,14 +82,11 @@ TABLE_INFO = {
     "roles": {
         "display_name": "Roles de Usuario",
         "id_field": "id",
-        "child_relations": {
-            "table": "usuario_roles",
-            "foreign_key": "role_id"
-        },
+        "child_relations": {"table": "usuario_roles", "foreign_key": "role_id"},
     },
     "usuario_roles": {
         "display_name": "Roles Asignados",
-        "id_field": "usuario_id,role_id", # Composite primary key
+        "id_field": "usuario_id,role_id",  # Composite primary key
         "relations": {
             "usuario_id": {"view": "usuarios", "display_field": "alias"},
             "role_id": {"view": "roles", "display_field": "nombre"},
@@ -102,17 +95,13 @@ TABLE_INFO = {
     "usuario_credenciales": {
         "display_name": "Credenciales de Usuario",
         "id_field": "usuario_id",
-        "relations": {
-            "usuario_id": {"view": "usuarios", "display_field": "alias"}
-        },
+        "relations": {"usuario_id": {"view": "usuarios", "display_field": "alias"}},
     },
     # --- END OF NEW TABLES ---
     "afiliadas": {
         "display_name": "Afiliadas",
         "id_field": "id",
-        "relations": {
-            "piso_id": {"view": "pisos", "display_field": "direccion"}
-        },
+        "relations": {"piso_id": {"view": "pisos", "display_field": "direccion"}},
         "child_relations": [
             {"table": "facturacion", "foreign_key": "afiliada_id"},
             {"table": "asesorias", "foreign_key": "afiliada_id"},
@@ -153,8 +142,7 @@ TABLE_INFO = {
             "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
             # The 'afiliada_id' is not a direct foreign key in the final schema, so it's removed.
         },
-    }
-
+    },
 }
 
 # =====================================================================
@@ -163,10 +151,14 @@ TABLE_INFO = {
 VIEW_INFO = {
     "v_afiliadas": {"display_name": "Info completa de Afiliadas"},
     "v_bloques": {"display_name": "Info de Bloques"},
-    "v_empresas": {"display_name": "Info completa de Empresas"},
+    "v_entramado_empresas": {"display_name": "Info completa de Entramados de Empresas"},
     "v_conflictos_con_afiliada": {"display_name": "Conflictos con Info de Afiliada"},
-    "v_diario_conflictos_con_afiliada": {"display_name": "Diario de Conflictos con Info de Afiliada"},
-    "v_conflictos_con_nodo": {"display_name": "Diario de Conflictos con Info para Nodos"},
+    "v_diario_conflictos_con_afiliada": {
+        "display_name": "Diario de Conflictos con Info de Afiliada"
+    },
+    "v_conflictos_con_nodo": {
+        "display_name": "Diario de Conflictos con Info para Nodos"
+    },
     "v_conflictos_enhanced": {"display_name": "Conflictos con Info Completa y Nodos"},
 }
 
