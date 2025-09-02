@@ -23,23 +23,17 @@ LEFT JOIN empresas e ON b.empresa_id = e.id
 LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id;
 
 -- VISTA 2: EMPRESAS (replica la estructura de Empresas.csv con conteos)
+-- VISTA 2: EMPRESAS (replica la estructura de Empresas.csv con conteos)
 CREATE OR REPLACE VIEW v_entramado_empresas AS
-SELECT
-    e.cif_nif_nie AS "CIF/NIF/NIE",
-    ee.nombre AS "Entramado",
-    e.nombre AS "Empresa",
-    e.directivos AS "Directivos",
-    e.api AS "API",
-    e.direccion_fiscal AS "Dirección",
-    b.direccion AS "Dirección Bloque",
-    a.nombre AS "Nombre",
-    a.apellidos AS "Apellidos"
+SELECT e.nombre AS "Nombre", e.cif_nif_nie AS "CIF/NIF/NIE", ee.nombre AS "Entramado", e.directivos AS "Directivos", e.api AS "API", e.direccion_fiscal AS "Dirección", COUNT(DISTINCT a.id) AS "Núm.Afiliadas"
 FROM
     entramado_empresas ee
     LEFT JOIN empresas e ON ee.id = e.entramado_id
     LEFT JOIN bloques b ON e.id = b.empresa_id
     LEFT JOIN pisos p ON b.id = p.bloque_id
-    LEFT JOIN afiliadas a ON p.id = a.piso_id;
+    LEFT JOIN afiliadas a ON p.id = a.piso_id
+GROUP BY
+    ee.nombre;
 
 -- VISTA 3: BLOQUES (replica la estructura de Bloques.csv con conteos)
 CREATE OR REPLACE VIEW v_bloques AS
