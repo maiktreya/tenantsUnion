@@ -25,15 +25,15 @@ LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id;
 -- VISTA 2: EMPRESAS (replica la estructura de Empresas.csv con conteos)
 CREATE OR REPLACE VIEW v_entramado_empresas AS
 SELECT
-    e.nombre AS "Nombre",
     e.cif_nif_nie AS "CIF/NIF/NIE",
     ee.nombre AS "Entramado",
+    e.nombre AS "Empresa",
     e.directivos AS "Directivos",
     e.api AS "API",
     e.direccion_fiscal AS "Dirección",
     b.direccion AS "Dirección Bloque",
     a.nombre AS "Nombre",
-    a.apellidos AS "Apellidos",
+    a.apellidos AS "Apellidos"
 FROM
     entramado_empresas ee
     LEFT JOIN empresas e ON ee.id = e.entramado_id
