@@ -150,16 +150,16 @@ TABLE_INFO = {
 # =====================================================================
 VIEW_INFO = {
     "v_afiliadas": {"display_name": "Info completa de Afiliadas"},
-    "v_bloques": {"display_name": "Info de Bloques"},
-    "v_entramado_empresas": {"display_name": "Info completa de Entramados de Empresas"},
-    "v_conflictos_con_afiliada": {"display_name": "Conflictos con Info de Afiliada"},
-    "v_diario_conflictos_con_afiliada": {
-        "display_name": "Diario de Conflictos con Info de Afiliada"
-    },
+    #"v_bloques": {"display_name": "Info de Bloques"},
+    #"v_entramado_empresas": {"display_name": "Info completa de Entramados de Empresas"},
+    # "v_conflictos_con_afiliada": {"display_name": "Conflictos con Info de Afiliada"},
+    #"v_diario_conflictos_con_afiliada": {
+    #    "display_name": "Diario de Conflictos con Info de Afiliada"
+    #},
     "v_conflictos_con_nodo": {
         "display_name": "Diario de Conflictos con Info para Nodos"
     },
-    "v_conflictos_enhanced": {"display_name": "Conflictos con Info Completa y Nodos"},
+    #"v_conflictos_enhanced": {"display_name": "Conflictos con Info Completa y Nodos"},
 }
 
 config = Config()
