@@ -31,9 +31,7 @@ FROM
     LEFT JOIN bloques b ON e.id = b.empresa_id
     LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
-GROUP BY
-    e.id,
-    ee.nombre;
+ORDER BY ee.nombre;
 
 -- VISTA 3: BLOQUES (replica la estructura de Bloques.csv con conteos)
 CREATE OR REPLACE VIEW v_bloques AS
