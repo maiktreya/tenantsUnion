@@ -19,6 +19,7 @@ class ConflictsView:
         self.nodos_list = []  # Store available nodes
         self.filter_nodo = None
         self.filter_estado = None
+        self.filter_causa = None  # New filter for 'causa'
         self.filter_text = None
 
     def create(self) -> ui.column:
@@ -32,7 +33,7 @@ class ConflictsView:
             with ui.expansion("Filtros", icon="filter_list").classes(
                 "w-full mb-4"
             ).props("default-opened"):
-                with ui.row().classes("w-full gap-4 flex-wrap"):
+                with ui.row().classes("w-full gap-4 flex-wrap items-center"):
                     # Node filter
                     self.filter_nodo = ui.select(
                         options={},
@@ -55,25 +56,40 @@ class ConflictsView:
                         on_change=self._apply_filters,
                     ).classes("w-48")
 
-                    # Causa filter
-                    self.filter_estado = ui.select(
-                        options={
-                            "": "Todos los estados",
-                            "Afiliada": "Afiliada",
-                            "Bloque": "Bloque",
-                        },
-                        label="Filtrar por Estado",
-                        value="",
-                        on_change=self._apply_filters,
-                    ).classes("w-48")
+                    # --- NEW: Causa filter based on your CSV ---
+                    causa_options_list = [
+                        "No renovación",
+                        "Fianza",
+                        "Acoso inmobiliario",
+                        "Renta Antigua",
+                        "Subida de alquiler",
+                        "Individualización Calefacción",
+                        "Reparaciones / Habitabilidad",
+                        "Venta de la vivienda",
+                        "Honorarios",
+                        "Requerimiento de la casa para uso propio",
+                        "Impago",
+                        "Actualización del precio (IPC)",
+                        "Negociación del contrato",
+                    ]
+                    # Create a sorted dictionary for the options
+                    causa_options = {"": "Todas las causas"}
+                    causa_options.update(
+                        {opt: opt for opt in sorted(causa_options_list)}
+                    )
 
-                    # Text search
+                    self.filter_causa = ui.select(
+                        options=causa_options,
+                        label="Filtrar por Causa",
+                        on_change=self._apply_filters,
+                        clearable=True,
+                    ).classes("w-64")
+                    # --- END NEW FILTER ---
+
+                    # Text search (now searches everything)
                     self.filter_text = (
-                        ui.input(
-                            label="Buscar en dirección o descripción",
-                            on_change=self._apply_filters,
-                        )
-                        .classes("w-64")
+                        ui.input(label="Búsqueda global", on_change=self._apply_filters)
+                        .classes("flex-grow min-w-[16rem]")
                         .props("clearable")
                     )
 
@@ -202,7 +218,7 @@ class ConflictsView:
 
         return options
 
-    async def _apply_filters(self):
+    async def _apply_filters(self, _=None):
         """Apply all active filters to the conflicts list"""
         filtered = self.all_conflicts.copy()
 
@@ -216,7 +232,12 @@ class ConflictsView:
             estado = self.filter_estado.value
             filtered = [c for c in filtered if c.get("estado") == estado]
 
-        # Filter by text search
+        # --- NEW: Filter by causa ---
+        if self.filter_causa and self.filter_causa.value:
+            causa = self.filter_causa.value
+            filtered = [c for c in filtered if c.get("causa") == causa]
+
+        # Filter by text search (searches multiple fields)
         if self.filter_text and self.filter_text.value:
             search_text = self.filter_text.value.lower()
             filtered = [
@@ -228,6 +249,8 @@ class ConflictsView:
                     or search_text in str(c.get("descripcion", "")).lower()
                     or search_text in str(c.get("afiliada_nombre_completo", "")).lower()
                     or search_text in str(c.get("causa", "")).lower()
+                    or search_text in str(c.get("resolucion", "")).lower()
+                    or search_text in str(c.get("id", "")).lower()
                 )
             ]
 
@@ -259,10 +282,13 @@ class ConflictsView:
             self.filter_nodo.value = ""
         if self.filter_estado:
             self.filter_estado.value = ""
+        if self.filter_causa:  # --- NEW ---
+            self.filter_causa.value = ""
         if self.filter_text:
             self.filter_text.value = ""
 
-        self._apply_filters()
+        # Use a small timer to ensure value propagation before applying filters
+        ui.timer(0.1, self._apply_filters, once=True)
 
     def _display_statistics(self):
         """Display conflict statistics in the stats card"""
@@ -286,7 +312,7 @@ class ConflictsView:
             with ui.row().classes("w-full gap-4 flex-wrap"):
                 ui.chip(f"Total: {total}", color="blue", icon="inventory")
 
-                for estado, count in status_counts.items():
+                for estado, count in sorted(status_counts.items()):
                     color_map = {
                         "Abierto": "red",
                         "En proceso": "orange",
