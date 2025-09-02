@@ -51,3 +51,8 @@
 1. el valor de prop vertical y por habitación es numerico y no va bien (ej: chopera 29)
 
 Como hacemos para poder hacer análisis de los datos de afiliadas, conflictos, etc?
+
+
+----
+
+## Explorador de vistas (update)
