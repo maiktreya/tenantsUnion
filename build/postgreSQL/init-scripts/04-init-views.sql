@@ -27,7 +27,7 @@ CREATE OR REPLACE VIEW v_entramado_empresas AS
 SELECT e.nombre AS "Nombre", e.cif_nif_nie AS "CIF/NIF/NIE", ee.nombre AS "Entramado", e.directivos AS "Directivos", e.api AS "API", e.direccion_fiscal AS "Dirección", COUNT(DISTINCT a.id) AS "Núm.Afiliadas"
 FROM
     entramado_empresas ee
-    LEFT JOIN empresas e ON ee.entramado_id = e.id
+    LEFT JOIN empresas e ON ee.id = e.entramado_id
     LEFT JOIN bloques b ON e.id = b.empresa_id
     LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
