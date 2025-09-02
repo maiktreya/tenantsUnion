@@ -35,7 +35,7 @@ services:
     image: python:3.11-slim
     profiles: ["Frontend", "Secured"]
     expose:
-      - "8081"
+      - "8081" # Internal only - no external access
     volumes:
       - ./build/niceGUI:/app${DEV_MODE:+:rw}${DEV_MODE:-:ro}
     working_dir: /app
