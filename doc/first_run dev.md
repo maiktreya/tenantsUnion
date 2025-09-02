@@ -11,11 +11,8 @@ Open your  `.env ` file and make sure the following variables are set:
 `INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev`
 
 * For direct access on http://localhost:8081:
-`NICEGUI_PORT_MAPPING=8081:8081`
 
 * `INIT_SCRIPTS_PATH`: This points to the directory containing the artificial_data.sql script, which will populate the database with safe, fictional data.
-
-* `NICEGUI_PORT_MAPPING`: This maps the application's internal port 8081 to localhost:8081 on your machine, allowing you to access it directly in your browser.
 
 ## 2. Running the Application
 With the .env file configured, you can start the application using the Frontend profile. This profile includes the database, the API, and the NiceGUI application, but excludes the Nginx and Certbot services used in production.
@@ -23,14 +20,14 @@ With the .env file configured, you can start the application using the Frontend 
 Execute the following command from the root of the project:
 
 ```bash
-docker compose --profile Frontend up -d
+ docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml up -d
 ```
 
 This command will:
 
 Build the necessary Docker images if they don't exist.
 
-Start the db, server, and nicegui-app services in the background (-d).
+Start the db, server, and nicegui-app services in the background (-d). exposing DB/Frontend portz
 
 The db service will automatically run the script specified by  `INIT_SCRIPTS_PATH `, creating the schema and populating it with artificial data.
 

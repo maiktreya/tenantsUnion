@@ -1,0 +1,10 @@
+# to override default to allow port external access for development:
+# docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml up --profile Frontend
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  nicegui-app:
+    ports:
+      - "127.0.0.1:8081:8081"
