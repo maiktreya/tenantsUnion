@@ -6,9 +6,7 @@ services:
       - "127.0.0.1:5432:5432" # expose on local bind
   server:
     ports:
-      - "127.0.0.1:3000:3000" # expose on local bind
-    environment:
-      PGRST_OPENAPI_MODE: enable # enable openAPI documentation
+      - "3001:3000" # expose on local bind
   nicegui-app:
     ports:
       - "127.0.0.1:8081:8081" # expose on local bind
