@@ -323,6 +323,7 @@ WHERE
     entramado IS NOT NULL
     AND entramado != '' ON CONFLICT (nombre) DO NOTHING;
 
+-- Refurbished INSERT for empresas to handle NULL entramados
 INSERT INTO
     empresas (
         nombre,
@@ -332,10 +333,17 @@ INSERT INTO
         direccion_fiscal,
         entramado_id
     )
-SELECT s.nombre, s.cif_nif_nie, s.directivos, s.api, s.direccion_fiscal, ee.id
+SELECT
+    s.nombre,
+    s.cif_nif_nie,
+    s.directivos,
+    s.api,
+    s.direccion_fiscal,
+    ee.id  -- This will be NULL when no entramado exists
 FROM
     staging_empresas s
-    JOIN entramado_empresas ee ON s.entramado = ee.nombre ON CONFLICT (cif_nif_nie) DO NOTHING;
+    LEFT JOIN entramado_empresas ee ON s.entramado = ee.nombre
+ON CONFLICT (cif_nif_nie) DO NOTHING;
 
 INSERT INTO
     bloques (
