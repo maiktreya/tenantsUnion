@@ -73,12 +73,10 @@ TABLE_INFO = {
         "child_relations": [
             {"table": "asesorias", "foreign_key": "tecnica_id"},
             {"table": "conflictos", "foreign_key": "usuario_responsable_id"},
-            # --- NEWLY ADDED CHILD RELATIONS ---
             {"table": "usuario_credenciales", "foreign_key": "usuario_id"},
             {"table": "usuario_roles", "foreign_key": "usuario_id"},
         ],
     },
-    # --- NEWLY ADDED TABLES FOR AUTHENTICATION ---
     "roles": {
         "display_name": "Roles de Usuario",
         "id_field": "id",
@@ -97,7 +95,6 @@ TABLE_INFO = {
         "id_field": "usuario_id",
         "relations": {"usuario_id": {"view": "usuarios", "display_field": "alias"}},
     },
-    # --- END OF NEW TABLES ---
     "afiliadas": {
         "display_name": "Afiliadas",
         "id_field": "id",
@@ -140,7 +137,6 @@ TABLE_INFO = {
         "id_field": "id",
         "relations": {
             "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
-            # The 'afiliada_id' is not a direct foreign key in the final schema, so it's removed.
         },
     },
 }
@@ -150,16 +146,9 @@ TABLE_INFO = {
 # =====================================================================
 VIEW_INFO = {
     "v_afiliadas": {"display_name": "Info completa de Afiliadas"},
-    #"v_bloques": {"display_name": "Info de Bloques"},
-    #"v_entramado_empresas": {"display_name": "Info completa de Entramados de Empresas"},
-    # "v_conflictos_con_afiliada": {"display_name": "Conflictos con Info de Afiliada"},
-    #"v_diario_conflictos_con_afiliada": {
-    #    "display_name": "Diario de Conflictos con Info de Afiliada"
-    #},
     "v_conflictos_con_nodo": {
         "display_name": "Diario de Conflictos con Info para Nodos"
     },
-    #"v_conflictos_enhanced": {"display_name": "Conflictos con Info Completa y Nodos"},
 }
 
 config = Config()

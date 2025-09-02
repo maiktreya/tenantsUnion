@@ -16,7 +16,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-
   server:
     image: postgrest/postgrest:v12.2.8
     expose:
@@ -30,7 +29,6 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
-
   nicegui-app:
     image: python:3.11-slim
     profiles: ["Frontend", "Secured"]
@@ -50,7 +48,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - POSTGREST_API_URL=${POSTGRES_API_URL}
-
   nginx:
     image: nginx:latest
     profiles: ["Secured"]
