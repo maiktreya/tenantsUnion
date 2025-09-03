@@ -153,3 +153,15 @@ WHERE
     -- We only want the #1 ranked match for each piso
     AND mb.rn = 1;
 
+
+-- 5. VERIFICATION QUERY: Check the matching results
+
+-- SELECT 'MATCHED' as status, COUNT(*) as count
+-- FROM pisos
+-- WHERE
+--     bloque_id IS NOT NULL
+-- UNION ALL
+-- SELECT 'UNMATCHED (needs linking)' as status, COUNT(*) as count
+-- FROM pisos
+-- WHERE
+--     bloque_id IS NULL;
