@@ -1,5 +1,5 @@
 -- =====================================================================
--- ARCHIVO 01: CREACIÓN DE ESQUEMA E IMPORTACIÓN (VERSIÓN ACTUALIZADA)
+-- ARCHIVO 01: CREACIÓN DE ESQUEMA E IMPORTACIÓN (VERSIÓN FINAL)
 -- =====================================================================
 -- Este script crea el esquema, importa los datos, y aplica mejoras
 -- en la integridad referencial y la indexación para un diseño robusto.
@@ -58,7 +58,6 @@ CREATE TABLE usuarios (
     roles TEXT
 );
 
--- ✅ ACTUALIZADO: Tabla afiliadas con los nuevos campos
 CREATE TABLE afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
@@ -75,7 +74,6 @@ CREATE TABLE afiliadas (
     fecha_baja DATE
 );
 
--- ✅ MEJORA: La facturación se elimina si se elimina la afiliada.
 CREATE TABLE facturacion (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE CASCADE,
@@ -85,7 +83,6 @@ CREATE TABLE facturacion (
     iban TEXT
 );
 
--- ✅ MEJORA: Se elimina la columna redundante `beneficiaria_nombre`.
 CREATE TABLE asesorias (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
@@ -97,7 +94,6 @@ CREATE TABLE asesorias (
     resultado TEXT
 );
 
--- ✅ MEJORA: Se elimina la columna redundante `afectada`.
 CREATE TABLE conflictos (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
@@ -111,11 +107,10 @@ CREATE TABLE conflictos (
     resolucion TEXT
 );
 
--- Create the new table to store the types of actions.
 CREATE TABLE acciones (
     id SERIAL PRIMARY KEY,
     nombre TEXT UNIQUE NOT NULL,
-    descripcion TEXT -- An optional field for more details if needed in the future.
+    descripcion TEXT
 );
 
 CREATE TABLE diario_conflictos (
@@ -132,8 +127,6 @@ CREATE TABLE diario_conflictos (
 -- =====================================================================
 -- PARTE 1.5: CREACIÓN DE ÍNDICES PARA MEJORAR EL RENDIMIENTO
 -- =====================================================================
--- ✅ MEJORA: Se añaden índices a todas las claves foráneas.
-
 CREATE INDEX idx_empresas_entramado_id ON empresas (entramado_id);
 
 CREATE INDEX idx_bloques_empresa_id ON bloques (empresa_id);
@@ -141,13 +134,6 @@ CREATE INDEX idx_bloques_empresa_id ON bloques (empresa_id);
 CREATE INDEX idx_pisos_bloque_id ON pisos (bloque_id);
 
 CREATE INDEX idx_afiliadas_piso_id ON afiliadas (piso_id);
-
--- ✅ NUEVOS: Índices para los nuevos campos de afiliadas
-CREATE INDEX idx_afiliadas_email ON afiliadas (email);
-
-CREATE INDEX idx_afiliadas_fecha_alta ON afiliadas (fecha_alta);
-
-CREATE INDEX idx_afiliadas_fecha_baja ON afiliadas (fecha_baja);
 
 CREATE INDEX idx_facturacion_afiliada_id ON facturacion (afiliada_id);
 
@@ -167,22 +153,17 @@ CREATE INDEX idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 
 -- =====================================================================
 -- PARTE 2: LÓGICA DE IMPORTACIÓN CON TABLAS STAGING
--- (El proceso de staging se actualiza para incluir los nuevos campos)
 -- =====================================================================
 
 -- 2.1. Crear tablas Staging
 
--- ✅ ACTUALIZADA: staging_afiliadas con los nuevos campos
+-- FINAL VERSION: This table structure now exactly matches the final CSV file header.
 CREATE TABLE staging_afiliadas (
     num_afiliada TEXT,
     nombre TEXT,
     apellidos TEXT,
     cif TEXT,
     genero TEXT,
-    email TEXT,
-    telefono TEXT,
-    nivel_participacion TEXT,
-    comision TEXT,
     direccion TEXT,
     cuota TEXT,
     frecuencia_pago TEXT,
@@ -190,11 +171,13 @@ CREATE TABLE staging_afiliadas (
     cuenta_corriente TEXT,
     regimen TEXT,
     estado TEXT,
-    fecha_alta TEXT,
-    fecha_baja TEXT,
     api TEXT,
     propiedad TEXT,
-    entramado TEXT
+    entramado TEXT,
+    email TEXT,
+    telefono TEXT,
+    fecha_alta TEXT,
+    fecha_baja TEXT
 );
 
 CREATE TABLE staging_empresas (
@@ -223,7 +206,6 @@ CREATE TABLE staging_bloques (
     col_extra_3 TEXT
 );
 
--- ✅ NUEVO: Tabla staging para los pisos
 CREATE TABLE staging_pisos (
     direccion TEXT,
     estado TEXT,
@@ -269,7 +251,6 @@ CREATE TABLE staging_usuarios (
 -- =====================================================================
 -- PARTE B.1: MEJORA DE LA TABLA DE USUARIOS
 -- =====================================================================
--- Se añaden campos para el estado del usuario.
 ALTER TABLE usuarios
 ADD COLUMN is_active BOOLEAN DEFAULT TRUE,
 ADD COLUMN created_at TIMESTAMP
@@ -301,7 +282,6 @@ WITH (
         HEADER true
     );
 
--- ✅ NUEVO: Carga de datos de pisos al área de staging
 COPY staging_pisos
 FROM '/csv-data/Pisos.csv'
 WITH (
@@ -335,6 +315,8 @@ WITH (
     );
 
 -- 2.3. Migrar datos de Staging a tablas finales
+
+-- RE-ENABLED: This logic is valid as the 'entramado' column is present.
 INSERT INTO
     entramado_empresas (nombre)
 SELECT DISTINCT
@@ -344,7 +326,6 @@ WHERE
     entramado IS NOT NULL
     AND entramado != '' ON CONFLICT (nombre) DO NOTHING;
 
--- Refurbished INSERT for empresas to handle NULL entramados
 INSERT INTO
     empresas (
         nombre,
@@ -354,7 +335,7 @@ INSERT INTO
         direccion_fiscal,
         entramado_id
     )
-SELECT s.nombre, s.cif_nif_nie, s.directivos, s.api, s.direccion_fiscal, ee.id -- This will be NULL when no entramado exists
+SELECT s.nombre, s.cif_nif_nie, s.directivos, s.api, s.direccion_fiscal, ee.id
 FROM
     staging_empresas s
     LEFT JOIN entramado_empresas ee ON s.entramado = ee.nombre ON CONFLICT (cif_nif_nie) DO NOTHING;
@@ -371,10 +352,7 @@ FROM
     staging_bloques s
     JOIN empresas e ON s.propiedad = e.nombre ON CONFLICT (direccion) DO NOTHING;
 
--- ✅ CORREGIDO: Migración de datos para la tabla de pisos
 WITH BloqueCandidatos AS (
-    -- Para cada piso, se buscan todos los bloques cuya dirección sea un prefijo de la dirección del piso.
-    -- Se asigna un número de fila, dando prioridad (rn=1) al bloque con la dirección más larga (la más específica).
     SELECT
         p.direccion AS piso_direccion,
         b.id AS bloque_id,
@@ -387,7 +365,6 @@ WITH BloqueCandidatos AS (
         p.direccion IS NOT NULL AND p.direccion != ''
 ),
 MejorCoincidenciaBloque AS (
-    -- Se selecciona solo la mejor coincidencia para cada piso (la más larga).
     SELECT piso_direccion, bloque_id FROM BloqueCandidatos WHERE rn = 1
 )
 INSERT INTO
@@ -402,14 +379,12 @@ INSERT INTO
     )
 SELECT
     s.direccion,
-    -- Extrae el municipio de la última parte del string de dirección, separada por comas.
     TRIM((string_to_array(s.direccion, ','))[array_upper(string_to_array(s.direccion, ','), 1)]),
-    -- Extrae el código postal de la penúltima parte, lo limpia de caracteres no numéricos y lo convierte a entero.
     CAST(NULLIF(regexp_replace((string_to_array(s.direccion, ','))[array_upper(string_to_array(s.direccion, ','), 1) - 1], '\D', '', 'g'), '') AS INTEGER),
     NULLIF(s.api, ''),
     mcb.bloque_id,
-    FALSE, -- Valor por defecto, no disponible en el CSV
-    FALSE  -- Valor por defecto, no disponible en el CSV
+    FALSE,
+    FALSE
 FROM
     staging_pisos s
 LEFT JOIN
@@ -435,7 +410,7 @@ SELECT
 FROM
     staging_usuarios ON CONFLICT (alias) DO NOTHING;
 
--- ✅ ACTUALIZADO: INSERT para afiliadas incluyendo los nuevos campos
+-- FINAL VERSION: This INSERT statement now correctly uses all available columns from the definitive CSV file.
 INSERT INTO
     afiliadas (
         num_afiliada,
@@ -457,30 +432,18 @@ SELECT
     s.apellidos,
     s.cif,
     s.genero,
-    NULLIF(s.email, ''), -- Handle empty strings as NULL
-    -- Clean telefono field by removing quotes and handling empty strings
-    NULLIF(
-        REPLACE (
-                REPLACE (s.telefono, '''', ''),
-                    '"',
-                    ''
-            ),
-            ''
-    ),
+    s.email,
+    s.telefono,
     s.regimen,
     s.estado,
-    -- Parse fecha_alta from DD/MM/YYYY format, handle empty/null values
-    CASE
-        WHEN s.fecha_alta IS NOT NULL
-        AND s.fecha_alta != '' THEN to_date (s.fecha_alta, 'DD/MM/YYYY')
-        ELSE NULL
-    END,
-    -- Parse fecha_baja from DD/MM/YYYY format, handle empty/null values
-    CASE
-        WHEN s.fecha_baja IS NOT NULL
-        AND s.fecha_baja != '' THEN to_date (s.fecha_baja, 'DD/MM/YYYY')
-        ELSE NULL
-    END,
+    to_date (
+        NULLIF(s.fecha_alta, ''),
+        'DD/MM/YYYY'
+    ),
+    to_date (
+        NULLIF(s.fecha_baja, ''),
+        'DD/MM/YYYY'
+    ),
     p.id
 FROM
     staging_afiliadas s
@@ -499,8 +462,8 @@ SELECT
         REPLACE (s.cuota, ',', '.') AS DECIMAL(8, 2)
     ),
     CASE s.frecuencia_pago
-        WHEN 'Mensual' THEN 1
         WHEN 'Anual' THEN 12
+        WHEN 'Mensual' THEN 1
         ELSE 0
     END,
     s.forma_pago,
@@ -510,7 +473,6 @@ FROM
     staging_afiliadas s
     JOIN afiliadas a ON s.num_afiliada = a.num_afiliada ON CONFLICT (id) DO NOTHING;
 
--- ✅ MEJORA: El INSERT ya no incluye la columna redundante `afectada`.
 INSERT INTO
     conflictos (
         afiliada_id,
@@ -528,7 +490,6 @@ FROM
         a.nombre || ' ' || a.apellidos
     ) = s.afectada ON CONFLICT (id) DO NOTHING;
 
--- ✅ MEJORA: El INSERT ya no incluye la columna redundante `beneficiaria_nombre`.
 INSERT INTO
     asesorias (
         afiliada_id,

@@ -3,6 +3,7 @@ from nicegui import ui, app
 from api.client import APIClient
 from config import TABLE_INFO
 
+
 class RecordDialog:
     """Dialog for creating/editing records, fields from TABLE_INFO."""
 
@@ -57,7 +58,16 @@ class RecordDialog:
             if "relations" in table_info:
                 fields.update(table_info["relations"].keys())
             # Guess some common fields if not present (name, estado, descripcion, etc)
-            for fname in ["nombre", "descripcion", "estado", "fecha", "causa", "ambito", "email", "alias"]:
+            for fname in [
+                "nombre",
+                "descripcion",
+                "estado",
+                "fecha",
+                "causa",
+                "ambito",
+                "email",
+                "alias",
+            ]:
                 if fname not in fields:
                     fields.add(fname)
             # Remove PKs for create mode
@@ -80,6 +90,7 @@ class RecordDialog:
         # Always preserve order: show relations first, then others (alphabetically)
         def field_sort_key(f):
             return (0 if f in relations else 1, f)
+
         fields = sorted(fields, key=field_sort_key)
 
         for field in fields:
@@ -93,50 +104,59 @@ class RecordDialog:
                     options_records = await self.api.get_records(view_name)
                     # Try to support multiple display fields (like "nombre,apellidos")
                     if "," in display_field:
+
                         def get_disp(r):
-                            return " ".join([str(r.get(df, "")) for df in display_field.split(",")]).strip()
+                            return " ".join(
+                                [str(r.get(df, "")) for df in display_field.split(",")]
+                            ).strip()
+
                     else:
+
                         def get_disp(r):
                             return str(r.get(display_field, f"ID: {r['id']}"))
-                    options = {
-                        r["id"]: get_disp(r)
-                        for r in options_records
-                    }
+
+                    options = {r["id"]: get_disp(r) for r in options_records}
                 except Exception as e:
-                    ui.notify(f"Error cargando opciones de {field}: {e}", type="negative")
+                    ui.notify(
+                        f"Error cargando opciones de {field}: {e}", type="negative"
+                    )
                     options = {}
                 self.inputs[field] = ui.select(
                     options=options,
                     label=field.replace("_", " ").title(),
-                    value=value if self.mode == "edit" else None
+                    value=value if self.mode == "edit" else None,
                 ).classes("w-full")
             else:
                 # Try to infer field type for better UI (int, float, email, textarea)
                 lower = field.lower()
                 if "nota" in lower or "descripcion" in lower or "comentario" in lower:
                     self.inputs[field] = ui.textarea(
-                        label=field.replace("_", " ").title(),
-                        value=value
+                        label=field.replace("_", " ").title(), value=value
                     ).classes("w-full")
                 elif "email" in lower:
-                    self.inputs[field] = ui.input(
-                        label=field.replace("_", " ").title(),
-                        value=value
-                    ).props("type=email").classes("w-full")
+                    self.inputs[field] = (
+                        ui.input(label=field.replace("_", " ").title(), value=value)
+                        .props("type=email")
+                        .classes("w-full")
+                    )
                 elif "fecha" in lower:
-                    self.inputs[field] = ui.input(
-                        label=field.replace("_", " ").title(),
-                        value=value
-                    ).props("type=date").classes("w-full")
-                elif isinstance(value, int) or lower.endswith("_id") or lower.startswith("id_"):
+                    self.inputs[field] = (
+                        ui.input(label=field.replace("_", " ").title(), value=value)
+                        .props("type=date")
+                        .classes("w-full")
+                    )
+                elif (
+                    isinstance(value, int)
+                    or lower.endswith("_id")
+                    or lower.startswith("id_")
+                ):
                     self.inputs[field] = ui.number(
                         label=field.replace("_", " ").title(),
-                        value=value if value != "" else None
+                        value=value if value != "" else None,
                     ).classes("w-full")
                 else:
                     self.inputs[field] = ui.input(
-                        label=field.replace("_", " ").title(),
-                        value=value
+                        label=field.replace("_", " ").title(), value=value
                     ).classes("w-full")
 
     async def _save(self):
@@ -182,6 +202,7 @@ class EnhancedRecordDialog(RecordDialog):
     """
     This class is kept for backwards compatibility; it is just an alias for the fully dynamic RecordDialog now.
     """
+
     pass
 
 
@@ -213,7 +234,10 @@ class ConflictNoteDialog:
         # Cargar acciones
         try:
             acciones = await self.api.get_records("acciones", order="id.asc")
-            self.acciones_options = {accion["id"]: accion.get("nombre", f"Acción #{accion['id']}") for accion in acciones}
+            self.acciones_options = {
+                accion["id"]: accion.get("nombre", f"Acción #{accion['id']}")
+                for accion in acciones
+            }
         except Exception as e:
             ui.notify(f"Error al cargar acciones: {e}", type="negative")
             self.acciones_options = {}
@@ -229,16 +253,15 @@ class ConflictNoteDialog:
             ui.label(title).classes("text-h6")
 
             # Inputs de la nueva estructura
-            initial_estado = self.record.get("estado") if self.mode == "edit" else self.conflict.get("estado", "")
+            initial_estado = (
+                self.record.get("estado")
+                if self.mode == "edit"
+                else self.conflict.get("estado", "")
+            )
             estado_input = ui.select(
                 options=["Abierto", "En proceso", "Resuelto", "Cerrado"],
                 label="Estado",
                 value=initial_estado,
-            ).classes("w-full")
-
-            ambito_input = ui.input(
-                "Ámbito",
-                value=self.record.get("ambito") if self.mode == "edit" else self.conflict.get("ambito", ""),
             ).classes("w-full")
 
             accion_input = ui.select(
@@ -247,18 +270,8 @@ class ConflictNoteDialog:
                 value=self.record.get("accion_id") if self.mode == "edit" else None,
             ).classes("w-full")
 
-            afiliada_input = ui.number(
-                "ID Afiliada (opcional)",
-                value=(
-                    self.record.get("afiliada_id")
-                    if self.mode == "edit"
-                    else self.conflict.get("afiliada_id", "")
-                ),
-            ).classes("w-full")
-
             notas_input = ui.textarea(
-                "Actualización/Notas",
-                value=self.record.get("notas", "")
+                "Actualización/Notas", value=self.record.get("notas", "")
             ).classes("w-full")
 
             with ui.row().classes("w-full justify-end gap-2"):
@@ -276,16 +289,21 @@ class ConflictNoteDialog:
                             "accion_id": accion_input.value,
                             "usuario_id": user_id,
                             "estado": estado_input.value or None,
-                            "ambito": ambito_input.value or None,
                             "notas": notas_input.value or None,
                         }
 
-                        note_data = {k: v for k, v in note_data.items() if v is not None}
+                        note_data = {
+                            k: v for k, v in note_data.items() if v is not None
+                        }
 
                         if self.mode == "create":
-                            result = await self.api.create_record("diario_conflictos", note_data)
+                            result = await self.api.create_record(
+                                "diario_conflictos", note_data
+                            )
                         else:
-                            result = await self.api.update_record("diario_conflictos", self.record["id"], note_data)
+                            result = await self.api.update_record(
+                                "diario_conflictos", self.record["id"], note_data
+                            )
 
                         if result:
                             # Si cambiamos el estado, también actualizar el conflicto principal
@@ -294,9 +312,15 @@ class ConflictNoteDialog:
                             if new_estado and new_estado != self.conflict.get("estado"):
                                 conflict_update_data["estado"] = new_estado
                             if new_estado == "Cerrado":
-                                conflict_update_data["fecha_cierre"] = datetime.now().strftime("%Y-%m-%d")
+                                conflict_update_data["fecha_cierre"] = (
+                                    datetime.now().strftime("%Y-%m-%d")
+                                )
                             if conflict_update_data:
-                                await self.api.update_record("conflictos", self.conflict["id"], conflict_update_data)
+                                await self.api.update_record(
+                                    "conflictos",
+                                    self.conflict["id"],
+                                    conflict_update_data,
+                                )
 
                             ui.notify(
                                 f"Nota {'añadida' if self.mode == 'create' else 'actualizada'} con éxito",
@@ -308,7 +332,9 @@ class ConflictNoteDialog:
                         else:
                             ui.notify("Error al guardar la nota", type="negative")
                     except Exception as e:
-                        ui.notify(f"Error al guardar la nota: {str(e)}", type="negative")
+                        ui.notify(
+                            f"Error al guardar la nota: {str(e)}", type="negative"
+                        )
 
                 ui.button(
                     "Guardar", on_click=save_note  # Fixed: call save_note directly

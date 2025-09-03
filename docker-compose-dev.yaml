@@ -9,4 +9,4 @@ services:
       - "127.0.0.1:3001:3000" # expose on local bind
   nicegui-app:
     ports:
-      - "127.0.0.1:8081:8081" # expose on local bind
+      - "127.0.0.1:80:8081" # expose on local bind
