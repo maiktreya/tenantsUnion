@@ -1,3 +1,5 @@
+# /build/niceGUI/views/views_explorer.py
+
 from typing import Dict, Any
 from nicegui import ui
 from api.client import APIClient
@@ -5,6 +7,9 @@ from state.views_state import ViewsState
 from components.data_table import DataTable
 from components.filters import FilterPanel
 from components.exporter import export_to_csv
+from components.relationship_explorer import (
+    RelationshipExplorer,
+)  # IMPORT THE NEW COMPONENT
 from config import VIEW_INFO, TABLE_INFO
 
 
@@ -17,6 +22,7 @@ class ViewsExplorerView:
         self.data_table = None
         self.filter_panel = None
         self.detail_container = None
+        self.relationship_explorer = None  # ADD INSTANCE VARIABLE
 
     def create(self) -> ui.column:
         """Create the views explorer UI."""
@@ -51,24 +57,33 @@ class ViewsExplorerView:
             self.data_table = DataTable(
                 state=self.state,
                 show_actions=False,
-                on_row_click=self._show_record_details,
+                on_row_click=self._on_row_click,
             )
             self.data_table.create()
 
             ui.separator().classes("my-4")
             self.detail_container = ui.column().classes("w-full")
 
+            # INITIALIZE THE COMPONENT
+            self.relationship_explorer = RelationshipExplorer(
+                self.api, self.detail_container
+            )
+
         return container
 
+    async def _on_row_click(self, record: Dict):
+        """Handles a row click by invoking the RelationshipExplorer component."""
+        view_name = self.state.selected_view.value
+        await self.relationship_explorer.show_details(record, view_name, is_view=True)
+
+    # ... (the rest of the file remains the same)
+
     async def _load_view_data(self, view_name: str = None):
-        """Load data, then set up the client-side filters and table."""
         if self.detail_container:
             self.detail_container.clear()
-
         view = view_name or self.state.selected_view.value
         if not view:
             return
-
         spinner = ui.spinner(size="lg", color="orange-600").classes("absolute-center")
         try:
             records = await self.api.get_records(view, limit=5000)
@@ -84,12 +99,10 @@ class ViewsExplorerView:
             spinner.delete()
 
     def _setup_filters(self):
-        """Setup the dynamic filter panel."""
         if not self.state.filter_container or not self.state.records:
             if self.state.filter_container:
                 self.state.filter_container.clear()
             return
-
         self.state.filter_container.clear()
         with self.state.filter_container:
             self.filter_panel = FilterPanel(
@@ -98,13 +111,11 @@ class ViewsExplorerView:
             self.filter_panel.create()
 
     def _update_filter(self, column: str, value: Any):
-        """Callback from FilterPanel to update state and refresh the table."""
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
         self.data_table.refresh()
 
     def _clear_filters(self):
-        """Clear filters in the state and the UI panel."""
         self.state.filters.clear()
         if self.filter_panel:
             self.filter_panel.clear()
@@ -112,122 +123,11 @@ class ViewsExplorerView:
         self.data_table.refresh()
 
     async def _refresh_data(self):
-        """Refresh current view data."""
         await self._load_view_data()
 
     def _export_data(self):
-        """Export filtered data to CSV."""
         if self.state.selected_view.value:
             export_to_csv(
                 self.state.filtered_records,
                 f"{self.state.selected_view.value}_export.csv",
             )
-
-    # =================================================================================
-    # NEW: ROBUST BIDIRECTIONAL RELATIONSHIP EXPLORER
-    # =================================================================================
-    async def _show_record_details(self, record: Dict):
-        """Handles a click on a row to show related records."""
-        self.detail_container.clear()
-        view_name = self.state.selected_view.value
-        if not view_name:
-            return
-
-        base_table_name = view_name[2:] if view_name.startswith("v_") else view_name
-        table_info = TABLE_INFO.get(base_table_name, {})
-
-        # New robust ID finding logic
-        primary_key_name = table_info.get("id_field", "id")
-        record_id = record.get(primary_key_name)
-        if record_id is None:
-            record_id = record.get("id")
-
-        if record_id is None:
-            ui.notify(
-                f"La vista '{view_name}' no contiene un campo '{primary_key_name}' o 'id' para buscar relaciones.",
-                type="warning",
-            )
-            return
-
-        with self.detail_container:
-            ui.label(
-                f"Relaciones para el registro de '{view_name}' (ID: {record_id})"
-            ).classes("text-h5 mb-2")
-            with ui.row().classes("w-full gap-4"):
-                with ui.column().classes("w-1/2"):
-                    await self._display_parent_relations(record, table_info)
-                with ui.column().classes("w-1/2"):
-                    await self._display_child_relations(record_id, table_info)
-
-    async def _display_parent_relations(self, record: Dict, table_info: Dict):
-        """Fetches and displays parent records."""
-        parent_relations = table_info.get("relations")
-        if not parent_relations:
-            return
-
-        ui.label("Registros Padre:").classes("text-h6")
-        with ui.card().classes("w-full"):
-            for fk_field, rel_info in parent_relations.items():
-                parent_id = record.get(fk_field)
-                if parent_id is None:
-                    continue
-                parent_table = rel_info["view"]
-                try:
-                    parents = await self.api.get_records(
-                        parent_table, filters={"id": f"eq.{parent_id}"}
-                    )
-                    if not parents:
-                        continue
-                    with ui.expansion(
-                        f"Padre en '{parent_table}' (ID: {parent_id})",
-                        icon="arrow_upward",
-                    ).classes("w-full"):
-                        for key, value in parents[0].items():
-                            with ui.row():
-                                ui.label(f"{key}:").classes("font-semibold w-32")
-                                ui.label(str(value))
-                except Exception as e:
-                    ui.notify(
-                        f"Error al cargar padre de '{parent_table}': {str(e)}",
-                        type="negative",
-                    )
-
-    async def _display_child_relations(self, record_id: int, table_info: Dict):
-        """Fetches and displays child records."""
-        child_relations = table_info.get("child_relations", [])
-        child_relations = (
-            [child_relations] if isinstance(child_relations, dict) else child_relations
-        )
-        if not child_relations:
-            return
-
-        ui.label("Registros Hijos:").classes("text-h6")
-        with ui.card().classes("w-full"):
-            for relation in child_relations:
-                child_table, fk = relation["table"], relation["foreign_key"]
-                try:
-                    children = await self.api.get_records(
-                        child_table, filters={fk: f"eq.{record_id}"}
-                    )
-                    with ui.expansion(
-                        f"Hijos en '{child_table}' ({len(children)})",
-                        icon="arrow_downward",
-                    ).classes("w-full"):
-                        if not children:
-                            ui.label("No se encontraron registros.").classes(
-                                "text-gray-500 p-2"
-                            )
-                            continue
-                        for child in children:
-                            with ui.card().classes("w-full my-1"):
-                                for key, value in child.items():
-                                    with ui.row():
-                                        ui.label(f"{key}:").classes(
-                                            "font-semibold w-32"
-                                        )
-                                        ui.label(str(value))
-                except Exception as e:
-                    ui.notify(
-                        f"Error al cargar hijos de '{child_table}': {str(e)}",
-                        type="negative",
-                    )

@@ -10,7 +10,8 @@ __all__ = [
     "ConflictNoteDialog",
     "EnhancedRecordDialog",
     "FilterPanel",
-    'export_to_csv',
-    'export_to_json',
-    'CSVImporterDialog'
+    "export_to_csv",
+    "export_to_json",
+    "CSVImporterDialog",
+    "RelationshipExplorer",
 ]
