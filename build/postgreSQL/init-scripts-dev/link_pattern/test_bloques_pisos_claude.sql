@@ -115,79 +115,50 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- 4. IMPROVED MIGRATION: Match pisos to bloques using similarity scoring
-WITH BloqueCandidatos AS (
-    SELECT
-        p.direccion AS piso_direccion,
-        b.id AS bloque_id,
-        b.direccion AS bloque_direccion,
-        address_similarity_score(p.direccion, b.direccion) as similarity_score,
-        ROW_NUMBER() OVER(
-            PARTITION BY p.direccion
-            ORDER BY address_similarity_score(p.direccion, b.direccion) DESC,
-                     LENGTH(b.direccion) DESC
-        ) as rn
-    FROM
-        staging_pisos p
-    CROSS JOIN
-        bloques b
-    WHERE
-        p.direccion IS NOT NULL AND p.direccion != ''
-        AND b.direccion IS NOT NULL AND b.direccion != ''
-        -- Only consider candidates with reasonable similarity
-        AND address_similarity_score(p.direccion, b.direccion) >= 0.6
-),
-MejorCoincidenciaBloque AS (
-    -- Select only the best match for each piso
-    SELECT
-        piso_direccion,
-        bloque_id,
-        bloque_direccion,
-        similarity_score
-    FROM BloqueCandidatos
-    WHERE rn = 1
-)
-INSERT INTO
-    pisos (
-        direccion,
-        municipio,
-        cp,
-        api,
-        bloque_id,
-        prop_vertical,
-        por_habitaciones
-    )
-SELECT
-    s.direccion,
-    -- Extract municipality from address
-    TRIM((string_to_array(s.direccion, ','))[array_upper(string_to_array(s.direccion, ','), 1)]),
-    -- Extract postal code
-    CAST(
-        NULLIF(
-            regexp_replace(
-                (string_to_array(s.direccion, ','))[array_upper(string_to_array(s.direccion, ','), 1) - 1],
-                '\D', '', 'g'
-            ),
-            ''
-        ) AS INTEGER
-    ),
-    NULLIF(s.api, ''),
-    mcb.bloque_id,
-    FALSE, -- Default value
-    FALSE  -- Default value
-FROM
-    staging_pisos s
-LEFT JOIN
-    MejorCoincidenciaBloque mcb ON s.direccion = mcb.piso_direccion
-WHERE
-    s.direccion IS NOT NULL AND s.direccion != '';
+-- SCRIPT TO LINK EXISTING PISOS TO BLOQUES
 
--- 5. VERIFICATION QUERY: Check the matching results
-SELECT 'MATCHED' as status, COUNT(*) as count
+-- 1. (UNCHANGED) The functions you created are still needed and correct.
+-- Ensure these functions exist in your database:
+-- normalize_address(TEXT)
+-- extract_base_address(TEXT)
+-- address_similarity_score(TEXT, TEXT)
+
+-- 2. 🔄 UPDATED SCRIPT: Find the best match and update the pisos table
+WITH
+    MatchedBloques AS (
+        -- This CTE finds the best bloque candidate for each piso that needs matching
+        SELECT
+            p.direccion AS piso_direccion,
+            b.id AS best_bloque_id,
+            -- We use ROW_NUMBER to rank the matches by similarity score
+            ROW_NUMBER() OVER (
+                PARTITION BY
+                    p.direccion
+                ORDER BY address_similarity_score (p.direccion, b.direccion) DESC, LENGTH(b.direccion) DESC -- Prefer longer, more specific bloque addresses as a tie-breaker
+            ) as rn
+        FROM pisos p
+            CROSS JOIN bloques b
+        WHERE
+            -- Important: Only process pisos that are not already linked
+            p.bloque_id IS NULL
+            AND address_similarity_score (p.direccion, b.direccion) >= 0.6 -- Similarity threshold
+    )
+UPDATE pisos
+SET
+    bloque_id = mb.best_bloque_id
+FROM MatchedBloques mb
+WHERE
+    -- Join condition to update the correct piso row
+    pisos.direccion = mb.piso_direccion
+    -- We only want the #1 ranked match for each piso
+    AND mb.rn = 1;
+
+-- 5. VERIFICATION QUERY: Check the matching resultsSELECT 'MATCHED' as status, COUNT(*) as count
 FROM pisos
 WHERE
     bloque_id IS NOT NULL
 UNION ALL
-SELECT 'UNMATCHED' as status, COUNT(*) as count
+SELECT 'UNMATCHED (needs linking)' as status, COUNT(*) as count
 FROM pisos
 WHERE
     bloque_id IS NULL;
@@ -198,11 +169,9 @@ WITH
         SELECT
             p.direccion as piso_direccion,
             b.direccion as bloque_direccion,
-            address_similarity_score (sp.direccion, b.direccion) as similarity_score
-        FROM
-            pisos p
+            address_similarity_score (p.direccion, b.direccion) as similarity_score
+        FROM pisos p
             LEFT JOIN bloques b ON p.bloque_id = b.id
-            LEFT JOIN staging_pisos sp ON p.direccion = sp.direccion
         WHERE
             p.bloque_id IS NOT NULL
     )

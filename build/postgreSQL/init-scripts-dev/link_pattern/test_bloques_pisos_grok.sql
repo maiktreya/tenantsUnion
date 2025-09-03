@@ -170,7 +170,7 @@ SELECT
             ''
         ) AS INTEGER
     ),
-    NULLIF(s.api, ''),
+    NULLIF(MAX(s.api), ''),
     mcb.bloque_id,
     FALSE, -- Default value
     FALSE  -- Default value
@@ -179,7 +179,11 @@ FROM
 LEFT JOIN
     MejorCoincidenciaBloque mcb ON s.direccion = mcb.piso_direccion
 WHERE
-    s.direccion IS NOT NULL AND s.direccion != '';
+    s.direccion IS NOT NULL AND s.direccion != ''
+GROUP BY
+    s.direccion,
+    mcb.bloque_id
+ON CONFLICT (direccion) DO NOTHING;
 
 -- 5. VERIFICATION QUERY: Check the matching results
 SELECT 'MATCHED' as status, COUNT(*) as count
