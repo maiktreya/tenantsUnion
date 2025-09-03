@@ -418,13 +418,13 @@ INSERT INTO
         apellidos,
         cif,
         genero,
-        email,
-        telefono,
+        email, -- Now included
+        telefono, -- Now included
         regimen,
         estado,
-        fecha_alta,
-        fecha_baja,
-        piso_id
+        fecha_alta, -- Correctly uses the date from the file
+        fecha_baja, -- Correctly uses the date from the file
+        piso_id -- Correctly links to pisos table
     )
 SELECT
     s.num_afiliada,
@@ -439,7 +439,7 @@ SELECT
     to_date (
         NULLIF(s.fecha_alta, ''),
         'DD/MM/YYYY'
-    ),
+    ), -- No longer uses CURRENT_DATE
     to_date (
         NULLIF(s.fecha_baja, ''),
         'DD/MM/YYYY'
@@ -447,7 +447,8 @@ SELECT
     p.id
 FROM
     staging_afiliadas s
-    LEFT JOIN pisos p ON s.direccion = p.direccion ON CONFLICT (num_afiliada) DO NOTHING;
+    LEFT JOIN pisos p ON s.direccion = p.direccion -- Uses the correct join
+    ON CONFLICT (num_afiliada) DO NOTHING;
 
 INSERT INTO
     facturacion (
