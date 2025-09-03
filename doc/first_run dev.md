@@ -3,55 +3,50 @@
 This guide explains how to run the application on your local machine for development and testing. This setup uses artificial data to protect privacy and exposes the application directly, without the Nginx reverse proxy or SSL.
 
 ## 1. Environment Setup
+
 Before running the application, configure your .env file for a development environment. This ensures you're using the correct database scripts and port settings.
 
-Open your  `.env ` file and make sure the following variables are set:
+Open your  `.env` file and make sure the following variables are set:
 
 * For development data (artificial, from a single SQL file):
 `INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev`
 
-* For direct access on http://localhost:8081:
+* For direct access on <http://localhost:8081>:
 
 * `INIT_SCRIPTS_PATH`: This points to the directory containing the artificial_data.sql script, which will populate the database with safe, fictional data.
 
-## 2. Running the Application
+* `DEV_MODE`: If set to true makes niceGUI bind mount "rw". If left blank the default for the folder is a more secure "ro".
+
+## 2. Exposing ports externally
+
+You have to force upserting `docker-compose-dev.yaml` over `docker-compose.yaml` to get ports **5432(postgreSQL)**, **3000(posgREST)** and **8081(niceGUI)** externally exposed (bear in mind nginx, UFW and the other layers of protection).
+
+## 3. Running the Application
+
 With the .env file configured, you can start the application using the Frontend profile. This profile includes the database, the API, and the NiceGUI application, but excludes the Nginx and Certbot services used in production.
 
 Execute the following command from the root of the project:
 
 ```bash
+ # for the standard fully dockerized dev envirmoment
  docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml up -d
+
+ # if you have a local python enviroment with the requirements installed you could run the frontend directly from source
+ docker compose up -f docker-compose.yaml -f docker-compose-dev.yaml -d && python build/niceGUI/main.py
 ```
 
 This command will:
 
 Build the necessary Docker images if they don't exist.
 
-Start the db, server, and nicegui-app services in the background (-d). exposing DB/Frontend portz
+Start the **db**, **server**, and **nicegui-app** services in the background (-d). exposing DB/Frontend ports.
 
-The db service will automatically run the script specified by  `INIT_SCRIPTS_PATH `, creating the schema and populating it with artificial data.
+The db service will automatically run the script specified by  `INIT_SCRIPTS_PATH`, creating the schema and populating it with artificial data in case `build/postgreSQL/init-scripts-dev/artificial_data.sql` is used.
 
-## 3. Accessing the Application
+## 4. Accessing the Application
+
 Once the containers are running, you can access the application directly in your web browser at:
 
 ```bash
 http://localhost:8081
 ```
-
-## 4. Common Development Operations
-View Logs:
-To see the real-time logs from all running services (useful for debugging):
-
-```bash
-docker compose logs -f
-```
-
-To view logs for a specific service (e.g., nicegui-app):
-
-```bash
-docker compose logs -f nicegui-app
-```
-
-
-Key Differences from Production (first_run)
-No Nginx or SSL: The development setup runs without the Nginx reverse proxy and does not use
