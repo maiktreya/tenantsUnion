@@ -1,6 +1,6 @@
 -- ROBUST ADDRESS MATCHING SOLUTION
 -- This script provides a comprehensive approach to match pisos to bloques based on address similarity
-
+SET search_path to sindicato_inq;
 -- 1. Create a function to normalize addresses for better matching
 CREATE OR REPLACE FUNCTION normalize_address(addr TEXT) RETURNS TEXT AS $$
 BEGIN
