@@ -44,7 +44,7 @@ class AdminView:
                 state=self.state,
                 on_edit=self._edit_record,
                 on_delete=self._delete_record,
-                on_row_click=self._on_row_click,
+                on_row_click=self._show_record_details, # MODIFIED: Changed to the new enhanced function
             )
             self.data_table.create()
 
@@ -62,7 +62,6 @@ class AdminView:
         if not table:
             return
 
-        # FIX: Manually control spinner for robust handling
         spinner = ui.spinner(size='lg', color='orange-600').classes('absolute-center')
         try:
             records = await self.api.get_records(table, limit=5000)
@@ -73,7 +72,6 @@ class AdminView:
         except Exception as e:
             ui.notify(f"Error al cargar datos: {str(e)}", type="negative")
         finally:
-            # This block ensures the spinner is always removed
             spinner.delete()
 
     def _setup_filters(self):
@@ -121,43 +119,97 @@ class AdminView:
         )
         dialog.open()
 
-    async def _on_row_click(self, record: Dict):
-        """Handles a click on a row to show related 'child' records."""
+    # =================================================================================
+    # NEW: ENHANCED BIDIRECTIONAL RELATIONSHIP EXPLORER
+    # =================================================================================
+    async def _show_record_details(self, record: Dict):
+        """
+        Handles a click on a row to show both parent and child related records.
+        """
         self.detail_container.clear()
         selected_table_name = self.state.selected_table.value
         table_info = TABLE_INFO.get(selected_table_name, {})
-        child_relations = table_info.get("child_relations")
+        record_id = record.get("id")
 
+        if record_id is None:
+            return
+
+        with self.detail_container:
+            ui.label(f"Relaciones para '{selected_table_name}' (ID: {record_id})").classes("text-h5 mb-2")
+
+            with ui.row().classes("w-full gap-4"):
+                # --- Parent Relationships ---
+                with ui.column().classes("w-1/2"):
+                    await self._display_parent_relations(record, table_info)
+
+                # --- Child Relationships ---
+                with ui.column().classes("w-1/2"):
+                    await self._display_child_relations(record_id, table_info)
+
+    async def _display_parent_relations(self, record: Dict, table_info: Dict):
+        """Fetches and displays parent records."""
+        parent_relations = table_info.get("relations")
+        if not parent_relations:
+            return
+
+        ui.label("Registros Padre (Este registro pertenece a):").classes("text-h6")
+        with ui.card().classes("w-full"):
+            for fk_field, relation_info in parent_relations.items():
+                parent_id = record.get(fk_field)
+                if parent_id is None:
+                    continue
+
+                parent_table = relation_info["view"]
+                try:
+                    parent_records = await self.api.get_records(parent_table, filters={"id": f"eq.{parent_id}"})
+                    if not parent_records:
+                        ui.label(f"No se encontró el padre en '{parent_table}' con ID {parent_id}").classes("text-red-500")
+                        continue
+
+                    parent_record = parent_records[0]
+                    with ui.expansion(f"Padre en '{parent_table}' (ID: {parent_id})", icon="arrow_upward").classes("w-full"):
+                        for key, value in parent_record.items():
+                            with ui.row():
+                                ui.label(f"{key}:").classes("font-semibold w-32")
+                                ui.label(str(value))
+                except Exception as e:
+                    ui.notify(f"Error al cargar padre de '{parent_table}': {str(e)}", type="negative")
+
+    async def _display_child_relations(self, record_id: int, table_info: Dict):
+        """Fetches and displays child records."""
+        child_relations = table_info.get("child_relations")
         if not child_relations:
             return
 
         if isinstance(child_relations, dict):
             child_relations = [child_relations]
 
-        record_id = record.get("id")
-        if record_id is None:
-            return
-
-        with self.detail_container:
+        ui.label("Registros Hijos (Registros que pertenecen a este):").classes("text-h6")
+        with ui.card().classes("w-full"):
             for relation in child_relations:
                 child_table = relation["table"]
                 foreign_key = relation["foreign_key"]
-                ui.label(f"Registros de '{child_table}' relacionados con '{selected_table_name}' (ID: {record_id})").classes("text-h6 mb-2")
                 try:
                     filters = {foreign_key: f"eq.{record_id}"}
                     related_records = await self.api.get_records(child_table, filters=filters)
-                    if not related_records:
-                        ui.label("No se encontraron registros relacionados.").classes("text-gray-500")
-                        continue
-                    with ui.grid(columns=2).classes("w-full gap-4 mb-4"):
+
+                    with ui.expansion(f"Hijos en '{child_table}' ({len(related_records)})", icon="arrow_downward").classes("w-full"):
+                        if not related_records:
+                            ui.label("No se encontraron registros relacionados.").classes("text-gray-500 p-2")
+                            continue
+
                         for rel_record in related_records:
-                            with ui.card().classes("w-full"):
+                            with ui.card().classes("w-full my-1"):
                                 for key, value in rel_record.items():
-                                    with ui.row().classes("w-full"):
+                                    with ui.row():
                                         ui.label(f"{key}:").classes("font-semibold w-32")
-                                        ui.label(str(value)).classes("flex-grow")
+                                        ui.label(str(value))
                 except Exception as e:
-                    ui.notify(f"Error al cargar datos de '{child_table}': {str(e)}", type="negative")
+                    ui.notify(f"Error al cargar hijos de '{child_table}': {str(e)}", type="negative")
+
+    # =================================================================================
+    # END OF ENHANCEMENTS
+    # =================================================================================
 
     async def _create_record(self):
         """Create a new record using the enhanced dialog."""
