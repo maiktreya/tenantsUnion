@@ -84,7 +84,6 @@ class Application:
     def create_header(self):
         """Creates the header with role-based navigation and adds hide-on-scroll logic."""
 
-        # --- HEADER WITH ID ---
         with ui.header().classes("bg-white shadow-lg").props("id=main-header"):
             with ui.row().classes("w-full items-center p-2 gap-4"):
                 with ui.element("div").classes(
@@ -133,8 +132,8 @@ class Application:
                         )
 
                     def logout():
+                        ui.run_javascript("window.location.href = '/login';")
                         app.storage.user.clear()
-                        ui.navigate.to("/login")
 
                     ui.button(on_click=logout, icon="logout").props(
                         "flat dense round color=red-600"
