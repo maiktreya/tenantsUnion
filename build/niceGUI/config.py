@@ -175,10 +175,10 @@ TABLE_INFO = {
 # =====================================================================
 VIEW_INFO = {
     "v_resumen_nodos": {"display_name": "Resumen de Nodos"},
-    "v_afiliadas": {"display_name": "Info completa de Afiliadas"},
-    "entramado_empresas_detalle": {"display_name": "Info completa de Entramados de Empresas"},
+    "v_resumen_entramados_empresas": {"display_name": "Resumen de Entramados y Empresas"},
+    "v_afiliadas_detalle": {"display_name": "Info completa de Afiliadas"},
     "v_conflictos_detalle": {"display_name": "Diario Conflictos con Info para Nodos"},
-    #"v_conflictos_enhanced": {"display_name": "Conflictos con Info Completa y Nodos"},
+    #"v_diario_conflictos_con_afiliada": {"display_name": "Conflictos con Info Completa y Nodos"},
 }
 
 config = Config()

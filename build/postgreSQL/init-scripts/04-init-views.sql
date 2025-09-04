@@ -10,7 +10,7 @@
 SET search_path TO sindicato_inq, public;
 
 -- VISTA 1: AFILIADAS (AHORA INCLUYE IDs Y NOMBRE DEL NODO)
-CREATE OR REPLACE VIEW v_afiliadas AS
+CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
     a.id, -- ID primario de la afiliada (para buscar hijos)
     a.piso_id, -- ID foráneo del piso (para buscar padres)
@@ -35,7 +35,7 @@ LEFT JOIN nodos n ON b.nodo_id = n.id;
 
 -- VISTA 2: ENTRAMADO_EMPRESAS (AHORA CON MÉTRICAS AMPLIADAS Y AGRUPACIÓN CORRECTA)
 -- NOTA: Esta es una vista de resumen. Al hacer clic en una fila, se mostrarán las empresas hijas (child records).
-CREATE OR REPLACE VIEW v_entramado_empresas_detalle AS
+CREATE OR REPLACE VIEW v_resumen_entramados_empresas AS
 SELECT
     ee.id, -- ID primario del entramado (para buscar hijos)
     ee.nombre AS "Entramado",
@@ -106,7 +106,7 @@ FROM
     LEFT JOIN acciones ac ON d.accion_id = ac.id;
 
 -- VISTA 6: VISTA MEJORADA PARA LA INTERFAZ DE CONFLICTOS
-CREATE OR REPLACE VIEW sindicato_inq.v_conflictos_enhanced AS
+CREATE OR REPLACE VIEW v_conflictos_enhanced AS
 SELECT
     c.id,
     c.estado,
