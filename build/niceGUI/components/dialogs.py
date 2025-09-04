@@ -2,7 +2,7 @@ from typing import Dict, Optional, Callable
 from nicegui import ui, app
 from api.client import APIClient
 from config import TABLE_INFO
-
+from datetime import date
 
 class RecordDialog:
     """Dialog for creating/editing records, fields from TABLE_INFO."""
@@ -35,50 +35,29 @@ class RecordDialog:
             )
             ui.label(title).classes("text-h6")
 
-            await self._create_inputs()  # Always async for uniformity
+            await self._create_inputs()
 
             with ui.row().classes("w-full justify-end gap-2"):
                 ui.button("Cancelar", on_click=self.dialog.close).props("flat")
-                ui.button(
-                    "Guardar", on_click=self._save  # Direct call, no lambda with timer
-                ).props("color=orange-600")
+                ui.button("Guardar", on_click=self._save).props("color=orange-600")
 
         self.dialog.open()
 
     def _get_fields(self):
-        """Get list of fields for the table, using TABLE_INFO and current record."""
+        """Get list of fields for the table, prioritizing explicit 'fields' list."""
         table_info = TABLE_INFO.get(self.table, {})
-        relations = table_info.get("relations", {})
-        # Try to get fields from first record if any (edit mode), else from relations/child_relations
-        fields = set()
+        if "fields" in table_info:
+            return table_info["fields"]
         if self.mode == "edit" and self.record:
-            fields.update(self.record.keys())
-        else:
-            # Infer from relations and child_relations (if any)
-            if "relations" in table_info:
-                fields.update(table_info["relations"].keys())
-            # Guess some common fields if not present (name, estado, descripcion, etc)
-            for fname in [
-                "nombre",
-                "descripcion",
-                "estado",
-                "fecha",
-                "causa",
-                "ambito",
-                "email",
-                "alias",
-            ]:
-                if fname not in fields:
-                    fields.add(fname)
-            # Remove PKs for create mode
-            id_field = table_info.get("id_field", "id")
-            if self.mode == "create":
-                for key in str(id_field).split(","):
-                    if key.strip() in fields:
-                        fields.remove(key.strip())
-        # Always ensure 'id' is not in create form
-        if self.mode == "create" and "id" in fields:
-            fields.remove("id")
+            fields = list(self.record.keys())
+            if 'id' in fields:
+                fields.remove('id')
+            return fields
+        fields = set()
+        if "relations" in table_info:
+            fields.update(table_info["relations"].keys())
+        if not fields:
+             ui.notify(f"No fields configured for table '{self.table}' in create mode.", type="warning")
         return list(fields)
 
     async def _create_inputs(self):
@@ -87,7 +66,6 @@ class RecordDialog:
         relations = table_info.get("relations", {})
         fields = self._get_fields()
 
-        # Always preserve order: show relations first, then others (alphabetically)
         def field_sort_key(f):
             return (0 if f in relations else 1, f)
 
@@ -95,69 +73,62 @@ class RecordDialog:
 
         for field in fields:
             value = self.record.get(field, "")
-            # If relation, show dropdown
+            lower = field.lower()
+
             if field in relations:
                 relation = relations[field]
                 view_name = relation["view"]
                 display_field = relation["display_field"]
                 try:
-                    options_records = await self.api.get_records(view_name)
-                    # Try to support multiple display fields (like "nombre,apellidos")
+                    options_records = await self.api.get_records(view_name, limit=2000)
                     if "," in display_field:
-
                         def get_disp(r):
-                            return " ".join(
-                                [str(r.get(df, "")) for df in display_field.split(",")]
-                            ).strip()
-
+                            return " ".join([str(r.get(df, "")) for df in display_field.split(",")]).strip()
                     else:
-
                         def get_disp(r):
                             return str(r.get(display_field, f"ID: {r['id']}"))
-
                     options = {r["id"]: get_disp(r) for r in options_records}
                 except Exception as e:
-                    ui.notify(
-                        f"Error cargando opciones de {field}: {e}", type="negative"
-                    )
+                    ui.notify(f"Error cargando opciones de {field}: {e}", type="negative")
                     options = {}
                 self.inputs[field] = ui.select(
                     options=options,
                     label=field.replace("_", " ").title(),
-                    value=value if self.mode == "edit" else None,
-                ).classes("w-full")
+                    value=value if value in options else None, # Ensures value is valid or None
+                ).classes("w-full").props("use-input")
+
+            elif self.table == 'conflictos' and field == 'ambito':
+                options = ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"]
+                # *** FIX: Ensure value is None if it's not a valid option ***
+                select_value = value if value in options else None
+                self.inputs[field] = ui.select(options=options, label="Ámbito", value=select_value).classes("w-full")
+
+            elif self.table == 'conflictos' and field == 'causa':
+                options = sorted([
+                    "No renovación", "Fianza", "Acoso inmobiliario", "Renta Antigua",
+                    "Subida de alquiler", "Individualización Calefacción", "Reparaciones / Habitabilidad",
+                    "Venta de la vivienda", "Honorarios", "Requerimiento de la casa para uso propio",
+                    "Impago", "Actualización del precio (IPC)", "Negociación del contrato",
+                ])
+                # *** FIX: Ensure value is None if it's not a valid option ***
+                select_value = value if value in options else None
+                self.inputs[field] = ui.select(options=options, label="Causa", value=select_value).classes("w-full").props("use-input")
+
+            elif "fecha" in lower:
+                default_value = value
+                if self.mode == 'create' and field == 'fecha_apertura':
+                    default_value = date.today().isoformat()
+                with ui.input(label=field.replace("_", " ").title(), value=default_value) as input_field:
+                    with input_field.add_slot('append'):
+                        ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
+                    with ui.menu() as menu:
+                        ui.date().bind_value(input_field)
+                self.inputs[field] = input_field
+
+            elif "nota" in lower or "descripcion" in lower:
+                self.inputs[field] = ui.textarea(label=field.replace("_", " ").title(), value=value).classes("w-full")
             else:
-                # Try to infer field type for better UI (int, float, email, textarea)
-                lower = field.lower()
-                if "nota" in lower or "descripcion" in lower or "comentario" in lower:
-                    self.inputs[field] = ui.textarea(
-                        label=field.replace("_", " ").title(), value=value
-                    ).classes("w-full")
-                elif "email" in lower:
-                    self.inputs[field] = (
-                        ui.input(label=field.replace("_", " ").title(), value=value)
-                        .props("type=email")
-                        .classes("w-full")
-                    )
-                elif "fecha" in lower:
-                    self.inputs[field] = (
-                        ui.input(label=field.replace("_", " ").title(), value=value)
-                        .props("type=date")
-                        .classes("w-full")
-                    )
-                elif (
-                    isinstance(value, int)
-                    or lower.endswith("_id")
-                    or lower.startswith("id_")
-                ):
-                    self.inputs[field] = ui.number(
-                        label=field.replace("_", " ").title(),
-                        value=value if value != "" else None,
-                    ).classes("w-full")
-                else:
-                    self.inputs[field] = ui.input(
-                        label=field.replace("_", " ").title(), value=value
-                    ).classes("w-full")
+                self.inputs[field] = ui.input(label=field.replace("_", " ").title(), value=value).classes("w-full")
 
     async def _save(self):
         """Save the record (create or edit)."""
@@ -167,16 +138,14 @@ class RecordDialog:
                 for field in self.inputs
                 if self.inputs[field].value not in [None, ""]
             }
-            # Remove id field for create
             if self.mode == "create":
                 data.pop("id", None)
-            if self.mode == "create":
                 result = await self.api.create_record(self.table, data)
                 if result:
                     ui.notify("Registro creado con éxito", type="positive")
-                    self.dialog.close()
                     if self.on_success:
                         await self.on_success()
+                    self.dialog.close()
             else:
                 changed_data = {
                     field: value
@@ -184,34 +153,23 @@ class RecordDialog:
                     if str(value) != str(self.record.get(field, ""))
                 }
                 if changed_data:
-                    result = await self.api.update_record(
-                        self.table, self.record.get("id"), changed_data
-                    )
+                    result = await self.api.update_record(self.table, self.record.get("id"), changed_data)
                     if result:
                         ui.notify("Registro actualizado con éxito", type="positive")
-                        self.dialog.close()
                         if self.on_success:
                             await self.on_success()
+                        self.dialog.close()
                 else:
                     ui.notify("No se realizaron cambios", type="info")
         except Exception as e:
             ui.notify(f"Error al guardar: {str(e)}", type="negative")
 
+# ... (The rest of the file remains the same) ...
 
 class EnhancedRecordDialog(RecordDialog):
-    """
-    This class is kept for backwards compatibility; it is just an alias for the fully dynamic RecordDialog now.
-    """
-
     pass
 
-
 class ConflictNoteDialog:
-    """
-    Dialog para añadir o editar notas en conflictos, compatible con la nueva tabla diario_conflictos.
-    (This could be further enhanced; here, we keep your custom logic.)
-    """
-
     def __init__(
         self,
         api: APIClient,
@@ -230,8 +188,6 @@ class ConflictNoteDialog:
 
     async def open(self):
         from datetime import datetime
-
-        # Cargar acciones
         try:
             acciones = await self.api.get_records("acciones", order="id.asc")
             self.acciones_options = {
@@ -240,7 +196,6 @@ class ConflictNoteDialog:
             }
         except Exception as e:
             ui.notify(f"Error al cargar acciones: {e}", type="negative")
-            self.acciones_options = {}
 
         self.dialog = ui.dialog()
 
@@ -252,7 +207,6 @@ class ConflictNoteDialog:
             )
             ui.label(title).classes("text-h6")
 
-            # Inputs de la nueva estructura
             initial_estado = (
                 self.record.get("estado")
                 if self.mode == "edit"
@@ -291,53 +245,31 @@ class ConflictNoteDialog:
                             "estado": estado_input.value or None,
                             "notas": notas_input.value or None,
                         }
-
-                        note_data = {
-                            k: v for k, v in note_data.items() if v is not None
-                        }
+                        note_data = {k: v for k, v in note_data.items() if v is not None}
 
                         if self.mode == "create":
-                            result = await self.api.create_record(
-                                "diario_conflictos", note_data
-                            )
+                            result = await self.api.create_record("diario_conflictos", note_data)
                         else:
-                            result = await self.api.update_record(
-                                "diario_conflictos", self.record["id"], note_data
-                            )
+                            result = await self.api.update_record("diario_conflictos", self.record["id"], note_data)
 
                         if result:
-                            # Si cambiamos el estado, también actualizar el conflicto principal
                             conflict_update_data = {}
                             new_estado = estado_input.value
                             if new_estado and new_estado != self.conflict.get("estado"):
                                 conflict_update_data["estado"] = new_estado
                             if new_estado == "Cerrado":
-                                conflict_update_data["fecha_cierre"] = (
-                                    datetime.now().strftime("%Y-%m-%d")
-                                )
-                            if conflict_update_data:
-                                await self.api.update_record(
-                                    "conflictos",
-                                    self.conflict["id"],
-                                    conflict_update_data,
-                                )
+                                conflict_update_data["fecha_cierre"] = datetime.now().strftime("%Y-%m-%d")
 
-                            ui.notify(
-                                f"Nota {'añadida' if self.mode == 'create' else 'actualizada'} con éxito",
-                                type="positive",
-                            )
-                            self.dialog.close()
+                            if conflict_update_data:
+                                await self.api.update_record("conflictos", self.conflict["id"], conflict_update_data)
+
+                            ui.notify(f"Nota {'añadida' if self.mode == 'create' else 'actualizada'} con éxito", type="positive")
                             if self.on_success:
                                 await self.on_success()
-                        else:
-                            ui.notify("Error al guardar la nota", type="negative")
+                            self.dialog.close()
                     except Exception as e:
-                        ui.notify(
-                            f"Error al guardar la nota: {str(e)}", type="negative"
-                        )
+                        ui.notify(f"Error al guardar la nota: {str(e)}", type="negative")
 
-                ui.button(
-                    "Guardar", on_click=save_note  # Fixed: call save_note directly
-                ).props("color=orange-600")
+                ui.button("Guardar", on_click=save_note).props("color=orange-600")
 
         self.dialog.open()

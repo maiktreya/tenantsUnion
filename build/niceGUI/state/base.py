@@ -1,8 +1,33 @@
 from typing import Any, Dict, List, Optional, Callable, Tuple
 from dataclasses import dataclass, field
 from nicegui import ui
-import operator
-from functools import reduce
+import unicodedata
+import re
+
+def _normalize_for_sorting(value: Any) -> str:
+    """
+    Normalizes a value for robust sorting, handling None, numbers as text,
+    case sensitivity, and accents.
+    """
+    if value is None:
+        return ''  # Return an empty string for None values
+
+    str_value = str(value).strip()
+
+    # Check if it is a numeric string
+    if re.match(r'^-?(?:\d+\.?\d*|\.\d+)$', str_value):
+        try:
+            numeric_value = float(str_value)
+            # Format as a zero-padded string to ensure correct numeric sorting
+            return f"{numeric_value:020.6f}"
+        except (ValueError, TypeError):
+            pass  # Fallback to text sorting if conversion fails
+
+    # For text values, normalize to remove accents and convert to lowercase
+    normalized = unicodedata.normalize('NFD', str_value.lower())
+    without_accents = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    return without_accents
+
 
 @dataclass
 class ReactiveValue:
@@ -30,12 +55,9 @@ class BaseTableState:
         self.records: List[Dict] = []
         self.filtered_records: List[Dict] = []
         self.filters: Dict[str, Any] = {}
-        # A list of tuples: (column_name, ascending_boolean)
         self.sort_criteria: List[Tuple[str, bool]] = []
         self.current_page = ReactiveValue(1)
         self.page_size = ReactiveValue(5)
-
-        # UI element references
         self.filter_container = None
         self.table_container = None
         self.pagination_container = None
@@ -48,28 +70,24 @@ class BaseTableState:
     def apply_filters_and_sort(self):
         """
         Apply all current filters and sorting criteria to the base records.
-        This is the core client-side logic.
         """
         filtered = self.records.copy()
 
         # Apply filters
         for column, filter_value in self.filters.items():
             if filter_value:
-                # Global search logic
                 if column == 'global_search':
                     search_term = str(filter_value).lower()
                     filtered = [
                         r for r in filtered
                         if any(search_term in str(v).lower() for v in r.values())
                     ]
-                # Multi-select logic for categorical filters
                 elif isinstance(filter_value, list):
-                    if filter_value: # Only filter if list is not empty
+                    if filter_value:
                         filtered = [
                             r for r in filtered
                             if r.get(column) in filter_value
                         ]
-                # Standard text filter
                 else:
                     filtered = [
                         r for r in filtered
@@ -80,10 +98,12 @@ class BaseTableState:
 
         # Apply sorting
         if self.sort_criteria:
-            # Sort by each criterion in reverse order of priority
             for column, ascending in reversed(self.sort_criteria):
+                # *** THIS IS THE KEY CHANGE ***
+                # We now use the robust _normalize_for_sorting function as the key,
+                # while still handling None values correctly to sort them at the beginning.
                 self.filtered_records.sort(
-                    key=lambda x: (x.get(column) is None, x.get(column, '')),
+                    key=lambda x: (x.get(column) is None, _normalize_for_sorting(x.get(column))),
                     reverse=not ascending
                 )
 
