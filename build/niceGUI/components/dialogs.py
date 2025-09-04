@@ -110,13 +110,14 @@ class RecordDialog:
                     "Venta de la vivienda", "Honorarios", "Requerimiento de la casa para uso propio",
                     "Impago", "Actualización del precio (IPC)", "Negociación del contrato",
                 ])
+                self.inputs[field] = ui.select(options=options, label="Causa", value=select_value).classes("w-full").props("use-input")
             elif self.table == 'conflictos' and field == 'estado':
                 options = sorted([
                     "Abierto", "En proceso", "Resuelto", "Cerrado",
                 ])
                 # *** FIX: Ensure value is None if it's not a valid option ***
                 select_value = value if value in options else None
-                self.inputs[field] = ui.select(options=options, label="Causa", value=select_value).classes("w-full").props("use-input")
+                self.inputs[field] = ui.select(options=options, label="Estado", value=select_value).classes("w-full").props("use-input")
 
             elif "fecha" in lower:
                 default_value = value
