@@ -5,7 +5,7 @@ from config import TABLE_INFO
 from datetime import date
 
 class RecordDialog:
-    """Dialog for creating/editing records, fields from TABLE_INFO."""
+    """Dialog for creating/editing records, driven by TABLE_INFO."""
 
     def __init__(
         self,
@@ -24,7 +24,7 @@ class RecordDialog:
         self.inputs = {}
 
     async def open(self):
-        """Open the dialog asynchronously for full dynamic field support."""
+        """Open the dialog asynchronously."""
         self.dialog = ui.dialog()
 
         with self.dialog, ui.card().classes("w-96"):
@@ -61,20 +61,19 @@ class RecordDialog:
         return list(fields)
 
     async def _create_inputs(self):
-        """Create input fields based on TABLE_INFO, relations, and record."""
+        """Create input fields dynamically based on TABLE_INFO configuration."""
         table_info = TABLE_INFO.get(self.table, {})
         relations = table_info.get("relations", {})
+        field_options = table_info.get("field_options", {}) # Get predefined options
         fields = self._get_fields()
 
-        def field_sort_key(f):
-            return (0 if f in relations else 1, f)
-
-        fields = sorted(fields, key=field_sort_key)
+        fields = sorted(fields, key=lambda f: (0 if f in relations else 1, f))
 
         for field in fields:
             value = self.record.get(field, "")
             lower = field.lower()
 
+            # 1. Foreign Key Relation -> Searchable Dropdown
             if field in relations:
                 relation = relations[field]
                 view_name = relation["view"]
@@ -82,11 +81,9 @@ class RecordDialog:
                 try:
                     options_records = await self.api.get_records(view_name, limit=2000)
                     if "," in display_field:
-                        def get_disp(r):
-                            return " ".join([str(r.get(df, "")) for df in display_field.split(",")]).strip()
+                        get_disp = lambda r: " ".join([str(r.get(df, "")) for df in display_field.split(",")]).strip()
                     else:
-                        def get_disp(r):
-                            return str(r.get(display_field, f"ID: {r['id']}"))
+                        get_disp = lambda r: str(r.get(display_field, f"ID: {r['id']}"))
                     options = {r["id"]: get_disp(r) for r in options_records}
                 except Exception as e:
                     ui.notify(f"Error cargando opciones de {field}: {e}", type="negative")
@@ -94,31 +91,20 @@ class RecordDialog:
                 self.inputs[field] = ui.select(
                     options=options,
                     label=field.replace("_", " ").title(),
-                    value=value if value in options else None, # Ensures value is valid or None
+                    value=value if value in options else None,
                 ).classes("w-full").props("use-input")
 
-            elif self.table == 'conflictos' and field == 'ambito':
-                options = ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"]
-                # *** FIX: Ensure value is None if it's not a valid option ***
+            # 2. Predefined Options from config.py -> Dropdown
+            elif field in field_options:
+                options = field_options[field]
                 select_value = value if value in options else None
-                self.inputs[field] = ui.select(options=options, label="Ámbito", value=select_value).classes("w-full")
+                self.inputs[field] = ui.select(
+                    options=options,
+                    label=field.replace("_", " ").title(),
+                    value=select_value
+                ).classes("w-full")
 
-            elif self.table == 'conflictos' and field == 'causa':
-                options = sorted([
-                    "No renovación", "Fianza", "Acoso inmobiliario", "Renta Antigua",
-                    "Subida de alquiler", "Individualización Calefacción", "Reparaciones / Habitabilidad",
-                    "Venta de la vivienda", "Honorarios", "Requerimiento de la casa para uso propio",
-                    "Impago", "Actualización del precio (IPC)", "Negociación del contrato",
-                ])
-                self.inputs[field] = ui.select(options=options, label="Causa", value=select_value).classes("w-full").props("use-input")
-            elif self.table == 'conflictos' and field == 'estado':
-                options = sorted([
-                    "Abierto", "En proceso", "Resuelto", "Cerrado",
-                ])
-                # *** FIX: Ensure value is None if it's not a valid option ***
-                select_value = value if value in options else None
-                self.inputs[field] = ui.select(options=options, label="Estado", value=select_value).classes("w-full").props("use-input")
-
+            # 3. Date Field -> Date Input with Default
             elif "fecha" in lower:
                 default_value = value
                 if self.mode == 'create' and field == 'fecha_apertura':
@@ -130,8 +116,11 @@ class RecordDialog:
                         ui.date().bind_value(input_field)
                 self.inputs[field] = input_field
 
+            # 4. Text Area for long text
             elif "nota" in lower or "descripcion" in lower:
                 self.inputs[field] = ui.textarea(label=field.replace("_", " ").title(), value=value).classes("w-full")
+
+            # 5. Default -> Plain Text Input
             else:
                 self.inputs[field] = ui.input(label=field.replace("_", " ").title(), value=value).classes("w-full")
 
@@ -169,7 +158,7 @@ class RecordDialog:
         except Exception as e:
             ui.notify(f"Error al guardar: {str(e)}", type="negative")
 
-# ... (The rest of the file remains the same) ...
+# ... The rest of the file (EnhancedRecordDialog, ConflictNoteDialog) remains unchanged ...
 
 class EnhancedRecordDialog(RecordDialog):
     pass

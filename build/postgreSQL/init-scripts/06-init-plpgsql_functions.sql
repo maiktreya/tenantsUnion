@@ -114,6 +114,40 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+
+
+-- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
+-- This procedure assigns nodo_id to bloques based on the most common nodo_id among their pisos' CPs
+-- It assumes the existence of a mapping table 'nodos_cp_mapping' with columns
+CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    bloque_record RECORD;
+    most_common_nodo_id INTEGER;
+BEGIN
+    -- Itera sobre cada bloque que no tiene un nodo asignado
+    FOR bloque_record IN SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL LOOP
+        -- Encuentra el nodo_id más común entre los pisos de este bloque
+        SELECT ncm.nodo_id INTO most_common_nodo_id
+        FROM sindicato_inq.pisos p
+        JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
+        WHERE p.bloque_id = bloque_record.id
+        GROUP BY ncm.nodo_id
+        ORDER BY COUNT(*) DESC
+        LIMIT 1;
+
+        -- Si se encontró un nodo común, actualiza el bloque
+        IF FOUND AND most_common_nodo_id IS NOT NULL THEN
+            UPDATE sindicato_inq.bloques
+            SET nodo_id = most_common_nodo_id
+            WHERE id = bloque_record.id;
+        END IF;
+    END LOOP;
+END;
+$$;
+
+
 -- 4. IMPROVED MIGRATION: Match pisos to bloques using similarity scoring
 -- SCRIPT TO LINK EXISTING PISOS TO BLOQUES
 

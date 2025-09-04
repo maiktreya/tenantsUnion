@@ -9,7 +9,7 @@
 
 SET search_path TO sindicato_inq, public;
 
--- VISTA 1: AFILIADAS (AHORA INCLUYE IDs)
+-- VISTA 1: AFILIADAS (AHORA INCLUYE IDs Y NOMBRE DEL NODO)
 CREATE OR REPLACE VIEW v_afiliadas AS
 SELECT
     a.id, -- ID primario de la afiliada (para buscar hijos)
@@ -24,25 +24,25 @@ SELECT
     a.estado AS "Estado",
     e.api AS "API",
     e.nombre AS "Propiedad",
-    COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado"
+    COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
+    COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"
 FROM afiliadas a
 LEFT JOIN pisos p ON a.piso_id = p.id
 LEFT JOIN bloques b ON p.bloque_id = b.id
 LEFT JOIN empresas e ON b.empresa_id = e.id
-LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id;
+LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
+LEFT JOIN nodos n ON b.nodo_id = n.id;
 
--- VISTA 2: ENTRAMADO_EMPRESAS (AHORA INCLUYE IDs)
+-- VISTA 2: ENTRAMADO_EMPRESAS (AHORA CON MÉTRICAS AMPLIADAS Y AGRUPACIÓN CORRECTA)
 CREATE OR REPLACE VIEW v_entramado_empresas AS
 SELECT
-    e.id, -- ID primario de la empresa (para buscar hijos)
-    e.entramado_id, -- ID foráneo del entramado (para buscar padres)
-    e.nombre AS "Nombre",
-    e.cif_nif_nie AS "CIF/NIF/NIE",
+    ee.id, -- ID primario del entramado
     ee.nombre AS "Entramado",
-    e.directivos AS "Directivos",
-    e.api AS "API",
-    e.direccion_fiscal AS "Dirección",
-    COUNT(DISTINCT a.id) AS "Núm.Afiliadas"
+    ee.descripcion AS "Descripción",
+    COUNT(DISTINCT e.id) AS "Núm. Empresas",
+    COUNT(DISTINCT b.id) AS "Núm. Bloques",
+    COUNT(DISTINCT p.id) AS "Núm. Pisos",
+    COUNT(DISTINCT a.id) AS "Núm. Afiliadas"
 FROM
     entramado_empresas ee
     LEFT JOIN empresas e ON ee.id = e.entramado_id
@@ -50,13 +50,7 @@ FROM
     LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
 GROUP BY
-    e.id,
-    e.nombre,
-    e.cif_nif_nie,
-    ee.nombre,
-    e.directivos,
-    e.api,
-    e.direccion_fiscal;
+    ee.id, ee.nombre, ee.descripcion;
 
 -- VISTA 3: BLOQUES (YA TENÍA ID, PERO SE AÑADEN FORÁNEOS PARA CLARIDAD)
 CREATE OR REPLACE VIEW v_bloques AS
@@ -165,3 +159,28 @@ FROM
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
     LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id
     LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
+
+-- =====================================================================
+-- VISTA NUEVA: RESUMEN POR NODO TERRITORIAL
+-- =====================================================================
+CREATE OR REPLACE VIEW v_resumen_nodos AS
+SELECT
+    n.id,
+    n.nombre AS "Nodo Territorial",
+    n.descripcion AS "Descripción",
+    COUNT(DISTINCT b.id) AS "Núm. Bloques",
+    COUNT(DISTINCT e.id) AS "Núm. Empresas Activas",
+    COUNT(DISTINCT a.id) AS "Núm. Afiliadas",
+    COUNT(DISTINCT c.id) AS "Total Conflictos",
+    COUNT(DISTINCT c.id) FILTER (WHERE c.estado = 'Abierto') AS "Conflictos Abiertos"
+FROM
+    nodos n
+    LEFT JOIN bloques b ON n.id = b.nodo_id
+    LEFT JOIN empresas e ON b.empresa_id = e.id
+    LEFT JOIN pisos p ON b.id = p.bloque_id
+    LEFT JOIN afiliadas a ON p.id = a.piso_id
+    LEFT JOIN conflictos c ON a.id = c.afiliada_id
+GROUP BY
+    n.id, n.nombre, n.descripcion
+ORDER BY
+    "Núm. Afiliadas" DESC;
