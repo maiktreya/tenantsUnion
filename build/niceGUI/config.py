@@ -120,9 +120,22 @@ TABLE_INFO = {
             "tecnica_id": {"view": "usuarios", "display_field": "alias"},
         },
     },
+
     "conflictos": {
         "display_name": "Conflictos",
         "id_field": "id",
+        # ADD THIS 'fields' LIST
+        "fields": [
+            "afiliada_id",
+            "usuario_responsable_id",
+            "estado",
+            "ambito",
+            "causa",
+            "fecha_apertura",
+            "descripcion",
+            "resolucion",
+            "fecha_cierre",
+        ],
         "relations": {
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
             "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"},
