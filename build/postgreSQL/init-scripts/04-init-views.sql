@@ -34,7 +34,7 @@ LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
 LEFT JOIN nodos n ON b.nodo_id = n.id;
 
 -- VISTA 2: ENTRAMADO_EMPRESAS (AHORA CON MÉTRICAS AMPLIADAS Y AGRUPACIÓN CORRECTA)
-CREATE OR REPLACE VIEW v_entramado_empresas AS
+CREATE OR REPLACE VIEW entramado_empresas_detalle AS
 SELECT
     ee.id, -- ID primario del entramado
     ee.nombre AS "Entramado",
