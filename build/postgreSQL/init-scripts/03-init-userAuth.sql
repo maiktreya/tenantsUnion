@@ -1,5 +1,4 @@
--- Create the dedicated schema for sindicato_inqentication
-CREATE SCHEMA IF NOT EXISTS sindicato_inq;
+--- PostgreSQL script to create user authentication and authorization tables
 
 SET search_path TO sindicato_inq;
 

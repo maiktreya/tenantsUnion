@@ -55,7 +55,9 @@ CREATE TABLE usuarios (
     nombre TEXT,
     apellidos TEXT,
     email TEXT,
-    roles TEXT
+    roles TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE afiliadas (
@@ -249,13 +251,9 @@ CREATE TABLE staging_usuarios (
 );
 
 -- =====================================================================
--- PARTE B.1: MEJORA DE LA TABLA DE USUARIOS
+-- PARTE 2.2: IMPORTACIÓN DE DATOS DESDE CSV
 -- =====================================================================
-ALTER TABLE usuarios
-ADD COLUMN is_active BOOLEAN DEFAULT TRUE,
-ADD COLUMN created_at TIMESTAMP
-WITH
-    TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+
 
 -- 2.2. Copiar datos desde CSV
 COPY staging_afiliadas

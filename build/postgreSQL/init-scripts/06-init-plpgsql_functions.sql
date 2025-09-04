@@ -116,7 +116,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 
 
 
--- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
+-- 4. PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
 -- This procedure assigns nodo_id to bloques based on the most common nodo_id among their pisos' CPs
 -- It assumes the existence of a mapping table 'nodos_cp_mapping' with columns
 CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
@@ -148,54 +148,22 @@ END;
 $$;
 
 
--- 4. IMPROVED MIGRATION: Match pisos to bloques using similarity scoring
--- SCRIPT TO LINK EXISTING PISOS TO BLOQUES
+-- 5. TRIGGER TO AUTOMATICALLY SYNC BLOQUES WHEN A PISO IS INSERTED OR UPDATED
+-- This trigger updates the nodo_id of the parent bloque whenever a piso's CP is set or changed
+-- It uses the mapping table 'nodos_cp_mapping' to find the corresponding nodo_id
+CREATE OR REPLACE FUNCTION sync_bloque_nodo()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Cuando se inserta o actualiza un piso...
+    -- Se busca el nodo correspondiente a su CP y se actualiza el bloque padre.
+    UPDATE sindicato_inq.bloques
+    SET nodo_id = (SELECT nodo_id FROM sindicato_inq.nodos_cp_mapping WHERE cp = NEW.cp)
+    WHERE id = NEW.bloque_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- 1. (UNCHANGED) The functions you created are still needed and correct.
--- Ensure these functions exist in your database:
--- normalize_address(TEXT)
--- extract_base_address(TEXT)
--- address_similarity_score(TEXT, TEXT)
-SET search_path TO public, sindicato_inq;
--- 2. 🔄 UPDATED SCRIPT: Find the best match and update the pisos table
-WITH
-    MatchedBloques AS (
-        -- This CTE finds the best bloque candidate for each piso that needs matching
-        SELECT
-            p.direccion AS piso_direccion,
-            b.id AS best_bloque_id,
-            -- We use ROW_NUMBER to rank the matches by similarity score
-            ROW_NUMBER() OVER (
-                PARTITION BY
-                    p.direccion
-                ORDER BY address_similarity_score (p.direccion, b.direccion) DESC, LENGTH(b.direccion) DESC -- Prefer longer, more specific bloque addresses as a tie-breaker
-            ) as rn
-        FROM pisos p
-            CROSS JOIN bloques b
-        WHERE
-            -- Important: Only process pisos that are not already linked
-            p.bloque_id IS NULL
-            AND address_similarity_score (p.direccion, b.direccion) >= 0.6 -- Similarity threshold
-    )
-UPDATE pisos
-SET
-    bloque_id = mb.best_bloque_id
-FROM MatchedBloques mb
-WHERE
-    -- Join condition to update the correct piso row
-    pisos.direccion = mb.piso_direccion
-    -- We only want the #1 ranked match for each piso
-    AND mb.rn = 1;
-
-
--- 5. VERIFICATION QUERY: Check the matching results
-
--- SELECT 'MATCHED' as status, COUNT(*) as count
--- FROM pisos
--- WHERE
---     bloque_id IS NOT NULL
--- UNION ALL
--- SELECT 'UNMATCHED (needs linking)' as status, COUNT(*) as count
--- FROM pisos
--- WHERE
---     bloque_id IS NULL;
+-- El trigger se activa cada vez que se crea o modifica un piso.
+CREATE TRIGGER trigger_sync_bloque_nodo
+AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
+FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
