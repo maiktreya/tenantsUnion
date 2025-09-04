@@ -35,7 +35,7 @@ LEFT JOIN nodos n ON b.nodo_id = n.id;
 
 -- VISTA 2: ENTRAMADO_EMPRESAS (AHORA CON MÉTRICAS AMPLIADAS Y AGRUPACIÓN CORRECTA)
 -- NOTA: Esta es una vista de resumen. Al hacer clic en una fila, se mostrarán las empresas hijas (child records).
-CREATE OR REPLACE VIEW v_entramado_empresas AS
+CREATE OR REPLACE VIEW v_entramado_empresas_detalle AS
 SELECT
     ee.id, -- ID primario del entramado (para buscar hijos)
     ee.nombre AS "Entramado",
