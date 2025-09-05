@@ -189,35 +189,17 @@ ORDER BY "Núm. Afiliadas" DESC;
 -- =====================================================================
 -- PROCEDIMIENTO: SINCRONIZACIÓN MASIVA DE NODOS PARA BLOQUES
 -- =====================================================================
--- Este procedimiento actualiza el campo 'nodo_id' para todos los bloques
--- que actualmente no lo tienen asignado. Determina el nodo más apropiado
--- basándose en el código postal más frecuente de los pisos asociados.
--- Para ejecutarlo, usar: CALL sync_all_bloques_to_nodos();
--- =====================================================================
-CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    bloque_record RECORD;
-    most_common_nodo_id INTEGER;
-BEGIN
-    -- Itera sobre cada bloque que no tiene un nodo asignado
-    FOR bloque_record IN SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL LOOP
-        -- Encuentra el nodo_id más común entre los pisos de este bloque
-        SELECT ncm.nodo_id INTO most_common_nodo_id
-        FROM sindicato_inq.pisos p
-        JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-        WHERE p.bloque_id = bloque_record.id
-        GROUP BY ncm.nodo_id
-        ORDER BY COUNT(*) DESC
-        LIMIT 1;
+CREATE OR REPLACE VIEW comprobar_link_pisos_bloques AS
 
-        -- Si se encontró un nodo común, actualiza el bloque
-        IF FOUND AND most_common_nodo_id IS NOT NULL THEN
-            UPDATE sindicato_inq.bloques
-            SET nodo_id = most_common_nodo_id
-            WHERE id = bloque_record.id;
-        END IF;
-    END LOOP;
-END;
-$$;
+SELECT
+    p.id AS piso_id,
+    p.direccion AS piso_address,
+    b.id AS matched_bloque_id,
+    b.direccion AS bloque_address
+FROM
+    pisos p
+-- We use an INNER JOIN to fetch only the pisos that have a matching bloque.
+JOIN
+    bloques b ON p.bloque_id = b.id
+-- Optional: You can filter for specific cases or just limit the results for a quick check.
+LIMIT 100; -- Show the first 100 matched pairs for a quick review.
