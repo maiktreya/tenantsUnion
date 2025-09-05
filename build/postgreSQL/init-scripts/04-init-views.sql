@@ -94,8 +94,7 @@ CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
 SELECT
     d.*,
     a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
-    u.alias AS autor_nota_alias,
-    ac.nombre AS accion_nombre
+    u.alias AS autor_nota_alias
 FROM
     diario_conflictos d
     LEFT JOIN conflictos c ON d.conflicto_id = c.id
