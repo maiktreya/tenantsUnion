@@ -103,6 +103,7 @@ CREATE TABLE conflictos (
     estado TEXT DEFAULT NULL,
     ambito TEXT,
     causa TEXT,
+    tarea_actual TEXT,
     fecha_apertura DATE,
     fecha_cierre DATE,
     descripcion TEXT,
@@ -123,6 +124,7 @@ CREATE TABLE diario_conflictos (
     estado TEXT,
     ambito TEXT,
     notas TEXT,
+    tarea_actual TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -253,7 +255,6 @@ CREATE TABLE staging_usuarios (
 -- =====================================================================
 -- PARTE 2.2: IMPORTACIÓN DE DATOS DESDE CSV
 -- =====================================================================
-
 
 -- 2.2. Copiar datos desde CSV
 COPY staging_afiliadas

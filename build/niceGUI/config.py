@@ -120,47 +120,60 @@ TABLE_INFO = {
             "tecnica_id": {"view": "usuarios", "display_field": "alias"},
         },
     },
-
     "conflictos": {
-            "display_name": "Conflictos",
-            "id_field": "id",
-            "fields": [
-                "afiliada_id",
-                "usuario_responsable_id",
-                "estado",
-                "ambito",
-                "causa",
-                "fecha_apertura",
-                "descripcion",
-                "resolucion",
-                "fecha_cierre",
-            ],
-            # --- ADD THIS NEW SECTION ---
-            "field_options": {
-                "estado": sorted([
-                    "Abierto", "En proceso", "Resuelto", "Cerrado",
-                ]),
-                "ambito": [
-                    "Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"
-                ],
-                "causa": sorted([
-                    "No renovación", "Fianza", "Acoso inmobiliario", "Renta Antigua",
-                    "Subida de alquiler", "Individualización Calefacción", "Reparaciones / Habitabilidad",
-                    "Venta de la vivienda", "Honorarios", "Requerimiento de la casa para uso propio",
-                    "Impago", "Actualización del precio (IPC)", "Negociación del contrato",
-                ]),
-            },
-            # --- END OF NEW SECTION ---
-            "relations": {
-                "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
-                "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"},
-            },
-            "child_relations": {
-                "table": "diario_conflictos",
-                "foreign_key": "conflicto_id",
-            },
+        "display_name": "Conflictos",
+        "id_field": "id",
+        "fields": [
+            "afiliada_id",
+            "usuario_responsable_id",
+            "estado",
+            "ambito",
+            "causa",
+            "tarea_actual",
+            "fecha_apertura",
+            "descripcion",
+            "resolucion",
+            "fecha_cierre",
+        ],
+        # --- ADD THIS NEW SECTION ---
+        "field_options": {
+            "estado": sorted(
+                [
+                    "Abierto",
+                    "En proceso",
+                    "Resuelto",
+                    "Cerrado",
+                ]
+            ),
+            "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"],
+            "causa": sorted(
+                [
+                    "No renovación",
+                    "Fianza",
+                    "Acoso inmobiliario",
+                    "Renta Antigua",
+                    "Subida de alquiler",
+                    "Individualización Calefacción",
+                    "Reparaciones / Habitabilidad",
+                    "Venta de la vivienda",
+                    "Honorarios",
+                    "Requerimiento de la casa para uso propio",
+                    "Impago",
+                    "Actualización del precio (IPC)",
+                    "Negociación del contrato",
+                ]
+            ),
+        },
+        # --- END OF NEW SECTION ---
+        "relations": {
+            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
+            "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"},
+        },
+        "child_relations": {
+            "table": "diario_conflictos",
+            "foreign_key": "conflicto_id",
+        },
     },
-
     "diario_conflictos": {
         "display_name": "Diario de Conflictos",
         "id_field": "id",
@@ -175,10 +188,12 @@ TABLE_INFO = {
 # =====================================================================
 VIEW_INFO = {
     "v_resumen_nodos": {"display_name": "Resumen de Nodos"},
-    "v_resumen_entramados_empresas": {"display_name": "Resumen de Entramados y Empresas"},
+    "v_resumen_entramados_empresas": {
+        "display_name": "Resumen de Entramados y Empresas"
+    },
     "v_afiliadas_detalle": {"display_name": "Info completa de Afiliadas"},
     "v_conflictos_detalle": {"display_name": "Diario Conflictos con Info para Nodos"},
-    #"v_diario_conflictos_con_afiliada": {"display_name": "Conflictos con Info Completa y Nodos"},
+    # "v_diario_conflictos_con_afiliada": {"display_name": "Conflictos con Info Completa y Nodos"},
 }
 
 config = Config()
