@@ -52,7 +52,7 @@ class RelationshipExplorer:
         # Render the content exactly once within the cleared container
         with self.container:
             ui.label(
-                f"Relationships for record from '{source_name}' (ID: {record_id})"
+                f"Relaciones asociadas al registro '{source_name}' (ID: {record_id})"
             ).classes("text-h5 mb-2")
             with ui.row().classes("w-full gap-4"):
                 with ui.column().classes("w-1/2"):
