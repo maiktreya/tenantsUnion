@@ -200,6 +200,5 @@ FROM
     pisos p
 -- We use an INNER JOIN to fetch only the pisos that have a matching bloque.
 JOIN
-    bloques b ON p.bloque_id = b.id
+    bloques b ON p.bloque_id = b.id;
 -- Optional: You can filter for specific cases or just limit the results for a quick check.
-LIMIT 100; -- Show the first 100 matched pairs for a quick review.
