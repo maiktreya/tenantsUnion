@@ -100,7 +100,7 @@ FROM
     diario_conflictos d
     LEFT JOIN conflictos c ON d.conflicto_id = c.id
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN usuarios u ON d.usuario_id = u.id
+    LEFT JOIN usuarios u ON d.usuario_id = u.id;
 
 -- VISTA 6: VISTA MEJORADA PARA LA INTERFAZ DE CONFLICTOS
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS
