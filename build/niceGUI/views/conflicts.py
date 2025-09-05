@@ -438,68 +438,87 @@ class ConflictsView:
             ui.notify(f"Error al cargar el historial: {str(e)}", type="negative")
 
     def _create_history_entry(self, entry: dict):
-        """Create history entry card"""
+        """Create a collapsible history entry card using ui.expansion."""
+
+        # Determine the expansion title based on key info
+        title_text = f"Nota #{entry.get('id', 'N/A')} - {entry.get('created_at', 'Sin fecha').split('T')[0]}"
+        if entry.get("autor_nota_alias"):
+            title_text += f" | Autor: {entry['autor_nota_alias']}"
+
+        # Use a card to contain the expansion for better visual separation
         with ui.card().classes("w-full mb-2"):
-            # Header
-            with ui.row().classes("w-full justify-between items-center mb-2"):
-                with ui.column():
-                    with ui.row().classes("items-center gap-2"):
+            # The expansion component for the collapsible behavior
+            with ui.expansion(title_text).classes("w-full"):
+
+                # Header slot to show key info without expanding
+                with ui.element("div").classes("p-2"):
+                    with ui.row().classes("w-full gap-2 items-center"):
                         ui.icon("schedule", size="sm").classes("text-gray-500")
-                        ui.label(entry.get("created_at", "Sin fecha")).classes(
-                            "text-caption text-gray-600"
+                        ui.label(
+                            entry.get("created_at", "Sin fecha").split(".")[0]
+                        ).classes("text-caption text-gray-600")
+                        ui.space()
+
+                        # Action buttons
+                        ui.button(
+                            icon="edit", on_click=lambda e=entry: self._edit_note(e)
+                        ).props("size=sm flat dense").tooltip("Editar nota")
+
+                        ui.button(
+                            icon="delete", on_click=lambda e=entry: self._delete_note(e)
+                        ).props("size=sm flat dense color=negative").tooltip(
+                            "Eliminar nota"
                         )
 
-                    if entry.get("autor_nota_alias"):
-                        with ui.row().classes("items-center gap-2 mt-1"):
-                            ui.icon("person", size="sm").classes("text-gray-500")
-                            ui.label(f"Por: {entry['autor_nota_alias']}").classes(
-                                "text-caption text-blue-600"
+                # Content inside the expansion
+                with ui.card_section().classes("w-full"):
+                    # Badges
+                    with ui.row().classes("gap-2 mb-2"):
+                        if entry.get("estado"):
+                            color_map = {
+                                "Abierto": "red",
+                                "En proceso": "orange",
+                                "Resuelto": "green",
+                                "Cerrado": "gray",
+                            }
+                            color = color_map.get(entry["estado"], "blue")
+                            ui.badge(f"Estado: {entry['estado']}", color=color).props(
+                                "outline"
                             )
 
-                # Actions
-                with ui.row().classes("gap-2"):
-                    ui.button(
-                        icon="edit", on_click=lambda e=entry: self._edit_note(e)
-                    ).props("size=sm flat dense").tooltip("Editar nota")
+                        if entry.get("accion_nombre"):
+                            ui.badge(
+                                f"Acción: {entry['accion_nombre']}", color="purple"
+                            ).props("outline")
 
-                    ui.button(
-                        icon="delete", on_click=lambda e=entry: self._delete_note(e)
-                    ).props("size=sm flat dense color=negative").tooltip(
-                        "Eliminar nota"
-                    )
+                        if entry.get("ambito"):
+                            ui.badge(
+                                f"Ámbito: {entry['ambito']}", color="indigo"
+                            ).props("outline")
 
-            # Badges
-            with ui.row().classes("gap-2 mb-2"):
-                if entry.get("estado"):
-                    color_map = {
-                        "Abierto": "red",
-                        "En proceso": "orange",
-                        "Resuelto": "green",
-                        "Cerrado": "gray",
-                    }
-                    color = color_map.get(entry["estado"], "blue")
-                    ui.badge(f"Estado: {entry['estado']}", color=color).props("outline")
+                    # Note content
+                    if entry.get("notas"):
+                        ui.separator().classes("my-2")
+                        with ui.row().classes("w-full"):
+                            ui.icon("notes", size="sm").classes("text-gray-500 mt-1")
+                            with ui.column().classes("flex-grow ml-2"):
+                                ui.label("Notas:").classes("font-semibold text-sm")
+                                ui.label(entry["notas"]).classes(
+                                    "text-gray-700 whitespace-pre-wrap"
+                                )
 
-                if entry.get("accion_nombre"):
-                    ui.badge(f"Acción: {entry['accion_nombre']}", color="purple").props(
-                        "outline"
-                    )
-
-                if entry.get("ambito"):
-                    ui.badge(f"Ámbito: {entry['ambito']}", color="indigo").props(
-                        "outline"
-                    )
-
-            # Note content
-            if entry.get("notas"):
-                ui.separator().classes("my-2")
-                with ui.row().classes("w-full"):
-                    ui.icon("notes", size="sm").classes("text-gray-500 mt-1")
-                    with ui.column().classes("flex-grow ml-2"):
-                        ui.label("Nota:").classes("font-semibold text-sm")
-                        ui.label(entry["notas"]).classes(
-                            "text-gray-700 whitespace-pre-wrap"
-                        )
+                    # New 'tarea_actual' content
+                    if entry.get("tarea_actual"):
+                        ui.separator().classes("my-2")
+                        with ui.row().classes("w-full"):
+                            ui.icon("task", size="sm").classes("text-gray-500 mt-1")
+                            with ui.column().classes("flex-grow ml-2"):
+                                ui.label("Tarea Actual:").classes(
+                                    "font-semibold text-sm"
+                                )
+                                ui.label(entry["tarea_actual"]).classes(
+                                    "text-gray-700 whitespace-pre-wrap"
+                                )
 
     async def _add_note(self):
         """Add a new note to the selected conflict"""

@@ -107,10 +107,14 @@ class DataTable:
                         with ui.row().classes(row_classes) as row:
                             for column in columns:
                                 value = record.get(column, "")
+                                # MODIFIED: Coerce None and empty strings to '-' for display
                                 display_value = (
-                                    str(value)[:75] + "..."
-                                    if len(str(value)) > 75
-                                    else str(value)
+                                    value if value is not None and value != "" else "-"
+                                )
+                                display_value = (
+                                    str(display_value)[:75] + "..."
+                                    if len(str(display_value)) > 75
+                                    else str(display_value)
                                 )
                                 ui.label(display_value).classes("flex-1").tooltip(
                                     str(value)

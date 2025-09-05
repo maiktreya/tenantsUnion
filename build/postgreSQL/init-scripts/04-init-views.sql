@@ -36,14 +36,8 @@ LEFT JOIN nodos n ON b.nodo_id = n.id;
 -- VISTA 2: ENTRAMADO_EMPRESAS (AHORA CON MÉTRICAS AMPLIADAS Y AGRUPACIÓN CORRECTA)
 -- NOTA: Esta es una vista de resumen. Al hacer clic en una fila, se mostrarán las empresas hijas (child records).
 CREATE OR REPLACE VIEW v_resumen_entramados_empresas AS
-SELECT
-    ee.id, -- ID primario del entramado (para buscar hijos)
-    ee.nombre AS "Entramado",
-    ee.descripcion AS "Descripción",
-    COUNT(DISTINCT e.id) AS "Núm. Empresas",
-    COUNT(DISTINCT b.id) AS "Núm. Bloques",
-    COUNT(DISTINCT p.id) AS "Núm. Pisos",
-    COUNT(DISTINCT a.id) AS "Núm. Afiliadas"
+SELECT ee.id, -- ID primario del entramado (para buscar hijos)
+    ee.nombre AS "Entramado", ee.descripcion AS "Descripción", COUNT(DISTINCT e.id) AS "Núm. Empresas", COUNT(DISTINCT b.id) AS "Núm. Bloques", COUNT(DISTINCT p.id) AS "Núm. Pisos", COUNT(DISTINCT a.id) AS "Núm. Afiliadas"
 FROM
     entramado_empresas ee
     LEFT JOIN empresas e ON ee.id = e.entramado_id
@@ -51,7 +45,9 @@ FROM
     LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
 GROUP BY
-    ee.id, ee.nombre, ee.descripcion;
+    ee.id,
+    ee.nombre,
+    ee.descripcion;
 
 -- VISTA 3: BLOQUES (YA TENÍA ID, PERO SE AÑADEN FORÁNEOS PARA CLARIDAD)
 CREATE OR REPLACE VIEW v_bloques AS
@@ -72,7 +68,9 @@ FROM
     LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
 GROUP BY
-    b.id, e.nombre, ee.nombre;
+    b.id,
+    e.nombre,
+    ee.nombre;
 
 -- VISTA 4: VISTA DE DETALLE DE CONFLICTOS (UNIFICADA)
 -- Esta vista combina la información de la afiliada, el nodo y el responsable, reemplazando las vistas anteriores.
@@ -112,6 +110,7 @@ SELECT
     c.estado,
     c.ambito,
     c.causa,
+    c.tarea_actual,
     c.fecha_apertura,
     c.fecha_cierre,
     c.descripcion,
@@ -170,7 +169,10 @@ SELECT
     COUNT(DISTINCT e.id) AS "Núm. Empresas Activas",
     COUNT(DISTINCT a.id) AS "Núm. Afiliadas",
     COUNT(DISTINCT c.id) AS "Total Conflictos",
-    COUNT(DISTINCT c.id) FILTER (WHERE c.estado = 'Abierto') AS "Conflictos Abiertos"
+    COUNT(DISTINCT c.id) FILTER (
+        WHERE
+            c.estado = 'Abierto'
+    ) AS "Conflictos Abiertos"
 FROM
     nodos n
     LEFT JOIN bloques b ON n.id = b.nodo_id
@@ -179,9 +181,10 @@ FROM
     LEFT JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN conflictos c ON a.id = c.afiliada_id
 GROUP BY
-    n.id, n.nombre, n.descripcion
-ORDER BY
-    "Núm. Afiliadas" DESC;
+    n.id,
+    n.nombre,
+    n.descripcion
+ORDER BY "Núm. Afiliadas" DESC;
 
 -- =====================================================================
 -- PROCEDIMIENTO: SINCRONIZACIÓN MASIVA DE NODOS PARA BLOQUES

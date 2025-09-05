@@ -82,7 +82,11 @@ class RelationshipExplorer:
                         for key, value in parents[0].items():
                             with ui.row():
                                 ui.label(f"{key}:").classes("font-semibold w-32")
-                                ui.label(str(value))
+                                # MODIFIED: Coerce None and empty strings to '-'
+                                display_value = (
+                                    value if value is not None and value != "" else "-"
+                                )
+                                ui.label(str(display_value))
                 except Exception as e:
                     ui.notify(
                         f"Error al cargar padre de '{parent_table}': {str(e)}",
@@ -122,7 +126,13 @@ class RelationshipExplorer:
                                         ui.label(f"{key}:").classes(
                                             "font-semibold w-32"
                                         )
-                                        ui.label(str(value))
+                                        # MODIFIED: Coerce None and empty strings to '-'
+                                        display_value = (
+                                            value
+                                            if value is not None and value != ""
+                                            else "-"
+                                        )
+                                        ui.label(str(display_value))
                 except Exception as e:
                     ui.notify(
                         f"Error al cargar hijos de '{child_table}': {str(e)}",
