@@ -144,8 +144,6 @@ CREATE INDEX idx_conflictos_usuario_responsable_id ON conflictos (usuario_respon
 
 CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
 
-CREATE INDEX idx_diario_conflictos_accion_id ON diario_conflictos (accion_id);
-
 CREATE INDEX idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 
 -- =====================================================================
