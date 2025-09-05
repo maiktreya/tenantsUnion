@@ -1,118 +1,135 @@
--- ROBUST ADDRESS MATCHING SOLUTION
--- This script provides a comprehensive approach to match pisos to bloques based on address similarity
-SET search_path to sindicato_inq;
--- 1. Create a function to normalize addresses for better matching
-CREATE OR REPLACE FUNCTION normalize_address(addr TEXT) RETURNS TEXT AS $$
-BEGIN
-    -- Remove extra spaces, convert to lowercase, remove special characters
-    -- Keep only letters, numbers, spaces and commas
-    RETURN TRIM(REGEXP_REPLACE(
-        REGEXP_REPLACE(LOWER(COALESCE(addr, '')), '[^a-z0-9\s,áéíóúñü]', '', 'g'),
-        '\s+', ' ', 'g'
-    ));
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
-
--- 2. Create a function to extract the base address (street + number + postal code + city)
-CREATE OR REPLACE FUNCTION extract_base_address(addr TEXT) RETURNS TEXT AS $$
+-- Function to calculate similarity between two text strings
+-- Uses a combination of techniques for fuzzy matching
+CREATE OR REPLACE FUNCTION calculate_similarity(text1 TEXT, text2 TEXT)
+RETURNS FLOAT AS $$
 DECLARE
-    parts TEXT[];
-    street_part TEXT;
-    postal_code TEXT;
-    city_part TEXT;
-    result TEXT;
+    clean_text1 TEXT;
+    clean_text2 TEXT;
+    similarity_score FLOAT;
 BEGIN
-    -- Split by comma and clean parts
-    parts := string_to_array(normalize_address(addr), ',');
-
-    -- Extract street part (first part, remove apartment/floor info)
-    street_part := TRIM(parts[1]);
-    -- Remove apartment/floor indicators like "2B 2", "piso 2F", "bajo C", etc.
-    street_part := REGEXP_REPLACE(street_part, '\s+(piso|bajo|portal|escalera)\s+.*$', '', 'i');
-    street_part := REGEXP_REPLACE(street_part, '\s+\d+[a-z]?\s*\d*\s*[a-z]?\s*$', '', 'i');
-    street_part := REGEXP_REPLACE(street_part, '\s+-?\d+[a-z]?\s*$', '', 'i');
-
-    -- Extract postal code (5 digits)
-    postal_code := '';
-    FOR i IN 1..array_length(parts, 1) LOOP
-        IF parts[i] ~ '^\s*\d{5}\s*$' THEN
-            postal_code := TRIM(parts[i]);
-            EXIT;
-        END IF;
-    END LOOP;
-
-    -- Extract city (usually the last non-empty part)
-    city_part := '';
-    FOR i IN REVERSE array_length(parts, 1)..1 LOOP
-        IF TRIM(parts[i]) != '' AND TRIM(parts[i]) != postal_code THEN
-            city_part := TRIM(parts[i]);
-            EXIT;
-        END IF;
-    END LOOP;
-
-    -- Combine parts
-    result := street_part;
-    IF postal_code != '' THEN
-        result := result || ', ' || postal_code;
-    END IF;
-    IF city_part != '' THEN
-        result := result || ', ' || city_part;
-    END IF;
-
-    RETURN result;
+    -- Normalize and clean the text
+    clean_text1 := LOWER(TRIM(REGEXP_REPLACE(text1, '\s+', ' ', 'g')));
+    clean_text2 := LOWER(TRIM(REGEXP_REPLACE(text2, '\s+', ' ', 'g')));
+    
+    -- Remove common variations and standardize
+    clean_text1 := REGEXP_REPLACE(clean_text1, ',\s*(españa|espanya|spain)\s*$', '', 'i');
+    clean_text2 := REGEXP_REPLACE(clean_text2, ',\s*(españa|espanya|spain)\s*$', '', 'i');
+    
+    -- Calculate similarity using PostgreSQL's similarity function
+    -- Note: This requires the pg_trgm extension
+    similarity_score := SIMILARITY(clean_text1, clean_text2);
+    
+    RETURN similarity_score;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql;
 
--- 3. Create a similarity scoring function
-CREATE OR REPLACE FUNCTION address_similarity_score(addr1 TEXT, addr2 TEXT) RETURNS NUMERIC AS $$
+-- Function to extract base address from piso address
+-- Removes apartment-specific details like "Bajo A", "1º B", etc.
+CREATE OR REPLACE FUNCTION extract_base_address(direccion_piso TEXT)
+RETURNS TEXT AS $$
 DECLARE
-    base1 TEXT;
-    base2 TEXT;
-    score NUMERIC := 0;
-    parts1 TEXT[];
-    parts2 TEXT[];
-    common_words INTEGER := 0;
-    total_words INTEGER := 0;
+    base_address TEXT;
 BEGIN
-    base1 := extract_base_address(addr1);
-    base2 := extract_base_address(addr2);
-
-    -- If addresses are very similar, return high score
-    IF base1 = base2 THEN
-        RETURN 1.0;
-    END IF;
-
-    -- Calculate word-based similarity
-    parts1 := string_to_array(base1, ' ');
-    parts2 := string_to_array(base2, ' ');
-
-    total_words := GREATEST(array_length(parts1, 1), array_length(parts2, 1));
-
-    -- Count common words
-    FOR i IN 1..array_length(parts1, 1) LOOP
-        FOR j IN 1..array_length(parts2, 1) LOOP
-            IF parts1[i] = parts2[j] AND length(parts1[i]) > 2 THEN
-                common_words := common_words + 1;
-                EXIT;
-            END IF;
-        END LOOP;
-    END LOOP;
-
-    -- Calculate similarity score
-    IF total_words > 0 THEN
-        score := common_words::NUMERIC / total_words::NUMERIC;
-    END IF;
-
-    -- Boost score if postal codes match
-    IF base1 ~ '\d{5}' AND base2 ~ '\d{5}' THEN
-        IF (SELECT regexp_matches(base1, '(\d{5})'))[1] = (SELECT regexp_matches(base2, '(\d{5})'))[1] THEN
-            score := score + 0.3;
-        END IF;
-    END IF;
-
-    RETURN LEAST(score, 1.0);
+    base_address := direccion_piso;
+    
+    -- Remove apartment/floor details (common patterns in Spanish addresses)
+    base_address := REGEXP_REPLACE(base_address, ',\s*(Bajo|Entresuelo|Principal|[0-9]+º?)\s*[A-Z]?,?', '', 'gi');
+    base_address := REGEXP_REPLACE(base_address, ',\s*(Ático|Dúplex|Estudio)\s*[A-Z]?,?', '', 'gi');
+    base_address := REGEXP_REPLACE(base_address, ',\s*[A-Z]\s*,?', '', 'g'); -- Single letter apartments
+    
+    -- Clean up extra commas and spaces
+    base_address := REGEXP_REPLACE(base_address, ',\s*,', ',', 'g');
+    base_address := REGEXP_REPLACE(base_address, '\s+', ' ', 'g');
+    base_address := TRIM(base_address);
+    
+    RETURN base_address;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql;
+
+-- Main function to find matching bloques for pisos with 80% similarity threshold
+CREATE OR REPLACE FUNCTION match_pisos_to_bloques(similarity_threshold FLOAT DEFAULT 0.8)
+RETURNS TABLE(
+    piso_id INTEGER,
+    piso_direccion TEXT,
+    bloque_id INTEGER,
+    bloque_direccion TEXT,
+    similarity_score FLOAT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id AS piso_id,
+        p.direccion AS piso_direccion,
+        b.id AS bloque_id,
+        b.direccion AS bloque_direccion,
+        calculate_similarity(extract_base_address(p.direccion), b.direccion) AS similarity_score
+    FROM pisos p
+    CROSS JOIN bloques b
+    WHERE calculate_similarity(extract_base_address(p.direccion), b.direccion) >= similarity_threshold
+    ORDER BY p.id, similarity_score DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to update pisos table with matched bloque_id
+CREATE OR REPLACE FUNCTION update_pisos_with_bloque_matches(similarity_threshold FLOAT DEFAULT 0.8)
+RETURNS INTEGER AS $$
+DECLARE
+    updated_count INTEGER := 0;
+    match_record RECORD;
+BEGIN
+    -- First, let's create a temporary table with the best matches
+    CREATE TEMP TABLE temp_matches AS
+    SELECT DISTINCT ON (piso_id) 
+        piso_id, 
+        bloque_id, 
+        similarity_score
+    FROM match_pisos_to_bloques(similarity_threshold)
+    ORDER BY piso_id, similarity_score DESC;
+    
+    -- Update pisos table with the best matches
+    FOR match_record IN 
+        SELECT piso_id, bloque_id FROM temp_matches
+    LOOP
+        UPDATE pisos 
+        SET bloque_id = match_record.bloque_id 
+        WHERE id = match_record.piso_id;
+        
+        updated_count := updated_count + 1;
+    END LOOP;
+    
+    DROP TABLE temp_matches;
+    
+    RETURN updated_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Utility function to test the matching before applying updates
+CREATE OR REPLACE FUNCTION preview_address_matches(similarity_threshold FLOAT DEFAULT 0.8, limit_results INTEGER DEFAULT 50)
+RETURNS TABLE(
+    piso_id INTEGER,
+    original_piso_address TEXT,
+    cleaned_piso_address TEXT,
+    bloque_id INTEGER,
+    bloque_address TEXT,
+    similarity_score FLOAT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id AS piso_id,
+        p.direccion AS original_piso_address,
+        extract_base_address(p.direccion) AS cleaned_piso_address,
+        b.id AS bloque_id,
+        b.direccion AS bloque_address,
+        calculate_similarity(extract_base_address(p.direccion), b.direccion) AS similarity_score
+    FROM pisos p
+    CROSS JOIN bloques b
+    WHERE calculate_similarity(extract_base_address(p.direccion), b.direccion) >= similarity_threshold
+    ORDER BY similarity_score DESC
+    LIMIT limit_results;
+END;
+$$ LANGUAGE plpgsql;
+
 
 
 
