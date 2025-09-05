@@ -58,7 +58,7 @@ class HomeView:
                     )
 
                 # Views card - for admin/gestor/sistemas roles
-                if self.has_role('admin', 'gestor', 'sistemas'):
+                if self.has_role('admin', 'gestor'):
                     self._create_card(
                         icon="table_view",
                         title="Explorador de Vistas",
@@ -66,7 +66,7 @@ class HomeView:
                         on_click=lambda: self.navigate("views"),
                         color="text-orange-600"
                     )
-
+                if self.has_role('admin', 'gestor', 'actas'):
                     # Conflicts card - for admin/gestor/sistemas roles
                     self._create_card(
                         icon="gavel",

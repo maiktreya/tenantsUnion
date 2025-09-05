@@ -107,10 +107,11 @@ class Application:
                             on_click=lambda: self.show_view("user_management"),
                         ).props("flat color=red-600")
 
-                    if self.has_role("admin", "gestor", "sistemas"):
+                    if self.has_role("admin", "gestor"):
                         ui.button(
                             "Vistas", on_click=lambda: self.show_view("views")
                         ).props("flat color=red-600")
+                    if self.has_role("admin", "gestor", "actas"):
                         ui.button(
                             "Conflictos", on_click=lambda: self.show_view("conflicts")
                         ).props("flat color=red-600")
@@ -186,7 +187,7 @@ class Application:
                 self.views["admin"] = AdminView(self.api_client)
                 self.views["user_management"] = UserManagementView(self.api_client)
 
-            if self.has_role("admin", "gestor", "sistemas"):
+            if self.has_role("admin", "gestor", "actas"):
                 self.views["conflicts"] = ConflictsView(self.api_client)
 
             with ui.column().classes("w-full min-h-screen bg-gray-50"):

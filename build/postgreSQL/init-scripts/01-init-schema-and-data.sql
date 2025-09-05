@@ -110,17 +110,10 @@ CREATE TABLE conflictos (
     resolucion TEXT
 );
 
-CREATE TABLE acciones (
-    id SERIAL PRIMARY KEY,
-    nombre TEXT UNIQUE NOT NULL,
-    descripcion TEXT
-);
-
 CREATE TABLE diario_conflictos (
     id SERIAL PRIMARY KEY,
     conflicto_id INTEGER NOT NULL REFERENCES conflictos (id) ON DELETE CASCADE,
     usuario_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
-    accion_id INTEGER REFERENCES acciones (id) ON DELETE SET NULL,
     estado TEXT,
     ambito TEXT,
     notas TEXT,

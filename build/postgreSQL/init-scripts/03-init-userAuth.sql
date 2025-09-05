@@ -54,6 +54,13 @@ VALUES (
         'Gestor de conflictos y afiliadas'
     );
 
+INSERT INTO
+    sindicato_inq.roles (nombre, descripcion)
+VALUES (
+        'actas',
+        'Perfil básico para gestionar actas y documentos'
+    );
+
 -- Para asignar el rol 'admin' al usuario con id 1:
 -- INSERT INTO sindicato_inq.usuario_roles (usuario_id, role_id) VALUES (1, 1);
 
