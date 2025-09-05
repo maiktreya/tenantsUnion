@@ -185,10 +185,8 @@ VIEW_INFO = {
     "v_resumen_nodos": { "display_name": "Resumen de Nodos", "base_table": "nodos" },
     "v_resumen_entramados_empresas": { "display_name": "Resumen de Entramados", "base_table": "entramado_empresas" },
     "v_afiliadas_detalle": { "display_name": "Detalle de Afiliadas", "base_table": "afiliadas" },
-    "v_bloques": { "display_name": "Detalle de Bloques", "base_table": "bloques" },
     "v_conflictos_detalle": { "display_name": "Detalle de Conflictos", "base_table": "conflictos" },
     "v_diario_conflictos_con_afiliada": { "display_name": "Historial de Conflictos (Diario)", "base_table": "diario_conflictos" },
-    "v_conflictos_enhanced": { "display_name": "Vista Avanzada de Conflictos", "base_table": "conflictos" },
     "comprobar_link_pisos_bloques": { "display_name": "Comprobar Vínculo Pisos-Bloques" },
 }
 
