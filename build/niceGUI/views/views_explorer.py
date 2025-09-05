@@ -1,15 +1,11 @@
-# /build/niceGUI/views/views_explorer.py
-
 from typing import Dict, Any
-from nicegui import ui
+from nicegui import ui, app
 from api.client import APIClient
 from state.views_state import ViewsState
 from components.data_table import DataTable
 from components.filters import FilterPanel
 from components.exporter import export_to_csv
-from components.relationship_explorer import (
-    RelationshipExplorer,
-)  # IMPORT THE NEW COMPONENT
+from components.relationship_explorer import RelationshipExplorer
 from config import VIEW_INFO, TABLE_INFO
 
 
@@ -22,7 +18,13 @@ class ViewsExplorerView:
         self.data_table = None
         self.filter_panel = None
         self.detail_container = None
-        self.relationship_explorer = None  # ADD INSTANCE VARIABLE
+        self.relationship_explorer = None
+
+    def has_role(self, *roles: str) -> bool:
+        """Check if current user has required roles (same as main app)"""
+        user_roles = {role.lower() for role in app.storage.user.get('roles', [])}
+        required_roles = {role.lower() for role in roles}
+        return not required_roles.isdisjoint(user_roles)
 
     def create(self) -> ui.column:
         """Create the views explorer UI."""
@@ -48,9 +50,12 @@ class ViewsExplorerView:
                     icon="filter_alt_off",
                     on_click=self._clear_filters,
                 ).props("color=orange-600")
-                ui.button(
-                    "Exportar CSV", icon="download", on_click=self._export_data
-                ).props("color=orange-600")
+                
+                # Role-based access control for the export button
+                if self.has_role('admin', 'sistemas'):
+                    ui.button(
+                        "Exportar CSV", icon="download", on_click=self._export_data
+                    ).props("color=orange-600")
 
             self.state.filter_container = ui.column().classes("w-full")
 
@@ -64,7 +69,6 @@ class ViewsExplorerView:
             ui.separator().classes("my-4")
             self.detail_container = ui.column().classes("w-full")
 
-            # INITIALIZE THE COMPONENT
             self.relationship_explorer = RelationshipExplorer(
                 self.api, self.detail_container
             )
