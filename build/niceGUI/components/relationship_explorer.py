@@ -3,7 +3,7 @@
 from typing import Dict
 from nicegui import ui
 from api.client import APIClient
-from config import TABLE_INFO
+from config import TABLE_INFO, VIEW_INFO  # Ensure VIEW_INFO is imported
 
 
 class RelationshipExplorer:
@@ -20,20 +20,23 @@ class RelationshipExplorer:
 
     async def show_details(self, record: Dict, source_name: str, is_view: bool):
         """
-        Displays the parent and child relationships for a given record.
-
-        Args:
-            record: The data record that was clicked.
-            source_name: The name of the table or view the record belongs to.
-            is_view: A boolean indicating if the source is a view.
+        Displays the parent and child relationships for a given record. This version has
+        corrected logic to prevent duplicate rendering.
         """
         self.container.clear()
 
-        # Determine the base table and its configuration
-        base_table_name = (
-            source_name[2:] if is_view and source_name.startswith("v_") else source_name
-        )
+        base_table_name = source_name
+        if is_view:
+            view_config = VIEW_INFO.get(source_name, {})
+            # Prioritize the explicit 'base_table' link from config.
+            # If not present, we cannot reliably find relationships for this view.
+            base_table_name = view_config.get("base_table")
+            if not base_table_name:
+                return  # Exit cleanly if view is not configured for relationship exploration
+
         table_info = TABLE_INFO.get(base_table_name, {})
+        if not table_info:
+            return  # Exit if the determined base table has no metadata
 
         # Find the primary key for the record
         primary_key_name = table_info.get("id_field", "id")
@@ -41,14 +44,15 @@ class RelationshipExplorer:
 
         if record_id is None:
             ui.notify(
-                f"La vista '{source_name}' no contiene un campo '{primary_key_name}' o 'id' para buscar relaciones.",
+                f"Could not find a primary key ('{primary_key_name}' or 'id') in the record from '{source_name}'.",
                 type="warning",
             )
             return
 
+        # Render the content exactly once within the cleared container
         with self.container:
             ui.label(
-                f"Relaciones para el registro de '{source_name}' (ID: {record_id})"
+                f"Relationships for record from '{source_name}' (ID: {record_id})"
             ).classes("text-h5 mb-2")
             with ui.row().classes("w-full gap-4"):
                 with ui.column().classes("w-1/2"):
@@ -82,7 +86,6 @@ class RelationshipExplorer:
                         for key, value in parents[0].items():
                             with ui.row():
                                 ui.label(f"{key}:").classes("font-semibold w-32")
-                                # MODIFIED: Coerce None and empty strings to '-'
                                 display_value = (
                                     value if value is not None and value != "" else "-"
                                 )
@@ -126,7 +129,6 @@ class RelationshipExplorer:
                                         ui.label(f"{key}:").classes(
                                             "font-semibold w-32"
                                         )
-                                        # MODIFIED: Coerce None and empty strings to '-'
                                         display_value = (
                                             value
                                             if value is not None and value != ""

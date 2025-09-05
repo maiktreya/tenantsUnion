@@ -75,6 +75,7 @@ TABLE_INFO = {
             {"table": "conflictos", "foreign_key": "usuario_responsable_id"},
             {"table": "usuario_credenciales", "foreign_key": "usuario_id"},
             {"table": "usuario_roles", "foreign_key": "usuario_id"},
+            {"table": "diario_conflictos", "foreign_key": "usuario_id"},
         ],
     },
     "roles": {
@@ -135,70 +136,74 @@ TABLE_INFO = {
             "resolucion",
             "fecha_cierre",
         ],
-        # --- ADD THIS NEW SECTION ---
         "field_options": {
-            "estado": sorted(
-                [
-                    "Abierto",
-                    "En proceso",
-                    "Resuelto",
-                    "Cerrado",
-                ]
-            ),
+            "estado": sorted(["Abierto", "En proceso", "Resuelto", "Cerrado"]),
             "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"],
             "causa": sorted(
                 [
-                    "No renovación",
-                    "Fianza",
-                    "Acoso inmobiliario",
-                    "Renta Antigua",
-                    "Subida de alquiler",
-                    "Individualización Calefacción",
-                    "Reparaciones / Habitabilidad",
-                    "Venta de la vivienda",
-                    "Honorarios",
-                    "Requerimiento de la casa para uso propio",
-                    "Impago",
-                    "Actualización del precio (IPC)",
-                    "Negociación del contrato",
+                    "No renovación", "Fianza", "Acoso inmobiliario", "Renta Antigua",
+                    "Subida de alquiler", "Individualización Calefacción", "Reparaciones / Habitabilidad",
+                    "Venta de la vivienda", "Honorarios", "Requerimiento de la casa para uso propio",
+                    "Impago", "Actualización del precio (IPC)", "Negociación del contrato",
                 ]
             ),
         },
-        # --- END OF NEW SECTION ---
         "relations": {
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
             "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"},
         },
-        "child_relations": {
-            "table": "diario_conflictos",
-            "foreign_key": "conflicto_id",
-        },
+        "child_relations": { "table": "diario_conflictos", "foreign_key": "conflicto_id" },
+    },
+     "acciones": {
+        "display_name": "Acciones de Conflictos",
+        "id_field": "id",
+        "child_relations": { "table": "diario_conflictos", "foreign_key": "accion_id" },
     },
     "diario_conflictos": {
         "display_name": "Diario de Conflictos",
         "id_field": "id",
         "relations": {
-            "conflicto_id": {"view": "conflictos", "display_field": "descripcion"},
+            "conflicto_id": {"view": "conflictos", "display_field": "id"},
+            "usuario_id": {"view": "usuarios", "display_field": "alias"},
+            "accion_id": {"view": "acciones", "display_field": "nombre"},
         },
     },
 }
 
+
 # =====================================================================
-#  MATERIALIZED VIEW METADATA
+#  MATERIALIZED VIEW METADATA (Corrected with base_table links)
 # =====================================================================
+# 'base_table' tells the RelationshipExplorer which entry in TABLE_INFO
+# to use for finding parent/child relationships.
+
 VIEW_INFO = {
-    "v_resumen_nodos": {"display_name": "Resumen de Nodos"},
-    "v_resumen_entramados_empresas": {
-        "display_name": "Resumen de Entramados y Empresas"
+    "v_resumen_nodos": {
+        "display_name": "Resumen de Nodos",
+        "base_table": "nodos",
     },
-    "v_afiliadas_detalle": {"display_name": "Info completa de Afiliadas"},
-    "v_conflictos_detalle": {"display_name": "Diario Conflictos con Info para Nodos"},,
-        "child_relations": {
-            "table": "diario_conflictos",
-            "foreign_key": "conflicto_id",
-        },
-    "comprobar_link_pisos_bloques": {"display_name": "Comprobar Link Pisos-Bloques"},
-    # "v_diario_conflictos_con_afiliada": {"display_name": "Conflictos con Info Completa y Nodos"},
+    "v_resumen_entramados_empresas": {
+        "display_name": "Resumen de Entramados",
+        "base_table": "entramado_empresas",
+    },
+    "v_afiliadas_detalle": {
+        "display_name": "Detalle de Afiliadas",
+        "base_table": "afiliadas",
+    },
+    "v_conflictos_detalle": {
+        "display_name": "Detalle de Conflictos",
+        "base_table": "conflictos",
+    },
+
+    #"v_conflictos_enhanced": {
+    #    "display_name": "Vista Avanzada de Conflictos",
+    #    "base_table": "conflictos",
+    #},
+    # This view is for utility/checking and doesn't represent a single core entity,
+    # so it doesn't need a base_table for relationship exploration.
+    "comprobar_link_pisos_bloques": {
+        "display_name": "Comprobar Vínculo Pisos-Bloques"
+    },
 }
 
 config = Config()
