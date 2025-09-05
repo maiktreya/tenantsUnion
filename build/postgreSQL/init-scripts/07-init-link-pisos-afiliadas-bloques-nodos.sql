@@ -1,3 +1,6 @@
+-- Script populating relations between tables with missing links (pisos, bloques, nodos)
+
+SET search_path TO sindicato_inq;
 
 -- 1. First, enable the pg_trgm extension if not already enabled:
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
