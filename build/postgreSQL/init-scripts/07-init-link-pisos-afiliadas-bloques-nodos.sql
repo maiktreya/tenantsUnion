@@ -20,7 +20,7 @@ FROM sindicato_inq.pisos p
 LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
 WHERE p.bloque_id IS NOT NULL
 LIMIT 20;
-*/
+
 
 
 -- 5. SYNC BLOQUES TO NODOS: Ensure all bloques are linked to their nodos
