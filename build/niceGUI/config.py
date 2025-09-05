@@ -156,20 +156,24 @@ TABLE_INFO = {
         },
         "child_relations": { "table": "diario_conflictos", "foreign_key": "conflicto_id" },
     },
-    "acciones": {
-        "display_name": "Acciones de Conflictos",
-        "id_field": "id",
-        "hidden_fields": ["id"],
-        "child_relations": { "table": "diario_conflictos", "foreign_key": "accion_id" },
-    },
     "diario_conflictos": {
         "display_name": "Diario de Conflictos",
         "id_field": "id",
-        "hidden_fields": ["id"],
+        "hidden_fields": ["id", "accion_id"], # Hide the old foreign key field
+        "fields": ["conflicto_id", "usuario_id", "accion", "estado", "ambito", "notas", "tarea_actual"],
+        "field_options": {
+            "estado": sorted(["Abierto", "En proceso", "Resuelto", "Cerrado"]),
+            "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"],
+            "accion": sorted([
+                'nota simple', 'nota localización propiedades', 'deposito fianza',
+                'puerta a puerta', 'comunicación enviada', 'llamada', 'acción',
+                'reunión de negociación', 'informe vulnerabilidad', 'MASC',
+                'justicia gratuita', 'demanda', 'sentencia'
+            ]),
+        },
         "relations": {
             "conflicto_id": {"view": "conflictos", "display_field": "id"},
             "usuario_id": {"view": "usuarios", "display_field": "alias"},
-            "accion_id": {"view": "acciones", "display_field": "nombre"},
         },
     },
 }
@@ -181,9 +185,10 @@ VIEW_INFO = {
     "v_resumen_nodos": { "display_name": "Resumen de Nodos", "base_table": "nodos" },
     "v_resumen_entramados_empresas": { "display_name": "Resumen de Entramados", "base_table": "entramado_empresas" },
     "v_afiliadas_detalle": { "display_name": "Detalle de Afiliadas", "base_table": "afiliadas" },
+    "v_bloques": { "display_name": "Detalle de Bloques", "base_table": "bloques" },
     "v_conflictos_detalle": { "display_name": "Detalle de Conflictos", "base_table": "conflictos" },
     "v_diario_conflictos_con_afiliada": { "display_name": "Historial de Conflictos (Diario)", "base_table": "diario_conflictos" },
-    #"v_conflictos_enhanced": { "display_name": "Vista Avanzada de Conflictos", "base_table": "conflictos" },
+    "v_conflictos_enhanced": { "display_name": "Vista Avanzada de Conflictos", "base_table": "conflictos" },
     "comprobar_link_pisos_bloques": { "display_name": "Comprobar Vínculo Pisos-Bloques" },
 }
 
