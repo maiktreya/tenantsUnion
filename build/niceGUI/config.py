@@ -192,7 +192,11 @@ VIEW_INFO = {
         "display_name": "Resumen de Entramados y Empresas"
     },
     "v_afiliadas_detalle": {"display_name": "Info completa de Afiliadas"},
-    "v_conflictos_detalle": {"display_name": "Diario Conflictos con Info para Nodos"},
+    "v_conflictos_detalle": {"display_name": "Diario Conflictos con Info para Nodos"},,
+        "child_relations": {
+            "table": "diario_conflictos",
+            "foreign_key": "conflicto_id",
+        },
     "comprobar_link_pisos_bloques": {"display_name": "Comprobar Link Pisos-Bloques"},
     # "v_diario_conflictos_con_afiliada": {"display_name": "Conflictos con Info Completa y Nodos"},
 }
