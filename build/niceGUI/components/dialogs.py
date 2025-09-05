@@ -200,20 +200,8 @@ class ConflictNoteDialog:
         self.record = record or {}
         self.mode = mode
         self.dialog = None
-        self.acciones_options = {}
 
     async def open(self):
-        from datetime import datetime
-
-        try:
-            acciones = await self.api.get_records("acciones", order="id.asc")
-            self.acciones_options = {
-                accion["id"]: accion.get("nombre", f"Acción #{accion['id']}")
-                for accion in acciones
-            }
-        except Exception as e:
-            ui.notify(f"Error al cargar acciones: {e}", type="negative")
-
         self.dialog = ui.dialog()
 
         with self.dialog, ui.card().classes("w-96"):
@@ -224,21 +212,30 @@ class ConflictNoteDialog:
             )
             ui.label(title).classes("text-h6")
 
+            # --- FIX START ---
+            # Get field options directly from the central configuration
+            diario_info = TABLE_INFO.get("diario_conflictos", {})
+            field_options = diario_info.get("field_options", {})
+            estado_options = field_options.get("estado", [])
+            accion_options = field_options.get("accion", [])
+            # --- FIX END ---
+
             initial_estado = (
                 self.record.get("estado")
                 if self.mode == "edit"
                 else self.conflict.get("estado", "")
             )
             estado_input = ui.select(
-                options=["Abierto", "En proceso", "Resuelto", "Cerrado"],
+                options=estado_options,
                 label="Estado",
                 value=initial_estado,
             ).classes("w-full")
 
+            # --- FIX: Use new options and field name "accion" ---
             accion_input = ui.select(
-                options=self.acciones_options,
+                options=accion_options,
                 label="Acción realizada",
-                value=self.record.get("accion_id") if self.mode == "edit" else None,
+                value=self.record.get("accion") if self.mode == "edit" else None,
             ).classes("w-full")
 
             notas_input = ui.textarea(
@@ -259,9 +256,10 @@ class ConflictNoteDialog:
                             ui.notify("Error: usuario no identificado", type="negative")
                             return
 
+                        # --- FIX: Use "accion" field instead of "accion_id" ---
                         note_data = {
                             "conflicto_id": self.conflict["id"],
-                            "accion_id": accion_input.value,
+                            "accion": accion_input.value,
                             "usuario_id": user_id,
                             "estado": estado_input.value or None,
                             "notas": notas_input.value or None,
@@ -283,21 +281,15 @@ class ConflictNoteDialog:
                         if result:
                             # Update the parent conflict
                             conflict_update_data = {}
-
-                            # Update 'tarea_actual' in the parent conflict with the new value
                             conflict_update_data["tarea_actual"] = (
                                 tarea_actual_input.value or None
                             )
 
-                            # Handle 'fecha_cierre' based on the note's estado
                             new_estado = estado_input.value
                             if (
                                 new_estado == "Cerrado"
                                 and self.conflict.get("estado") != "Cerrado"
                             ):
-                                # Conflict is being closed, set fecha_cierre to today's date
-                                from datetime import date
-
                                 conflict_update_data["fecha_cierre"] = (
                                     date.today().isoformat()
                                 )
@@ -306,7 +298,6 @@ class ConflictNoteDialog:
                                 new_estado != "Cerrado"
                                 and self.conflict.get("estado") == "Cerrado"
                             ):
-                                # Conflict is being reopened, set fecha_cierre to null
                                 conflict_update_data["fecha_cierre"] = None
                                 conflict_update_data["estado"] = new_estado
 

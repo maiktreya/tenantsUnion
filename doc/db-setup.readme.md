@@ -66,5 +66,5 @@ Para simplificar las consultas del frontend y mejorar el rendimiento, este scrip
 
 Finalmente, este script puebla tablas de consulta esenciales que fueron creadas en los pasos anteriores.
 
-1.  **Tabla de Acciones**: Inserta una lista predefinida de acciones (`nota simple`, `llamada`, `demanda`, etc.) en la tabla `acciones`. Esto proporciona las opciones estandarizadas disponibles al añadir una entrada en el `diario_conflictos`.
+
 2.  **Datos de Nodos y CPs**: Como se mencionó en el Paso 2, este script es responsable de rellenar las tablas `nodos` y `nodos_cp_mapping` con los datos geográficos reales.

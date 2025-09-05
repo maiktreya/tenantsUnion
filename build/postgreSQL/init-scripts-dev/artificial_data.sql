@@ -107,17 +107,10 @@ CREATE TABLE IF NOT EXISTS conflictos (
     resolucion TEXT
 );
 
-CREATE TABLE IF NOT EXISTS acciones (
-    id SERIAL PRIMARY KEY,
-    nombre TEXT UNIQUE NOT NULL,
-    descripcion TEXT
-);
-
 CREATE TABLE IF NOT EXISTS diario_conflictos (
     id SERIAL PRIMARY KEY,
     conflicto_id INTEGER NOT NULL REFERENCES conflictos (id) ON DELETE CASCADE,
     usuario_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
-    accion_id INTEGER REFERENCES acciones (id) ON DELETE SET NULL,
     estado TEXT,
     ambito TEXT,
     notas TEXT,
@@ -277,7 +270,6 @@ FROM
     LEFT JOIN conflictos c ON d.conflicto_id = c.id
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN usuarios u ON d.usuario_id = u.id
-    LEFT JOIN acciones ac ON d.accion_id = ac.id;
 
 CREATE OR REPLACE VIEW v_conflictos_con_nodo AS
 SELECT
@@ -363,7 +355,6 @@ pisos,
 bloques,
 empresas,
 entramado_empresas,
-acciones,
 nodos,
 nodos_cp_mapping,
 roles,
@@ -371,24 +362,6 @@ usuario_credenciales,
 usuario_roles
 RESTART IDENTITY;
 
--- Datos Estáticos (necesarios para la aplicación)
-INSERT INTO
-    acciones (nombre)
-VALUES ('nota simple'),
-    (
-        'nota localización propiedades'
-    ),
-    ('deposito fianza'),
-    ('puerta a puerta'),
-    ('comunicación enviada'),
-    ('llamada'),
-    ('acción'),
-    ('reunión de negociación'),
-    ('informe vulnerabilidad'),
-    ('MASC'),
-    ('justicia gratuita'),
-    ('demanda'),
-    ('sentencia') ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO
     roles (nombre, descripcion)
@@ -847,12 +820,6 @@ VALUES (
             WHERE
                 alias = 'test_gestor'
         ),
-        (
-            SELECT id
-            FROM acciones
-            WHERE
-                nombre = 'llamada'
-        ),
         'Abierto',
         'Afiliada',
         'Primer contacto con la afiliada para recabar información.',
@@ -870,12 +837,6 @@ VALUES (
             FROM usuarios
             WHERE
                 alias = 'test_gestor'
-        ),
-        (
-            SELECT id
-            FROM acciones
-            WHERE
-                nombre = 'comunicación enviada'
         ),
         'En proceso',
         'Afiliada',
