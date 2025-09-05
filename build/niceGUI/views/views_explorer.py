@@ -123,9 +123,9 @@ class ViewsExplorerView:
     async def _refresh_data(self):
         await self._load_view_data()
 
-    # def _export_data(self):
-    #     if self.state.selected_view.value:
-    #         export_to_csv(
-    #             self.state.filtered_records,
-    #             f"{self.state.selected_view.value}_export.csv",
-    #         )
+    def _export_data(self):
+        if self.state.selected_view.value:
+            export_to_csv(
+                self.state.filtered_records,
+                f"{self.state.selected_view.value}_export.csv",
+            )

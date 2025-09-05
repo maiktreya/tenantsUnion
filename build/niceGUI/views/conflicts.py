@@ -362,20 +362,25 @@ class ConflictsView:
                     ui.badge(conflict["estado"], color=color).props("outline")
 
                 info_items = [
-                    ("ID", conflict.get("id", "N/A")),
-                    ("Afiliada", conflict.get("afiliada_nombre_completo", "N/A")),
-                    ("Nº Afiliada", conflict.get("num_afiliada", "N/A")),
-                    ("Ámbito", conflict.get("ambito", "N/A")),
-                    ("Causa", conflict.get("causa", "N/A")),
-                    ("Fecha Apertura", conflict.get("fecha_apertura", "N/A")),
-                    ("Fecha Cierre", conflict.get("fecha_cierre", "N/A")),
-                    ("Responsable", conflict.get("usuario_responsable_alias", "N/A")),
+                    ("ID", conflict.get("id")),
+                    ("Afiliada", conflict.get("afiliada_nombre_completo")),
+                    ("Nº Afiliada", conflict.get("num_afiliada")),
+                    ("Ámbito", conflict.get("ambito")),
+                    ("Causa", conflict.get("causa")),
+                    ("Fecha Apertura", conflict.get("fecha_apertura")),
+                    ("Fecha Cierre", conflict.get("fecha_cierre")),
+                    ("Responsable", conflict.get("usuario_responsable_alias")),
+                    ("Tarea Actual", conflict.get("tarea_actual")),
                 ]
 
                 for label, value in info_items:
                     with ui.row().classes("mb-1"):
                         ui.label(f"{label}:").classes("font-bold w-32")
-                        ui.label(str(value) if value else "N/A").classes("flex-grow")
+                        # MODIFIED: Coerce to '-' if empty
+                        display_value = (
+                            value if value is not None and value != "" else "-"
+                        )
+                        ui.label(str(display_value)).classes("flex-grow")
 
                 # Description
                 if conflict.get("descripcion"):
@@ -396,17 +401,21 @@ class ConflictsView:
                 )
 
                 location_items = [
-                    ("Nodo Territorial", conflict.get("nodo_nombre", "N/A")),
-                    ("Dirección Piso", conflict.get("piso_direccion", "N/A")),
-                    ("Dirección Bloque", conflict.get("bloque_direccion", "N/A")),
-                    ("Municipio", conflict.get("piso_municipio", "N/A")),
-                    ("Código Postal", conflict.get("piso_cp", "N/A")),
+                    ("Nodo Territorial", conflict.get("nodo_nombre")),
+                    ("Dirección Piso", conflict.get("piso_direccion")),
+                    ("Dirección Bloque", conflict.get("bloque_direccion")),
+                    ("Municipio", conflict.get("piso_municipio")),
+                    ("Código Postal", conflict.get("piso_cp")),
                 ]
 
                 for label, value in location_items:
                     with ui.row().classes("mb-1"):
                         ui.label(f"{label}:").classes("font-bold w-32")
-                        ui.label(str(value) if value else "N/A").classes("flex-grow")
+                        # MODIFIED: Coerce to '-' if empty
+                        display_value = (
+                            value if value is not None and value != "" else "-"
+                        )
+                        ui.label(str(display_value)).classes("flex-grow")
 
     async def _load_conflict_history(self):
         """Load history for selected conflict"""
