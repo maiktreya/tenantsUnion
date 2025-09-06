@@ -1,9 +1,9 @@
-# run with: docker-compose -f docker-compose-db-dev.yaml up -d --renew-anon-volumes
+# run with: docker compose -f docker-compose-db-dev.yaml up -d --renew-anon-volumes
 services:
-  db:
+  db-dev:
     image: postgres:17
     ports:
-      - "5432:5432" # Internal only - no external access
+      - "5430:5432" # Internal only - no external access
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}

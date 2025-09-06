@@ -1,5 +1,5 @@
 # to override default to allow port external access for development:
-# docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml up --profile Frontend
+# docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up --profile Frontend
 services:
   db:
     ports:
