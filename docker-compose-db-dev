@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:17
+    expose:
+      - "5432" # Internal only - no external access
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - /var/lib/postgresql/data  # Explicit anonymous volume for --renew-anon-volumes
+      - ${INIT_SCRIPTS_PATH:-./build/postgreSQL/init-scripts}:/docker-entrypoint-initdb.d
+      - ./dev/back/SI_MAD/db_fork:/csv-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
