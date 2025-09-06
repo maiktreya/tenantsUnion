@@ -117,7 +117,15 @@ class EnhancedRecordDialog:
         fields = sorted(fields, key=lambda f: (0 if f in relations else 1, f))
 
         for field in fields:
-            value = self.record.get(field, "")
+            # =====================================================================
+            # THE FIX IS HERE:
+            # We now default to `None` instead of `""` for the value.
+            # A `None` value tells the ui.select component that nothing is selected yet,
+            # which is the correct state for a new record. An empty string "" is
+            # treated as an invalid key if it's not in the options list.
+            # =====================================================================
+            value = self.record.get(field)  # OLD: self.record.get(field, "")
+
             label = field.replace("_", " ").title()
             lower_field = field.lower()
 
@@ -170,7 +178,7 @@ class EnhancedRecordDialog:
                     "w-full"
                 )
             else:
-                self.inputs[field] = ui.input(label=label, value=value).classes(
+                self.inputs[field] = ui.input(label=label, value=value or "").classes(
                     "w-full"
                 )
 
