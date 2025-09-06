@@ -1,3 +1,13 @@
+# This file lists the Python packages required to run the automated tests.
+# Install them using: pip install -r tests/requirements.txt
+# Core testing framework
 pytest
+
+# For testing asynchronous code (like our API client and NiceGUI)
 pytest-asyncio
+
+# For mocking HTTP requests in unit tests
 respx
+
+# For managing Docker containers within integration tests
+pytest-docker

@@ -7,6 +7,9 @@ from state.conflicts_state import ConflictsState
 from components.dialogs import EnhancedRecordDialog, ConfirmationDialog
 from datetime import date
 
+# Import TABLE_INFO to be the single source of truth for options
+from config import TABLE_INFO
+
 
 class ConflictsView:
     """Enhanced conflicts management view with address display and node filtering"""
@@ -32,6 +35,19 @@ class ConflictsView:
         with container:
             ui.label("Toma de Actas - Gestión de Conflictos").classes("text-h4")
 
+            # --- REFACTORED: Get options directly from TABLE_INFO ---
+            conflict_options = TABLE_INFO.get("conflictos", {}).get("field_options", {})
+            estado_opts_list = conflict_options.get("estado", [])
+            causa_opts_list = conflict_options.get("causa", [])
+
+            # --- REFACTORED: Build options dictionaries dynamically ---
+            estado_options = {"": "Todos los estados"}
+            estado_options.update({opt: opt for opt in estado_opts_list})
+
+            causa_options = {"": "Todas las causas"}
+            causa_options.update({opt: opt for opt in causa_opts_list})
+            # --- END REFACTOR ---
+
             # Filter Section
             with ui.expansion("Filtros", icon="filter_list").classes(
                 "w-full mb-4"
@@ -44,37 +60,14 @@ class ConflictsView:
                         clearable=True,
                     ).classes("w-64")
                     self.filter_estado = ui.select(
-                        options={
-                            "": "Todos los estados",
-                            "Abierto": "Abierto",
-                            "En proceso": "En proceso",
-                            "Resuelto": "Resuelto",
-                            "Cerrado": "Cerrado",
-                        },
+                        # Use the dynamically generated options
+                        options=estado_options,
                         label="Filtrar por Estado",
                         value="",
                         on_change=self._apply_filters,
                     ).classes("w-48")
-                    causa_options_list = [
-                        "No renovación",
-                        "Fianza",
-                        "Acoso inmobiliario",
-                        "Renta Antigua",
-                        "Subida de alquiler",
-                        "Individualización Calefacción",
-                        "Reparaciones / Habitabilidad",
-                        "Venta de la vivienda",
-                        "Honorarios",
-                        "Requerimiento de la casa para uso propio",
-                        "Impago",
-                        "Actualización del precio (IPC)",
-                        "Negociación del contrato",
-                    ]
-                    causa_options = {"": "Todas las causas"}
-                    causa_options.update(
-                        {opt: opt for opt in sorted(causa_options_list)}
-                    )
                     self.filter_causa = ui.select(
+                        # Use the dynamically generated options
                         options=causa_options,
                         label="Filtrar por Causa",
                         on_change=self._apply_filters,
