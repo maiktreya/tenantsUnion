@@ -17,7 +17,7 @@ DECLARE
     best_match_id INTEGER;
     -- The threshold for a match to be considered valid (0.6 = 80% similarity).
     -- You can adjust this value to be more or less strict.
-    similarity_threshold REAL := 0.8;
+    similarity_threshold REAL := 0.5;
     -- Variable to hold the normalized address from the 'pisos' table.
     normalized_piso_address TEXT;
 BEGIN
