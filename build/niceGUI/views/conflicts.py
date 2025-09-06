@@ -1,8 +1,11 @@
-from typing import Optional, List, Dict
-from nicegui import ui
+# build/niceGUI/views/conflicts.py
+
+from typing import Optional, List, Dict, Awaitable, Callable
+from nicegui import ui, app
 from api.client import APIClient
 from state.conflicts_state import ConflictsState
-from components.dialogs import ConflictNoteDialog
+from components.dialogs import EnhancedRecordDialog, ConfirmationDialog
+from datetime import date
 
 
 class ConflictsView:
@@ -14,12 +17,12 @@ class ConflictsView:
         self.conflict_select = None
         self.info_container = None
         self.history_container = None
-        self.all_conflicts = []  # Store all conflicts for filtering
-        self.filtered_conflicts = []  # Store filtered results
-        self.nodos_list = []  # Store available nodes
+        self.all_conflicts = []
+        self.filtered_conflicts = []
+        self.nodos_list = []
         self.filter_nodo = None
         self.filter_estado = None
-        self.filter_causa = None  # New filter for 'causa'
+        self.filter_causa = None
         self.filter_text = None
 
     def create(self) -> ui.column:
@@ -34,15 +37,12 @@ class ConflictsView:
                 "w-full mb-4"
             ).props("default-opened"):
                 with ui.row().classes("w-full gap-4 flex-wrap items-center"):
-                    # Node filter
                     self.filter_nodo = ui.select(
                         options={},
                         label="Filtrar por Nodo",
                         on_change=self._apply_filters,
                         clearable=True,
                     ).classes("w-64")
-
-                    # State filter
                     self.filter_estado = ui.select(
                         options={
                             "": "Todos los estados",
@@ -55,8 +55,6 @@ class ConflictsView:
                         value="",
                         on_change=self._apply_filters,
                     ).classes("w-48")
-
-                    # --- NEW: Causa filter based on your CSV ---
                     causa_options_list = [
                         "No renovación",
                         "Fianza",
@@ -72,28 +70,21 @@ class ConflictsView:
                         "Actualización del precio (IPC)",
                         "Negociación del contrato",
                     ]
-                    # Create a sorted dictionary for the options
                     causa_options = {"": "Todas las causas"}
                     causa_options.update(
                         {opt: opt for opt in sorted(causa_options_list)}
                     )
-
                     self.filter_causa = ui.select(
                         options=causa_options,
                         label="Filtrar por Causa",
                         on_change=self._apply_filters,
                         clearable=True,
                     ).classes("w-64")
-                    # --- END NEW FILTER ---
-
-                    # Text search (now searches everything)
                     self.filter_text = (
                         ui.input(label="Búsqueda global", on_change=self._apply_filters)
                         .classes("flex-grow min-w-[16rem]")
                         .props("clearable")
                     )
-
-                    # Clear filters button
                     ui.button(
                         "Limpiar Filtros",
                         icon="clear_all",
@@ -101,9 +92,7 @@ class ConflictsView:
                     ).props("flat color=orange-600")
 
             with ui.row().classes("w-full gap-4"):
-                # Left panel - Selection and info
                 with ui.column().classes("w-96 gap-4"):
-                    # Conflict selector with enhanced display
                     with ui.row().classes("w-full gap-2"):
                         self.conflict_select = (
                             ui.select(
@@ -114,221 +103,131 @@ class ConflictsView:
                             .classes("flex-grow")
                             .props("use-input")
                         )
-
                         ui.button(icon="refresh", on_click=self._load_conflicts).props(
                             "flat"
                         )
-
-                    # Statistics card
                     self.stats_card = ui.card().classes("w-full p-4")
                     self._display_statistics()
-
-                    # Action buttons
                     with ui.row().classes("w-full gap-2"):
                         ui.button(
                             "Añadir Nota", icon="add_comment", on_click=self._add_note
                         ).props("color=orange-600").classes("flex-grow")
-
                         ui.button(
                             "Crear Conflicto",
                             icon="add_circle",
                             on_click=self._create_conflict,
                         ).props("color=green-600").classes("flex-grow")
-
-                    # Conflict info container
                     self.info_container = ui.column().classes("w-full")
-
-                # Right panel - History
                 with ui.column().classes("flex-grow"):
                     self.history_container = ui.column().classes("w-full gap-4")
 
-        # Load data on startup
         ui.timer(0.5, self._initialize_data, once=True)
-
         return container
 
     async def _initialize_data(self):
-        """Initialize all necessary data"""
         await self._load_nodos()
         await self._load_conflicts()
 
     async def _load_nodos(self):
-        """Load available nodes for filtering"""
         try:
             nodos = await self.api.get_records("nodos", order="nombre.asc")
             self.nodos_list = nodos
-
-            # Update filter options
             nodo_options = {"": "Todos los nodos"}
             for nodo in nodos:
                 nodo_options[nodo["id"]] = nodo["nombre"]
-
             if self.filter_nodo:
                 self.filter_nodo.set_options(nodo_options)
-                self.filter_nodo.value = ""
-
         except Exception as e:
-            ui.notify(f"Error al cargar nodos: {str(e)}", type="negative")
+            ui.notify(f"Error loading nodes: {str(e)}", type="negative")
 
     async def _load_conflicts(self):
-        """Load all conflicts with enhanced information"""
         try:
-            # Use the enhanced view for complete information
             conflicts = await self.api.get_records(
                 "v_conflictos_enhanced", order="id.desc"
             )
-
             self.all_conflicts = conflicts
-            self.filtered_conflicts = conflicts
             self.state.set_conflicts(conflicts)
-
-            # Apply existing filters if any
             await self._apply_filters()
-
             self._display_statistics()
-
         except Exception as e:
-            ui.notify(f"Error al cargar conflictos: {str(e)}", type="negative")
+            ui.notify(f"Error loading conflicts: {str(e)}", type="negative")
 
     def _get_conflict_options(self, conflicts: List[Dict]) -> Dict[int, str]:
-        """Generate conflict options with address for select dropdown"""
         options = {}
         for conflict in conflicts:
-            # Use the pre-computed label from the view, or build it
-            if conflict.get("conflict_label"):
-                label = conflict["conflict_label"]
-            else:
-                # Fallback label construction
-                conflict_id = conflict["id"]
-                direccion = (
-                    conflict.get("piso_direccion")
-                    or conflict.get("bloque_direccion")
-                    or "Sin dirección"
-                )
-                afiliada = conflict.get("afiliada_nombre_completo", "Sin afiliada")
-                estado = conflict.get("estado", "")
-
-                label = f"ID {conflict_id} - {direccion}"
-                if afiliada != "Sin afiliada":
-                    label += f" | {afiliada}"
-                if estado:
-                    label += f" [{estado}]"
-
+            label = conflict.get("conflict_label", f"ID {conflict.get('id', 'N/A')}")
             options[conflict["id"]] = label
-
         return options
 
     async def _apply_filters(self, _=None):
-        """Apply all active filters to the conflicts list"""
         filtered = self.all_conflicts.copy()
-
-        # Filter by node
         if self.filter_nodo and self.filter_nodo.value:
-            nodo_id = self.filter_nodo.value
-            filtered = [c for c in filtered if c.get("nodo_id") == nodo_id]
-
-        # Filter by state
+            filtered = [
+                c for c in filtered if c.get("nodo_id") == self.filter_nodo.value
+            ]
         if self.filter_estado and self.filter_estado.value:
-            estado = self.filter_estado.value
-            filtered = [c for c in filtered if c.get("estado") == estado]
-
-        # --- NEW: Filter by causa ---
+            filtered = [
+                c for c in filtered if c.get("estado") == self.filter_estado.value
+            ]
         if self.filter_causa and self.filter_causa.value:
-            causa = self.filter_causa.value
-            filtered = [c for c in filtered if c.get("causa") == causa]
-
-        # Filter by text search (searches multiple fields)
+            filtered = [
+                c for c in filtered if c.get("causa") == self.filter_causa.value
+            ]
         if self.filter_text and self.filter_text.value:
             search_text = self.filter_text.value.lower()
             filtered = [
                 c
                 for c in filtered
-                if (
-                    search_text in str(c.get("piso_direccion", "")).lower()
-                    or search_text in str(c.get("bloque_direccion", "")).lower()
-                    or search_text in str(c.get("descripcion", "")).lower()
-                    or search_text in str(c.get("afiliada_nombre_completo", "")).lower()
-                    or search_text in str(c.get("causa", "")).lower()
-                    or search_text in str(c.get("resolucion", "")).lower()
-                    or search_text in str(c.get("id", "")).lower()
-                )
+                if any(search_text in str(val).lower() for val in c.values() if val)
             ]
-
         self.filtered_conflicts = filtered
         self.state.set_conflicts(filtered)
-
-        # Update select options
         options = self._get_conflict_options(filtered)
         if self.conflict_select:
             self.conflict_select.set_options(options)
-
-            # Clear selection if current selection is filtered out
             if self.state.selected_conflict_id.value not in options:
                 self.conflict_select.value = None
                 self.state.set_selected_conflict(None)
                 self._clear_displays()
-
         self._display_statistics()
 
-        # Show filter results
-        total = len(self.all_conflicts)
-        filtered_count = len(filtered)
-        if filtered_count < total:
-            ui.notify(f"Mostrando {filtered_count} de {total} conflictos", type="info")
-
     def _clear_filters(self):
-        """Clear all filters and show all conflicts"""
-        if self.filter_nodo:
-            self.filter_nodo.value = ""
-        if self.filter_estado:
-            self.filter_estado.value = ""
-        if self.filter_causa:  # --- NEW ---
-            self.filter_causa.value = ""
-        if self.filter_text:
-            self.filter_text.value = ""
-
-        # Use a small timer to ensure value propagation before applying filters
+        self.filter_nodo.value = None
+        self.filter_estado.value = ""
+        self.filter_causa.value = None
+        self.filter_text.value = ""
         ui.timer(0.1, self._apply_filters, once=True)
 
     def _display_statistics(self):
-        """Display conflict statistics in the stats card"""
         if not self.stats_card:
             return
-
         self.stats_card.clear()
-
         with self.stats_card:
             ui.label("Estadísticas").classes("text-h6 mb-2")
-
-            total = len(self.filtered_conflicts)
-
-            # Count by status
             status_counts = {}
             for conflict in self.filtered_conflicts:
                 estado = conflict.get("estado", "Sin estado")
                 status_counts[estado] = status_counts.get(estado, 0) + 1
-
-            # Display counts
             with ui.row().classes("w-full gap-4 flex-wrap"):
-                ui.chip(f"Total: {total}", color="blue", icon="inventory")
-
+                ui.chip(
+                    f"Total: {len(self.filtered_conflicts)}",
+                    color="blue",
+                    icon="inventory",
+                )
                 for estado, count in sorted(status_counts.items()):
-                    color_map = {
+                    color = {
                         "Abierto": "red",
                         "En proceso": "orange",
                         "Resuelto": "green",
                         "Cerrado": "gray",
-                    }
-                    color = color_map.get(estado, "blue")
+                    }.get(estado, "blue")
                     ui.chip(f"{estado}: {count}", color=color)
 
     async def _on_conflict_change(self, conflict_id: Optional[int]):
-        """Handle conflict selection change"""
         if not conflict_id:
             self.state.set_selected_conflict(None)
             self._clear_displays()
             return
-
         conflict = self.state.get_conflict_by_id(conflict_id)
         if conflict:
             self.state.set_selected_conflict(conflict)
@@ -336,7 +235,7 @@ class ConflictsView:
             await self._load_conflict_history()
 
     async def _display_conflict_info(self):
-        """Display enhanced conflict information"""
+        """[RESTORED] Display enhanced conflict information"""
         if not self.info_container or not self.state.selected_conflict:
             return
 
@@ -345,12 +244,8 @@ class ConflictsView:
 
         with self.info_container:
             ui.label("Información del Conflicto").classes("text-h6 mb-2")
-
-            # Main conflict information card
             with ui.card().classes("w-full mb-2"):
                 ui.label("Datos del Conflicto").classes("text-subtitle2 font-bold mb-2")
-
-                # Status badge
                 if conflict.get("estado"):
                     color_map = {
                         "Abierto": "red",
@@ -376,30 +271,25 @@ class ConflictsView:
                 for label, value in info_items:
                     with ui.row().classes("mb-1"):
                         ui.label(f"{label}:").classes("font-bold w-32")
-                        # MODIFIED: Coerce to '-' if empty
                         display_value = (
                             value if value is not None and value != "" else "-"
                         )
                         ui.label(str(display_value)).classes("flex-grow")
 
-                # Description
                 if conflict.get("descripcion"):
                     ui.separator().classes("my-2")
                     ui.label("Descripción:").classes("font-bold")
                     ui.label(conflict.get("descripcion")).classes("text-gray-700")
 
-                # Resolution
                 if conflict.get("resolucion"):
                     ui.separator().classes("my-2")
                     ui.label("Resolución:").classes("font-bold")
                     ui.label(conflict.get("resolucion")).classes("text-green-700")
 
-            # Location card with complete information
             with ui.card().classes("w-full"):
                 ui.label("Información de Ubicación").classes(
                     "text-subtitle2 font-bold mb-2"
                 )
-
                 location_items = [
                     ("Nodo Territorial", conflict.get("nodo_nombre")),
                     ("Dirección Piso", conflict.get("piso_direccion")),
@@ -407,23 +297,18 @@ class ConflictsView:
                     ("Municipio", conflict.get("piso_municipio")),
                     ("Código Postal", conflict.get("piso_cp")),
                 ]
-
                 for label, value in location_items:
                     with ui.row().classes("mb-1"):
                         ui.label(f"{label}:").classes("font-bold w-32")
-                        # MODIFIED: Coerce to '-' if empty
                         display_value = (
                             value if value is not None and value != "" else "-"
                         )
                         ui.label(str(display_value)).classes("flex-grow")
 
     async def _load_conflict_history(self):
-        """Load history for selected conflict"""
         if not self.history_container or not self.state.selected_conflict:
             return
-
         self.history_container.clear()
-
         try:
             history = await self.api.get_records(
                 "v_diario_conflictos_con_afiliada",
@@ -431,10 +316,8 @@ class ConflictsView:
                 order="created_at.desc",
             )
             self.state.set_history(history)
-
             with self.history_container:
                 ui.label("Historial de Notas").classes("text-h6 mb-2")
-
                 if self.state.history:
                     for entry in self.state.history:
                         self._create_history_entry(entry)
@@ -442,24 +325,17 @@ class ConflictsView:
                     ui.label("No se encontraron entradas en el historial").classes(
                         "text-gray-500"
                     )
-
         except Exception as e:
-            ui.notify(f"Error al cargar el historial: {str(e)}", type="negative")
+            ui.notify(f"Error loading history: {str(e)}", type="negative")
 
     def _create_history_entry(self, entry: dict):
-        """Create a collapsible history entry card using ui.expansion."""
-
-        # Determine the expansion title based on key info
+        """[RESTORED] Create a collapsible history entry card."""
         title_text = f"Nota #{entry.get('id', 'N/A')} - {entry.get('created_at', 'Sin fecha').split('T')[0]}"
         if entry.get("autor_nota_alias"):
             title_text += f" | Autor: {entry['autor_nota_alias']}"
 
-        # Use a card to contain the expansion for better visual separation
         with ui.card().classes("w-full mb-2"):
-            # The expansion component for the collapsible behavior
             with ui.expansion(title_text).classes("w-full"):
-
-                # Header slot to show key info without expanding
                 with ui.element("div").classes("p-2"):
                     with ui.row().classes("w-full gap-2 items-center"):
                         ui.icon("schedule", size="sm").classes("text-gray-500")
@@ -467,45 +343,15 @@ class ConflictsView:
                             entry.get("created_at", "Sin fecha").split(".")[0]
                         ).classes("text-caption text-gray-600")
                         ui.space()
-
-                        # Action buttons
                         ui.button(
                             icon="edit", on_click=lambda e=entry: self._edit_note(e)
                         ).props("size=sm flat dense").tooltip("Editar nota")
-
                         ui.button(
                             icon="delete", on_click=lambda e=entry: self._delete_note(e)
                         ).props("size=sm flat dense color=negative").tooltip(
                             "Eliminar nota"
                         )
-
-                # Content inside the expansion
                 with ui.card_section().classes("w-full"):
-                    # Badges
-                    with ui.row().classes("gap-2 mb-2"):
-                        if entry.get("estado"):
-                            color_map = {
-                                "Abierto": "red",
-                                "En proceso": "orange",
-                                "Resuelto": "green",
-                                "Cerrado": "gray",
-                            }
-                            color = color_map.get(entry["estado"], "blue")
-                            ui.badge(f"Estado: {entry['estado']}", color=color).props(
-                                "outline"
-                            )
-
-                        if entry.get("accion_nombre"):
-                            ui.badge(
-                                f"Acción: {entry['accion_nombre']}", color="purple"
-                            ).props("outline")
-
-                        if entry.get("ambito"):
-                            ui.badge(
-                                f"Ámbito: {entry['ambito']}", color="indigo"
-                            ).props("outline")
-
-                    # Note content
                     if entry.get("notas"):
                         ui.separator().classes("my-2")
                         with ui.row().classes("w-full"):
@@ -515,8 +361,6 @@ class ConflictsView:
                                 ui.label(entry["notas"]).classes(
                                     "text-gray-700 whitespace-pre-wrap"
                                 )
-
-                    # New 'tarea_actual' content
                     if entry.get("tarea_actual"):
                         ui.separator().classes("my-2")
                         with ui.row().classes("w-full"):
@@ -530,91 +374,101 @@ class ConflictsView:
                                 )
 
     async def _add_note(self):
-        """Add a new note to the selected conflict"""
         if not self.state.selected_conflict:
-            ui.notify("Por favor, seleccione un conflicto primero", type="warning")
+            ui.notify("Please select a conflict first", type="warning")
             return
-
-        async def on_note_added():
-            await self._load_conflicts()
-            await self._on_conflict_change(self.state.selected_conflict["id"])
-
-        dialog = ConflictNoteDialog(
+        dialog = EnhancedRecordDialog(
             api=self.api,
-            conflict=self.state.selected_conflict,
-            on_success=on_note_added,
+            table="diario_conflictos",
             mode="create",
+            on_success=self._on_note_saved,
+            on_save=self._save_note_handler(None),
         )
         await dialog.open()
 
     async def _create_conflict(self):
-        """Open dialog to create a new conflict"""
-        from components.dialogs import EnhancedRecordDialog
-
-        async def on_conflict_created():
-            await self._load_conflicts()
-            ui.notify("Conflicto creado exitosamente", type="positive")
-
         dialog = EnhancedRecordDialog(
             api=self.api,
             table="conflictos",
             mode="create",
-            on_success=on_conflict_created,
+            on_success=self._load_conflicts,
         )
         await dialog.open()
 
     async def _edit_note(self, note: dict):
-        """Edit an existing note"""
-
-        async def on_note_updated():
-            await self._load_conflict_history()
-
-        dialog = ConflictNoteDialog(
+        dialog = EnhancedRecordDialog(
             api=self.api,
-            conflict=self.state.selected_conflict,
+            table="diario_conflictos",
             record=note,
-            on_success=on_note_updated,
             mode="edit",
+            on_success=self._on_note_saved,
+            on_save=self._save_note_handler(note),
         )
         await dialog.open()
 
-    async def _delete_note(self, note: dict):
-        """Delete a note with confirmation"""
-        note_id = note.get("id")
+    def _save_note_handler(
+        self, record: Optional[Dict]
+    ) -> Callable[[Dict], Awaitable[bool]]:
+        """Returns an async function to handle the custom save logic for notes."""
 
-        with ui.dialog() as dialog, ui.card():
-            ui.label(f"¿Eliminar nota #{note_id}?").classes("text-h6")
-            ui.label("Esta acción no se puede deshacer.").classes(
-                "text-body2 text-gray-600"
+        async def _handler(data: Dict) -> bool:
+            user_id = app.storage.user.get("user_id")
+            if not user_id:
+                ui.notify("Error: User not identified", type="negative")
+                return False
+
+            data["conflicto_id"] = self.state.selected_conflict["id"]
+            data["usuario_id"] = user_id
+
+            if record:  # Edit mode
+                result = await self.api.update_record(
+                    "diario_conflictos", record["id"], data
+                )
+            else:  # Create mode
+                result = await self.api.create_record("diario_conflictos", data)
+
+            if not result:
+                return False
+
+            # Update parent conflict status
+            conflict_update = {"tarea_actual": data.get("tarea_actual")}
+            if data.get("estado") == "Cerrado":
+                conflict_update["estado"] = "Cerrado"
+                conflict_update["fecha_cierre"] = date.today().isoformat()
+
+            # Also update the state if it's not being closed
+            elif data.get("estado"):
+                conflict_update["estado"] = data.get("estado")
+
+            await self.api.update_record(
+                "conflictos", self.state.selected_conflict["id"], conflict_update
             )
+            return True
 
-            if note.get("notas"):
-                ui.separator().classes("my-2")
-                note_preview = (
-                    note["notas"][:100] + "..."
-                    if len(note["notas"]) > 100
-                    else note["notas"]
-                )
-                ui.label(f'Nota: "{note_preview}"').classes(
-                    "text-caption text-gray-500"
-                )
+        return _handler
 
-            with ui.row().classes("w-full justify-end gap-2 mt-4"):
-                ui.button("Cancelar", on_click=dialog.close).props("flat")
+    async def _on_note_saved(self):
+        """Callback after a note is successfully saved."""
+        await self._load_conflicts()
+        if self.state.selected_conflict:
+            await self._on_conflict_change(self.state.selected_conflict["id"])
 
-                async def confirm():
-                    success = await self.api.delete_record("diario_conflictos", note_id)
-                    if success:
-                        ui.notify("Nota eliminada con éxito", type="positive")
-                        dialog.close()
-                        await self._load_conflict_history()
+    def _delete_note(self, note: dict):
+        async def _confirm_delete():
+            success = await self.api.delete_record("diario_conflictos", note["id"])
+            if success:
+                ui.notify("Note deleted successfully", type="positive")
+                await self._load_conflict_history()
 
-                ui.button("Eliminar", on_click=confirm).props("color=negative")
-
-        dialog.open()
+        ConfirmationDialog(
+            title="Delete Note",
+            message=f"Are you sure you want to delete note #{note.get('id')}?",
+            on_confirm=_confirm_delete,
+            confirm_button_text="Delete",
+            confirm_button_color="negative",
+        )
 
     def _clear_displays(self):
-        """Clear info and history displays"""
         if self.info_container:
             self.info_container.clear()
         if self.history_container:
