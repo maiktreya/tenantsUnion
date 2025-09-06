@@ -36,7 +36,6 @@ class ConflictsView:
             ui.label("Toma de Actas - Gestión de Conflictos").classes("text-h4")
 
             # --- REFACTORED: Load filter options directly from TABLE_INFO ---
-            # This makes the view dynamically adapt to changes in the config file.
             conflict_options = TABLE_INFO.get("conflictos", {}).get("field_options", {})
             estado_opts_list = conflict_options.get("estado", [])
             causa_opts_list = conflict_options.get("causa", [])
@@ -306,7 +305,7 @@ class ConflictsView:
             )
             self.state.set_history(history)
             with self.history_container:
-                ui.label("Historial de Notas").classes("text-h6 mb-2")
+                ui.label("Historial del conflicto").classes("text-h6 mb-2")
                 if self.state.history:
                     for entry in self.state.history:
                         self._create_history_entry(entry)
@@ -318,7 +317,7 @@ class ConflictsView:
             ui.notify(f"Error loading history: {str(e)}", type="negative")
 
     def _create_history_entry(self, entry: dict):
-        title = f"Nota #{entry.get('id', 'N/A')} - {entry.get('created_at', 'Sin fecha').split('T')[0]}"
+        title = f"Nota con fecha {entry.get('created_at', 'Sin fecha').split('T')[0]}"
         if entry.get("autor_nota_alias"):
             title += f" | Autor: {entry['autor_nota_alias']}"
 
@@ -340,7 +339,6 @@ class ConflictsView:
                             "Eliminar nota"
                         )
                 with ui.card_section().classes("w-full"):
-                    # --- NEW: Display the 'accion' field ---
                     if entry.get("accion"):
                         ui.separator().classes("my-2")
                         with ui.row().classes("w-full items-start"):
@@ -432,17 +430,27 @@ class ConflictsView:
             if not result:
                 return False
 
-            conflict_update = {"tarea_actual": data.get("tarea_actual")}
-            if data.get("estado") == "Cerrado":
-                conflict_update.update(
-                    {"estado": "Cerrado", "fecha_cierre": date.today().isoformat()}
-                )
-            elif data.get("estado"):
-                conflict_update["estado"] = data.get("estado")
+            # --- NEW LOGIC: Update parent conflict based on 'estado' ---
+            conflict_update = {}
+            if data.get("tarea_actual"):
+                conflict_update["tarea_actual"] = data.get("tarea_actual")
 
-            await self.api.update_record(
-                "conflictos", self.state.selected_conflict["id"], conflict_update
-            )
+            # If an 'estado' is set in the note, update the parent conflict
+            if data.get("estado"):
+                if data["estado"] == "Cerrado":
+                    # If closing, set status and closing date
+                    conflict_update["estado"] = "Cerrado"
+                    conflict_update["fecha_cierre"] = date.today().isoformat()
+                else:
+                    # Otherwise, just update the status
+                    conflict_update["estado"] = data["estado"]
+
+            # Only update if there are changes to be made
+            if conflict_update:
+                await self.api.update_record(
+                    "conflictos", self.state.selected_conflict["id"], conflict_update
+                )
+
             return True
 
         return _handler
@@ -450,6 +458,7 @@ class ConflictsView:
     async def _on_note_saved(self):
         await self._load_conflicts()
         if self.state.selected_conflict:
+            # Re-select the conflict to refresh its data
             await self._on_conflict_change(self.state.selected_conflict["id"])
 
     def _delete_note(self, note: dict):

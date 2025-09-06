@@ -186,6 +186,7 @@ TABLE_INFO = {
             "conflicto_id",
             "usuario_id",
             "accion",
+            "estado",
             "notas",
             "tarea_actual",
         ],
