@@ -225,18 +225,22 @@ VIEW_INFO = {
     "v_resumen_entramados_empresas": {
         "display_name": "Resumen de Entramados",
         "base_table": "entramado_empresas",
+        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
     "v_afiliadas_detalle": {
         "display_name": "Detalle de Afiliadas",
         "base_table": "afiliadas",
+        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
     "v_conflictos_detalle": {
         "display_name": "Detalle de Conflictos",
         "base_table": "conflictos",
+        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
     "v_diario_conflictos_con_afiliada": {
         "display_name": "Historial de Conflictos (Diario)",
         "base_table": "diario_conflictos",
+        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
     "comprobar_link_pisos_bloques": {"display_name": "Comprobar Vínculo Pisos-Bloques"},
 }
