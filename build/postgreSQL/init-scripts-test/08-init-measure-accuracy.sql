@@ -2,6 +2,37 @@
 
 SET search_path TO sindicato_inq, public;
 
+-- This query provides a detailed, row-by-row analysis of the matching results.
+-- It includes both linked and unlinked 'pisos' to give a complete picture.
+
+SELECT
+    p.id AS piso_id,
+    p.direccion AS direccion1,
+    p.bloque_id,
+    b.direccion AS direccion2,
+    -- A boolean column to clearly indicate if a link was successfully made.
+    (p.bloque_id IS NOT NULL) AS linked,
+    -- Calculate the similarity score between the normalized addresses.
+    -- This uses the same logic as the matching function to show the exact score
+    -- for the link that was made.
+    -- The score will be NULL for unlinked pisos, as there is no 'b.direccion' to compare.
+    similarity(
+        trim(split_part(b.direccion, ',', 1)) || ', ' || trim(split_part(b.direccion, ',', 2)),
+        trim(split_part(p.direccion, ',', 1)) || ', ' || trim(split_part(p.direccion, ',', 2))
+    ) AS score
+FROM
+    pisos p
+-- We use a LEFT JOIN to include all records from 'pisos',
+-- even if they didn't find a match in the 'bloques' table.
+LEFT JOIN
+    bloques b ON p.bloque_id = b.id
+-- You can order by score to see the best or worst matches first.
+-- For example, to see the weakest matches:
+-- ORDER BY score ASC;
+-- Or to see all the unlinked records first:
+ORDER BY linked DESC, score DESC;
+
+
 -- After running the update, you can check the results with this query.
 -- It will show you how many pisos were successfully linked and how many remain unlinked.
 SELECT
@@ -34,35 +65,6 @@ LIMIT 100; -- Show the first 100 matched pairs for a quick review.
 
 
 
--- This query provides a detailed, row-by-row analysis of the matching results.
--- It includes both linked and unlinked 'pisos' to give a complete picture.
-
-SELECT
-    p.id AS piso_id,
-    p.direccion AS direccion1,
-    p.bloque_id,
-    b.direccion AS direccion2,
-    -- A boolean column to clearly indicate if a link was successfully made.
-    (p.bloque_id IS NOT NULL) AS linked,
-    -- Calculate the similarity score between the normalized addresses.
-    -- This uses the same logic as the matching function to show the exact score
-    -- for the link that was made.
-    -- The score will be NULL for unlinked pisos, as there is no 'b.direccion' to compare.
-    similarity(
-        trim(split_part(b.direccion, ',', 1)) || ', ' || trim(split_part(b.direccion, ',', 2)),
-        trim(split_part(p.direccion, ',', 1)) || ', ' || trim(split_part(p.direccion, ',', 2))
-    ) AS score
-FROM
-    pisos p
--- We use a LEFT JOIN to include all records from 'pisos',
--- even if they didn't find a match in the 'bloques' table.
-LEFT JOIN
-    bloques b ON p.bloque_id = b.id
--- You can order by score to see the best or worst matches first.
--- For example, to see the weakest matches:
--- ORDER BY score ASC;
--- Or to see all the unlinked records first:
-ORDER BY linked DESC, score DESC;
 
 
 -- This query generates a summary report to measure the overall effectiveness
