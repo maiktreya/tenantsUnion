@@ -29,8 +29,8 @@ TABLE_INFO = {
         "id_field": "id",
         "hidden_fields": ["id"],
         "child_relations": [
-            {"table": "nodos_cp_mapping", "foreign_key": "nodo_id"},
             {"table": "bloques", "foreign_key": "nodo_id"},
+            {"table": "nodos_cp_mapping", "foreign_key": "nodo_id"},
         ],
     },
     "nodos_cp_mapping": {
