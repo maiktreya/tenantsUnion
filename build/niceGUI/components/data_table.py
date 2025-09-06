@@ -1,3 +1,5 @@
+# maiktreya/tenantsunion/maiktreya-tenantsUnion-414fb7381de7159f8d5e19480086689987d993ee/build/niceGUI/components/data_table.py
+
 from typing import List, Dict, Optional, Callable
 from nicegui import ui, events
 from state.base import BaseTableState
@@ -13,13 +15,14 @@ class DataTable:
         on_delete: Optional[Callable] = None,
         on_row_click: Optional[Callable] = None,
         show_actions: bool = True,
+        hidden_columns: Optional[List[str]] = None,  # <-- ADDED
     ):
         self.state = state
         self.on_edit = on_edit
         self.on_delete = on_delete
         self.on_row_click = on_row_click
         self.show_actions = show_actions
-        self.container = None
+        self.hidden_columns = hidden_columns or []  # <-- ADDED
 
     def create(self) -> ui.column:
         """Create the table UI."""
@@ -57,12 +60,16 @@ class DataTable:
                 return
 
             if records:
-                columns = list(records[0].keys())
+                # --- MODIFICATION START ---
+                # Filter columns to be displayed by removing hidden ones
+                all_columns = list(records[0].keys())
+                columns = [col for col in all_columns if col not in self.hidden_columns]
+                # --- MODIFICATION END ---
+
                 with ui.card().classes("w-full"):
                     # Table Header
                     with ui.row().classes("w-full bg-gray-100 p-2 items-center"):
                         for column in columns:
-                            # Pass the column name and the event object to the handler
                             with ui.row().classes(
                                 "flex-1 items-center cursor-pointer gap-1"
                             ).on(
@@ -105,9 +112,8 @@ class DataTable:
                             row_classes += " cursor-pointer"
 
                         with ui.row().classes(row_classes) as row:
-                            for column in columns:
+                            for column in columns:  # Use the filtered columns list
                                 value = record.get(column, "")
-                                # MODIFIED: Coerce None and empty strings to '-' for display
                                 display_value = (
                                     value if value is not None and value != "" else "-"
                                 )

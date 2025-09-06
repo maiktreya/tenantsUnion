@@ -1,3 +1,5 @@
+# maiktreya/tenantsunion/maiktreya-tenantsUnion-414fb7381de7159f8d5e19480086689987d993ee/build/niceGUI/views/views_explorer.py
+
 from typing import Dict, Any
 from nicegui import ui, app
 from api.client import APIClient
@@ -15,14 +17,14 @@ class ViewsExplorerView:
     def __init__(self, api_client: APIClient):
         self.api = api_client
         self.state = ViewsState()
-        self.data_table = None
+        self.data_table_container = None
         self.filter_panel = None
         self.detail_container = None
         self.relationship_explorer = None
 
     def has_role(self, *roles: str) -> bool:
         """Check if current user has required roles (same as main app)"""
-        user_roles = {role.lower() for role in app.storage.user.get('roles', [])}
+        user_roles = {role.lower() for role in app.storage.user.get("roles", [])}
         required_roles = {role.lower() for role in roles}
         return not required_roles.isdisjoint(user_roles)
 
@@ -50,21 +52,16 @@ class ViewsExplorerView:
                     icon="filter_alt_off",
                     on_click=self._clear_filters,
                 ).props("color=orange-600")
-                
-                # Role-based access control for the export button
-                if self.has_role('admin', 'sistemas'):
+
+                if self.has_role("admin", "sistemas"):
                     ui.button(
                         "Exportar CSV", icon="download", on_click=self._export_data
                     ).props("color=orange-600")
 
             self.state.filter_container = ui.column().classes("w-full")
 
-            self.data_table = DataTable(
-                state=self.state,
-                show_actions=False,
-                on_row_click=self._on_row_click,
-            )
-            self.data_table.create()
+            # Create a container that will hold the dynamically created data table
+            self.data_table_container = ui.column().classes("w-full")
 
             ui.separator().classes("my-4")
             self.detail_container = ui.column().classes("w-full")
@@ -81,17 +78,36 @@ class ViewsExplorerView:
         await self.relationship_explorer.show_details(record, view_name, is_view=True)
 
     async def _load_view_data(self, view_name: str = None):
+        """Loads data for the selected view and dynamically creates the data table."""
         if self.detail_container:
             self.detail_container.clear()
+
         view = view_name or self.state.selected_view.value
         if not view:
             return
+
+        if self.data_table_container:
+            self.data_table_container.clear()
+
         spinner = ui.spinner(size="lg", color="orange-600").classes("absolute-center")
         try:
             records = await self.api.get_records(view, limit=5000)
             self.state.set_records(records)
             self._setup_filters()
-            self.data_table.refresh()
+
+            # Dynamically create the DataTable with the correct hidden columns
+            with self.data_table_container:
+                view_config = VIEW_INFO.get(view, {})
+                hidden_fields = view_config.get("hidden_fields", [])
+
+                data_table = DataTable(
+                    state=self.state,
+                    show_actions=False,
+                    on_row_click=self._on_row_click,
+                    hidden_columns=hidden_fields,
+                )
+                data_table.create()
+
             ui.notify(
                 f"Se cargaron {len(records)} registros de la vista", type="positive"
             )
@@ -115,14 +131,15 @@ class ViewsExplorerView:
     def _update_filter(self, column: str, value: Any):
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
-        self.data_table.refresh()
+        # The table will auto-refresh due to its subscription to the state.
+        # No need for a direct self.data_table.refresh() call.
 
     def _clear_filters(self):
         self.state.filters.clear()
         if self.filter_panel:
             self.filter_panel.clear()
         self.state.apply_filters_and_sort()
-        self.data_table.refresh()
+        # The table will auto-refresh due to its subscription to the state.
 
     async def _refresh_data(self):
         await self._load_view_data()
