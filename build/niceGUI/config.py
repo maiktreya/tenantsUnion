@@ -29,14 +29,14 @@ TABLE_INFO = {
         "id_field": "id",
         "hidden_fields": ["id"],
         "child_relations": [
-            {"table": "bloques", "foreign_key": "nodo_id"},
             {"table": "nodos_cp_mapping", "foreign_key": "nodo_id"},
+            {"table": "bloques", "foreign_key": "nodo_id"},
         ],
     },
     "nodos_cp_mapping": {
         "display_name": "Mapeo CP-Nodos",
         "id_field": "cp",
-        "hidden_fields": ["nodo_id"],
+        "hidden_fields": ["cp"],
         "relations": {"nodo_id": {"view": "nodos", "display_field": "nombre"}},
     },
     "entramado_empresas": {
@@ -181,19 +181,16 @@ TABLE_INFO = {
     "diario_conflictos": {
         "display_name": "Diario de Conflictos",
         "id_field": "id",
-        "hidden_fields": ["id", "accion_id"],  # Hide the old foreign key field
+        "hidden_fields": ["id"],  # Hide the old foreign key field
         "fields": [
             "conflicto_id",
             "usuario_id",
             "accion",
-            "estado",
-            "ambito",
             "notas",
             "tarea_actual",
         ],
         "field_options": {
             "estado": sorted(["Abierto", "En proceso", "Resuelto", "Cerrado"]),
-            "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"],
             "accion": sorted(
                 [
                     "nota simple",

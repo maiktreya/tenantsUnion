@@ -57,7 +57,7 @@ class EnhancedRecordDialog:
         self.record = record or {}
         self.mode = mode
         self.on_success = on_success
-        self.on_save = on_save  # Custom save handler
+        self.on_save = on_save
         self.dialog = None
         self.inputs = {}
 
@@ -90,12 +90,11 @@ class EnhancedRecordDialog:
             return table_info["fields"]
         if self.mode == "edit" and self.record:
             fields = list(self.record.keys())
-            # Exclude the primary key from the editable fields by default
             pk_field = TABLE_INFO.get(self.table, {}).get("id_field", "id")
             if pk_field in fields:
                 fields.remove(pk_field)
             return fields
-        # Fallback for create mode if fields are not explicitly defined
+
         fields = set()
         if "relations" in table_info:
             fields.update(table_info["relations"].keys())
@@ -113,7 +112,6 @@ class EnhancedRecordDialog:
         field_options = table_info.get("field_options", {})
         fields = self._get_fields()
 
-        # Sort fields to show relations first
         fields = sorted(fields, key=lambda f: (0 if f in relations else 1, f))
 
         for field in fields:
@@ -141,29 +139,39 @@ class EnhancedRecordDialog:
                         f"Error loading options for {field}: {e}", type="negative"
                     )
                     options = {}
+
+                # --- DEFINITIVE FIX ---
+                # Check if the current value is a valid key in the options.
+                # If not, set it to None to prevent the ValueError.
+                current_value = value
+                if current_value not in options:
+                    current_value = None
+
                 self.inputs[field] = (
-                    ui.select(options=options, label=label, value=value)
+                    ui.select(options=options, label=label, value=current_value)
                     .classes("w-full")
                     .props("use-input")
                 )
+
             elif field in field_options:
+                options = field_options[field]
+                current_value = value
+
+                # --- DEFINITIVE FIX ---
+                # Also apply the same safety check for non-relation dropdowns.
+                if current_value not in options:
+                    current_value = None
+
                 self.inputs[field] = ui.select(
-                    options=field_options[field], label=label, value=value
+                    options=options, label=label, value=current_value
                 ).classes("w-full")
 
-            # --- MODIFICATION START ---
-            # This logic is now more specific to avoid incorrectly defaulting 'fecha_cierre'.
             elif "fecha" in lower_field:
                 default_value = value
-
-                # ONLY default 'fecha_apertura' to today's date on create mode.
                 if self.mode == "create" and not value and field == "fecha_apertura":
                     default_value = date.today().isoformat()
-
-                # For all other date fields (like fecha_cierre), the value remains None if not set.
                 elif self.mode == "create" and not value:
                     default_value = None
-
                 with ui.input(label=label, value=default_value) as input_field:
                     with input_field.add_slot("append"):
                         ui.icon("edit_calendar").on(
@@ -172,8 +180,6 @@ class EnhancedRecordDialog:
                     with ui.menu() as menu:
                         ui.date().bind_value(input_field)
                 self.inputs[field] = input_field
-            # --- MODIFICATION END ---
-
             elif any(
                 substr in lower_field
                 for substr in ["nota", "descripcion", "resolucion"]
@@ -196,7 +202,6 @@ class EnhancedRecordDialog:
             }
 
             if self.on_save:
-                # If a custom handler is provided, use it
                 success = await self.on_save(data)
                 if success:
                     self.dialog.close()
@@ -204,7 +209,6 @@ class EnhancedRecordDialog:
                         await self.on_success()
                 return
 
-            # Default save logic
             if self.mode == "create":
                 result = await self.api.create_record(self.table, data)
                 if result:

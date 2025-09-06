@@ -115,7 +115,7 @@ CREATE TABLE diario_conflictos (
     conflicto_id INTEGER NOT NULL REFERENCES conflictos (id) ON DELETE CASCADE,
     usuario_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
     estado TEXT,
-    ambito TEXT,
+    accion TEXT,
     notas TEXT,
     tarea_actual TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

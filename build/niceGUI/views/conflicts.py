@@ -28,8 +28,6 @@ class ConflictsView:
         self.filter_causa = None
         self.filter_text = None
 
-    # In build/niceGUI/views/conflicts.py
-
     def create(self) -> ui.column:
         """Create the enhanced conflicts view UI"""
         container = ui.column().classes("w-full p-4 gap-4")
@@ -37,7 +35,6 @@ class ConflictsView:
         with container:
             ui.label("Toma de Actas - Gestión de Conflictos").classes("text-h4")
 
-            # --- (Code for getting options from TABLE_INFO remains the same) ---
             conflict_options = TABLE_INFO.get("conflictos", {}).get("field_options", {})
             estado_opts_list = conflict_options.get("estado", [])
             causa_opts_list = conflict_options.get("causa", [])
@@ -48,7 +45,6 @@ class ConflictsView:
             causa_options = {"": "Todas las causas"}
             causa_options.update({opt: opt for opt in causa_opts_list})
 
-            # --- (Filter Section remains the same) ---
             with ui.expansion("Filtros", icon="filter_list").classes(
                 "w-full mb-4"
             ).props("default-opened"):
@@ -85,19 +81,16 @@ class ConflictsView:
             with ui.row().classes("w-full gap-4"):
                 with ui.column().classes("w-96 gap-4"):
                     with ui.row().classes("w-full gap-2"):
-                        # --- MODIFICATION IS HERE ---
-                        # We've added the `clearable=True` argument to the select component.
                         self.conflict_select = (
                             ui.select(
                                 options={},
                                 label="Seleccionar Conflicto",
                                 on_change=lambda e: self._on_conflict_change(e.value),
-                                clearable=True,  # This adds the de-select button
+                                clearable=True,
                             )
                             .classes("flex-grow")
                             .props("use-input")
                         )
-                        # --- END MODIFICATION ---
                         ui.button(icon="refresh", on_click=self._load_conflicts).props(
                             "flat"
                         )
@@ -230,7 +223,7 @@ class ConflictsView:
             await self._load_conflict_history()
 
     async def _display_conflict_info(self):
-        """[RESTORED] Display enhanced conflict information"""
+        """Display enhanced conflict information"""
         if not self.info_container or not self.state.selected_conflict:
             return
 
@@ -324,7 +317,7 @@ class ConflictsView:
             ui.notify(f"Error loading history: {str(e)}", type="negative")
 
     def _create_history_entry(self, entry: dict):
-        """[RESTORED] Create a collapsible history entry card."""
+        """Create a collapsible history entry card."""
         title_text = f"Nota #{entry.get('id', 'N/A')} - {entry.get('created_at', 'Sin fecha').split('T')[0]}"
         if entry.get("autor_nota_alias"):
             title_text += f" | Autor: {entry['autor_nota_alias']}"
@@ -368,18 +361,31 @@ class ConflictsView:
                                     "text-gray-700 whitespace-pre-wrap"
                                 )
 
+    # --- DEFINITIVE FIX IS HERE ---
     async def _add_note(self):
+        """Create a new note with pre-filled context."""
         if not self.state.selected_conflict:
             ui.notify("Please select a conflict first", type="warning")
             return
+
+        # Pre-fill the record with the necessary IDs from the current context.
+        initial_record = {
+            "conflicto_id": self.state.selected_conflict["id"],
+            "usuario_id": app.storage.user.get("user_id"),
+        }
+
         dialog = EnhancedRecordDialog(
             api=self.api,
             table="diario_conflictos",
             mode="create",
+            # Pass the pre-filled record to the dialog
+            record=initial_record,
             on_success=self._on_note_saved,
             on_save=self._save_note_handler(None),
         )
         await dialog.open()
+
+    # --- END OF FIX ---
 
     async def _create_conflict(self):
         dialog = EnhancedRecordDialog(
@@ -407,13 +413,14 @@ class ConflictsView:
         """Returns an async function to handle the custom save logic for notes."""
 
         async def _handler(data: Dict) -> bool:
-            user_id = app.storage.user.get("user_id")
-            if not user_id:
+            # Merge the pre-filled data with the form data
+            if not record:  # Only in create mode
+                data["conflicto_id"] = self.state.selected_conflict["id"]
+                data["usuario_id"] = app.storage.user.get("user_id")
+
+            if not data.get("usuario_id"):
                 ui.notify("Error: User not identified", type="negative")
                 return False
-
-            data["conflicto_id"] = self.state.selected_conflict["id"]
-            data["usuario_id"] = user_id
 
             if record:  # Edit mode
                 result = await self.api.update_record(
@@ -430,8 +437,6 @@ class ConflictsView:
             if data.get("estado") == "Cerrado":
                 conflict_update["estado"] = "Cerrado"
                 conflict_update["fecha_cierre"] = date.today().isoformat()
-
-            # Also update the state if it's not being closed
             elif data.get("estado"):
                 conflict_update["estado"] = data.get("estado")
 
