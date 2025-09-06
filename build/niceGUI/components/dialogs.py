@@ -117,15 +117,7 @@ class EnhancedRecordDialog:
         fields = sorted(fields, key=lambda f: (0 if f in relations else 1, f))
 
         for field in fields:
-            # =====================================================================
-            # THE FIX IS HERE:
-            # We now default to `None` instead of `""` for the value.
-            # A `None` value tells the ui.select component that nothing is selected yet,
-            # which is the correct state for a new record. An empty string "" is
-            # treated as an invalid key if it's not in the options list.
-            # =====================================================================
-            value = self.record.get(field)  # OLD: self.record.get(field, "")
-
+            value = self.record.get(field)
             label = field.replace("_", " ").title()
             lower_field = field.lower()
 
@@ -158,10 +150,20 @@ class EnhancedRecordDialog:
                 self.inputs[field] = ui.select(
                     options=field_options[field], label=label, value=value
                 ).classes("w-full")
+
+            # --- MODIFICATION START ---
+            # This logic is now more specific to avoid incorrectly defaulting 'fecha_cierre'.
             elif "fecha" in lower_field:
                 default_value = value
-                if self.mode == "create" and not value:
+
+                # ONLY default 'fecha_apertura' to today's date on create mode.
+                if self.mode == "create" and not value and field == "fecha_apertura":
                     default_value = date.today().isoformat()
+
+                # For all other date fields (like fecha_cierre), the value remains None if not set.
+                elif self.mode == "create" and not value:
+                    default_value = None
+
                 with ui.input(label=label, value=default_value) as input_field:
                     with input_field.add_slot("append"):
                         ui.icon("edit_calendar").on(
@@ -170,6 +172,8 @@ class EnhancedRecordDialog:
                     with ui.menu() as menu:
                         ui.date().bind_value(input_field)
                 self.inputs[field] = input_field
+            # --- MODIFICATION END ---
+
             elif any(
                 substr in lower_field
                 for substr in ["nota", "descripcion", "resolucion"]

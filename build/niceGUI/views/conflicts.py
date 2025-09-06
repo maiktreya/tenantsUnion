@@ -28,6 +28,8 @@ class ConflictsView:
         self.filter_causa = None
         self.filter_text = None
 
+    # In build/niceGUI/views/conflicts.py
+
     def create(self) -> ui.column:
         """Create the enhanced conflicts view UI"""
         container = ui.column().classes("w-full p-4 gap-4")
@@ -35,20 +37,18 @@ class ConflictsView:
         with container:
             ui.label("Toma de Actas - Gestión de Conflictos").classes("text-h4")
 
-            # --- REFACTORED: Get options directly from TABLE_INFO ---
+            # --- (Code for getting options from TABLE_INFO remains the same) ---
             conflict_options = TABLE_INFO.get("conflictos", {}).get("field_options", {})
             estado_opts_list = conflict_options.get("estado", [])
             causa_opts_list = conflict_options.get("causa", [])
 
-            # --- REFACTORED: Build options dictionaries dynamically ---
             estado_options = {"": "Todos los estados"}
             estado_options.update({opt: opt for opt in estado_opts_list})
 
             causa_options = {"": "Todas las causas"}
             causa_options.update({opt: opt for opt in causa_opts_list})
-            # --- END REFACTOR ---
 
-            # Filter Section
+            # --- (Filter Section remains the same) ---
             with ui.expansion("Filtros", icon="filter_list").classes(
                 "w-full mb-4"
             ).props("default-opened"):
@@ -60,14 +60,12 @@ class ConflictsView:
                         clearable=True,
                     ).classes("w-64")
                     self.filter_estado = ui.select(
-                        # Use the dynamically generated options
                         options=estado_options,
                         label="Filtrar por Estado",
                         value="",
                         on_change=self._apply_filters,
                     ).classes("w-48")
                     self.filter_causa = ui.select(
-                        # Use the dynamically generated options
                         options=causa_options,
                         label="Filtrar por Causa",
                         on_change=self._apply_filters,
@@ -87,15 +85,19 @@ class ConflictsView:
             with ui.row().classes("w-full gap-4"):
                 with ui.column().classes("w-96 gap-4"):
                     with ui.row().classes("w-full gap-2"):
+                        # --- MODIFICATION IS HERE ---
+                        # We've added the `clearable=True` argument to the select component.
                         self.conflict_select = (
                             ui.select(
                                 options={},
                                 label="Seleccionar Conflicto",
                                 on_change=lambda e: self._on_conflict_change(e.value),
+                                clearable=True,  # This adds the de-select button
                             )
                             .classes("flex-grow")
                             .props("use-input")
                         )
+                        # --- END MODIFICATION ---
                         ui.button(icon="refresh", on_click=self._load_conflicts).props(
                             "flat"
                         )
