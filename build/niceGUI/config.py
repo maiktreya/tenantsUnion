@@ -36,7 +36,7 @@ TABLE_INFO = {
     "nodos_cp_mapping": {
         "display_name": "Mapeo CP-Nodos",
         "id_field": "cp",
-        "hidden_fields": ["cp"],
+        "hidden_fields": ["nodo_id"],
         "relations": {"nodo_id": {"view": "nodos", "display_field": "nombre"}},
     },
     "entramado_empresas": {
