@@ -42,11 +42,11 @@ Purpose: To test individual components (functions, classes) in isolation. These 
 
 Examples:
 
-```bash
-test_api_client.py: Tests the APIClient's methods for making HTTP requests, mocking the API endpoints.
-test_state_management.py: Tests the logic within state classes for filtering, sorting, and pagination.
+
+- **test_api_client.py**: Tests the APIClient's methods for making HTTP requests, mocking the API endpoints.
+- **test_state_management.py**: Tests the logic within state classes for filtering, sorting, and pagination.
 test_auth.py: Tests authentication helper functions like password verification.
-```
+- **test_dialogs.py**: Tests the dialogs module, including the RecordDialog class. This includes testing the save_record method with mocked API responses.
 
 ### 2. Integration Tests (tests/integration/)
 
@@ -54,9 +54,8 @@ Purpose: To test the interaction between different components of the system. The
 
 Example:
 
-```bash
-test_database_api.py: This is a crucial test that starts the PostgreSQL and PostgREST services using Docker. It inserts data directly into the database, then uses the real APIClient to verify that the data can be correctly retrieved through the live API. This validates the entire backend stack.
-```
+
+- **test_database_api.py**: This is a crucial test that starts the PostgreSQL and PostgREST services using Docker. It inserts data directly into the database, then uses the real APIClient to verify that the data can be correctly retrieved through the live API. This validates the entire backend stack.
 
 
 ### 3. End-to-End (E2E) Tests (tests/e2e/)
@@ -65,20 +64,17 @@ Purpose: To simulate real user interactions with the application's user interfac
 
 Example:
 
-```bash
-test_login_flow.py: Simulates a user navigating to the login page, entering credentials, and verifying that they are redirected to the home page upon successful login. This tests the complete authentication flow from the UI to the backend logic.
-```
+- **test_login_flow.py**: Simulates a user navigating to the login page, entering credentials, and verifying that they are redirected to the home page upon successful login. This tests the complete authentication flow from the UI to the backend logic.
+
 
 
 ---
 
 #### 📦 Key Libraries Used
-Pytest: The core testing framework.
 
-Pytest-Asyncio: For testing asynchronous code.
 
-RESPX: For mocking HTTP requests in unit tests.
-
-Pytest-Docker: For managing Docker containers within integration tests.
-
-NiceGUI Testing Tools: For E2E testing of the user interface.
+- **Pytest**: The core testing framework.
+- **Pytest-Asyncio**: For testing asynchronous code.
+- **RESPX**: For mocking HTTP requests in unit tests.
+- **Pytest-Docker**: For managing Docker containers within integration tests.
+- **NiceGUI Testing Tools**: For E2E testing of the user interface.
