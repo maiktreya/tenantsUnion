@@ -20,11 +20,12 @@ class RelationshipExplorer:
 
     async def show_details(self, record: Dict, source_name: str, is_view: bool):
         """
-        Displays parent/child relationships in a two-column layout.
+        Displays parent/child relationships in a responsive, two-column layout
+        that stacks on mobile and splits on desktop.
         """
         self.container.clear()
 
-        # --- (Boilerplate to find the base table and record ID) ---
+        # Boilerplate to find the base table and record ID
         base_table_name = source_name
         if is_view:
             view_config = VIEW_INFO.get(source_name, {})
@@ -45,24 +46,28 @@ class RelationshipExplorer:
                 type="warning",
             )
             return
-        # --- (End Boilerplate) ---
+        # End Boilerplate
 
         with self.container:
             ui.label(
                 f"Relationships for record from '{source_name}' (ID: {record_id})"
             ).classes("text-h5 mb-2")
 
-            # --- NEW LAYOUT ---
-            # Create a main row to hold the two columns
-            with ui.row().classes("w-full gap-4 no-wrap"):
+            # --- FINAL RESPONSIVE LAYOUT ---
+            # This row contains two columns. The `flex-wrap` class allows the columns
+            # to stack vertically when the screen is too narrow.
+            with ui.row().classes("w-full gap-4 flex-wrap"):
 
                 # --- LEFT COLUMN: PARENTS ---
-                with ui.column().classes("w-1/2"):
+                # `w-full` is the default (for mobile). `md:w-1/2` is not quite right.
+                # A better approach is to let flexbox handle it.
+                # We set a basis of 100% on small screens and ~50% on larger ones.
+                with ui.column().classes("w-full md:flex-1"):
                     ui.label("Registros Padre:").classes("text-h6")
                     await self._display_parent_relations(record, table_info)
 
                 # --- RIGHT COLUMN: CHILDREN ---
-                with ui.column().classes("w-1/2"):
+                with ui.column().classes("w-full md:flex-1"):
                     ui.label("Registros Hijos:").classes("text-h6")
                     await self._display_child_relations(record_id, table_info)
 
