@@ -223,7 +223,6 @@ class ConflictsView:
             await self._load_conflict_history()
 
     async def _display_conflict_info(self):
-        """Display enhanced conflict information"""
         if not self.info_container or not self.state.selected_conflict:
             return
 
@@ -317,7 +316,6 @@ class ConflictsView:
             ui.notify(f"Error loading history: {str(e)}", type="negative")
 
     def _create_history_entry(self, entry: dict):
-        """Create a collapsible history entry card."""
         title_text = f"Nota #{entry.get('id', 'N/A')} - {entry.get('created_at', 'Sin fecha').split('T')[0]}"
         if entry.get("autor_nota_alias"):
             title_text += f" | Autor: {entry['autor_nota_alias']}"
@@ -361,14 +359,12 @@ class ConflictsView:
                                     "text-gray-700 whitespace-pre-wrap"
                                 )
 
-    # --- DEFINITIVE FIX IS HERE ---
     async def _add_note(self):
-        """Create a new note with pre-filled context."""
         if not self.state.selected_conflict:
             ui.notify("Please select a conflict first", type="warning")
             return
 
-        # Pre-fill the record with the necessary IDs from the current context.
+        # THIS IS THE LOGICAL FIX: Pre-fill a dictionary with the necessary context.
         initial_record = {
             "conflicto_id": self.state.selected_conflict["id"],
             "usuario_id": app.storage.user.get("user_id"),
@@ -378,14 +374,11 @@ class ConflictsView:
             api=self.api,
             table="diario_conflictos",
             mode="create",
-            # Pass the pre-filled record to the dialog
-            record=initial_record,
+            record=initial_record,  # Pass the pre-filled record to the dialog
             on_success=self._on_note_saved,
             on_save=self._save_note_handler(None),
         )
         await dialog.open()
-
-    # --- END OF FIX ---
 
     async def _create_conflict(self):
         dialog = EnhancedRecordDialog(
@@ -410,29 +403,25 @@ class ConflictsView:
     def _save_note_handler(
         self, record: Optional[Dict]
     ) -> Callable[[Dict], Awaitable[bool]]:
-        """Returns an async function to handle the custom save logic for notes."""
-
         async def _handler(data: Dict) -> bool:
-            # Merge the pre-filled data with the form data
-            if not record:  # Only in create mode
-                data["conflicto_id"] = self.state.selected_conflict["id"]
-                data["usuario_id"] = app.storage.user.get("user_id")
-
-            if not data.get("usuario_id"):
+            user_id = app.storage.user.get("user_id")
+            if not user_id:
                 ui.notify("Error: User not identified", type="negative")
                 return False
 
-            if record:  # Edit mode
+            data["conflicto_id"] = self.state.selected_conflict["id"]
+            data["usuario_id"] = user_id
+
+            if record:
                 result = await self.api.update_record(
                     "diario_conflictos", record["id"], data
                 )
-            else:  # Create mode
+            else:
                 result = await self.api.create_record("diario_conflictos", data)
 
             if not result:
                 return False
 
-            # Update parent conflict status
             conflict_update = {"tarea_actual": data.get("tarea_actual")}
             if data.get("estado") == "Cerrado":
                 conflict_update["estado"] = "Cerrado"
@@ -448,7 +437,6 @@ class ConflictsView:
         return _handler
 
     async def _on_note_saved(self):
-        """Callback after a note is successfully saved."""
         await self._load_conflicts()
         if self.state.selected_conflict:
             await self._on_conflict_change(self.state.selected_conflict["id"])

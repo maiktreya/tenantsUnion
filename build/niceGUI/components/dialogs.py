@@ -140,12 +140,16 @@ class EnhancedRecordDialog:
                     )
                     options = {}
 
-                # --- DEFINITIVE FIX ---
-                # Check if the current value is a valid key in the options.
-                # If not, set it to None to prevent the ValueError.
                 current_value = value
                 if current_value not in options:
                     current_value = None
+
+                # Hide pre-filled fields in create mode for a cleaner UI
+                if field in ["conflicto_id", "usuario_id"] and self.mode == "create":
+                    self.inputs[field] = ui.input(value=current_value).style(
+                        "display: none"
+                    )
+                    continue
 
                 self.inputs[field] = (
                     ui.select(options=options, label=label, value=current_value)
@@ -157,8 +161,6 @@ class EnhancedRecordDialog:
                 options = field_options[field]
                 current_value = value
 
-                # --- DEFINITIVE FIX ---
-                # Also apply the same safety check for non-relation dropdowns.
                 if current_value not in options:
                     current_value = None
 
