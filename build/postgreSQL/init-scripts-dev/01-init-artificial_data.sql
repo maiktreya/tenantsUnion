@@ -316,6 +316,61 @@ SELECT
 FROM pisos p
 LEFT JOIN bloques b ON p.bloque_id = b.id;
 
+CREATE OR REPLACE VIEW v_conflictos_enhanced AS
+SELECT
+    c.id,
+    c.estado,
+    c.ambito,
+    c.causa,
+    c.tarea_actual,
+    c.fecha_apertura,
+    c.fecha_cierre,
+    c.descripcion,
+    c.resolucion,
+    c.afiliada_id,
+    c.usuario_responsable_id,
+    a.nombre AS afiliada_nombre,
+    a.apellidos AS afiliada_apellidos,
+    CONCAT(a.nombre, ' ', a.apellidos) AS afiliada_nombre_completo,
+    a.num_afiliada,
+    p.id AS piso_id,
+    p.direccion AS piso_direccion,
+    p.municipio AS piso_municipio,
+    p.cp AS piso_cp,
+    b.id AS bloque_id,
+    b.direccion AS bloque_direccion,
+    COALESCE(n1.id, n2.id) AS nodo_id,
+    COALESCE(n1.nombre, n2.nombre) AS nodo_nombre,
+    u.alias AS usuario_responsable_alias,
+    CONCAT(
+        'ID ',
+        c.id,
+        ' - ',
+        COALESCE(
+            p.direccion,
+            b.direccion,
+            'Sin dirección'
+        ),
+        ' | ',
+        COALESCE(
+            a.nombre || ' ' || a.apellidos,
+            'Sin afiliada'
+        ),
+        CASE
+            WHEN c.estado IS NOT NULL THEN ' [' || c.estado || ']'
+            ELSE ''
+        END
+    ) AS conflict_label
+FROM
+    sindicato_inq.conflictos c
+    LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
+    LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
+    LEFT JOIN sindicato_inq.nodos n1 ON b.nodo_id = n1.id
+    LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id
+    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
+
 -- =====================================================================
 -- PASO 4: LIMPIEZA Y POBLACIÓN DE DATOS ARTIFICIALES
 -- =====================================================================
@@ -423,11 +478,11 @@ INSERT INTO usuarios (alias, nombre, apellidos, email, roles, is_active) VALUES
 -- Hash para password "12345678" usando bcrypt con cost 12: $2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui
 INSERT INTO usuario_credenciales (usuario_id, password_hash) VALUES
     (1, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- admin
-    (2, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- sumate
-    (3, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- gestor1
-    (4, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- tecnico1
-    (5, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- usuario1
-    (6, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'); -- usuario2
+    (2, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- sumate
+    (3, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- gestor1
+    (4, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- tecnico1
+    (5, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- usuario1
+    (6, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'); -- usuario2
 
 -- Asignar roles a usuarios
 INSERT INTO usuario_roles (usuario_id, role_id) VALUES
