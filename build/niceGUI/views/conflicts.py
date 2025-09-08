@@ -192,29 +192,32 @@ class ConflictsView:
         ui.timer(0.1, self._apply_filters, once=True)
 
     def _display_statistics(self):
-        if not self.stats_card:
-            return
-        self.stats_card.clear()
-        with self.stats_card:
-            ui.label("Estadísticas").classes("text-h6 mb-2")
-            status_counts = {}
-            for conflict in self.filtered_conflicts:
-                estado = conflict.get("estado", "Sin estado")
-                status_counts[estado] = status_counts.get(estado, 0) + 1
-            with ui.row().classes("w-full gap-4 flex-wrap"):
-                ui.chip(
-                    f"Total: {len(self.filtered_conflicts)}",
-                    color="blue",
-                    icon="inventory",
-                )
-                for estado, count in sorted(status_counts.items()):
-                    color = {
-                        "Abierto": "red",
-                        "En proceso": "orange",
-                        "Resuelto": "green",
-                        "Cerrado": "gray",
-                    }.get(estado, "blue")
-                    ui.chip(f"{estado}: {count}", color=color)
+            if not self.stats_card:
+                return
+            self.stats_card.clear()
+            with self.stats_card:
+                ui.label("Estadísticas").classes("text-h6 mb-2")
+                status_counts = {}
+                for conflict in self.filtered_conflicts:
+                    # Ensure the key is always a string, defaulting None to "Sin estado"
+                    estado = conflict.get("estado") or "Sin estado"
+                    status_counts[estado] = status_counts.get(estado, 0) + 1
+
+                with ui.row().classes("w-full gap-4 flex-wrap"):
+                    ui.chip(
+                        f"Total: {len(self.filtered_conflicts)}",
+                        color="blue",
+                        icon="inventory",
+                    )
+                    # This sorted() call is now safe because all keys are strings.
+                    for estado, count in sorted(status_counts.items()):
+                        color = {
+                            "Abierto": "red",
+                            "En proceso": "orange",
+                            "Resuelto": "green",
+                            "Cerrado": "gray",
+                        }.get(estado, "blue")
+                        ui.chip(f"{estado}: {count}", color=color)
 
     async def _on_conflict_change(self, conflict_id: Optional[int]):
         if not conflict_id:

@@ -1,6 +1,6 @@
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
-from state.base import ReactiveValue
+from state.base import ReactiveValue, _normalize_for_sorting  # <-- IMPORT THE ROBUST FUNCTION
 
 @dataclass
 class ConflictsState:
@@ -24,10 +24,11 @@ class ConflictsState:
             self.selected_conflict_id.set(None)
 
     def set_history(self, history: List[Dict]):
-        """Set conflict history"""
+        """Set conflict history with robust sorting."""
+        # This now uses the powerful, existing normalization function to prevent errors
         self.history = sorted(
             history,
-            key=lambda x: x.get('created_at', ''),
+            key=lambda x: _normalize_for_sorting(x.get('created_at')),
             reverse=True
         )
 
