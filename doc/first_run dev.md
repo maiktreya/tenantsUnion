@@ -33,6 +33,9 @@ Execute the following command from the root of the project:
 
  # if you have a local python enviroment with the requirements installed you could run the frontend directly from source
  docker compose up -f docker-compose.yaml -f docker-compose-dev.yaml -d && python build/niceGUI/main.py
+
+ # for allowing an enviroment with a local postgreSQL instance with hot reload
+ docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml  up  -d --renew-anon-volumes && docker logs --follow tenantsunion-db-1
 ```
 
 This command will:
