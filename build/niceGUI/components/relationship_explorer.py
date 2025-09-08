@@ -18,165 +18,98 @@ class RelationshipExplorer:
         self.api = api_client
         self.container = container
 
-    async def show_details(self, record: Dict, source_name: str, is_view: bool):
+    async def show_details(self, record: Dict, source_name: str, calling_view: str):
         """
-        Displays parent/child relationships in a responsive, two-column layout
-        that stacks on mobile and splits on desktop.
+        Displays parent/child relationships.
+        Args:
+            record: The data record that was clicked.
+            source_name: The name of the table or view the record is from.
+            calling_view: A string ('admin' or 'views') to control field visibility.
         """
         self.container.clear()
 
-        # Boilerplate to find the base table and record ID
+        # Determine if the source is a view to find the base table
+        is_view = calling_view == 'views'
         base_table_name = source_name
         if is_view:
-            view_config = VIEW_INFO.get(source_name, {})
-            base_table_name = view_config.get("base_table")
-            if not base_table_name:
-                return
+            base_table_name = VIEW_INFO.get(source_name, {}).get("base_table", source_name)
 
         table_info = TABLE_INFO.get(base_table_name, {})
-        if not table_info:
-            return
-
         primary_key_name = table_info.get("id_field", "id")
         record_id = record.get(primary_key_name) or record.get("id")
 
         if record_id is None:
-            ui.notify(
-                f"Could not find primary key in record from '{source_name}'.",
-                type="warning",
-            )
+            ui.notify(f"Could not find primary key in record from '{source_name}'.", type="warning")
             return
-        # End Boilerplate
 
         with self.container:
-            ui.label(
-                f"Relationships for record from '{source_name}' (ID: {record_id})"
-            ).classes("text-h5 mb-2")
-
-            # --- FINAL RESPONSIVE LAYOUT ---
-            # This row contains two columns. The `flex-wrap` class allows the columns
-            # to stack vertically when the screen is too narrow.
+            ui.label(f"Relationships for record from '{source_name}' (ID: {record_id})").classes("text-h5 mb-2")
             with ui.row().classes("w-full gap-4 flex-wrap"):
-
-                # --- LEFT COLUMN: PARENTS ---
-                # `w-full` is the default (for mobile). `md:w-1/2` is not quite right.
-                # A better approach is to let flexbox handle it.
-                # We set a basis of 100% on small screens and ~50% on larger ones.
                 with ui.column().classes("w-full md:flex-1"):
                     ui.label("Registros Padre:").classes("text-h6")
-                    await self._display_parent_relations(record, table_info)
+                    await self._display_parent_relations(record, table_info, calling_view)
 
-                # --- RIGHT COLUMN: CHILDREN ---
                 with ui.column().classes("w-full md:flex-1"):
                     ui.label("Registros Hijos:").classes("text-h6")
-                    await self._display_child_relations(record_id, table_info)
+                    await self._display_child_relations(record_id, table_info, calling_view)
 
-    async def _display_parent_relations(self, record: Dict, table_info: Dict):
-        """Fetches and displays parent records within a card."""
-        parent_relations = table_info.get("relations")
-
+    async def _display_parent_relations(self, record: Dict, table_info: Dict, calling_view: str):
+        """Fetches and displays parent records, respecting the calling view context."""
+        parent_relations = table_info.get("relations", {})
         with ui.card().classes("w-full"):
-            if not parent_relations:
-                ui.label("No hay relaciones padre configuradas.").classes(
-                    "text-gray-500 p-2"
-                )
-                return
-
-            has_parents = any(
-                record.get(fk_field) is not None for fk_field in parent_relations
-            )
-            if not has_parents:
-                ui.label("No se encontraron registros padre.").classes(
-                    "text-gray-500 p-2"
-                )
+            if not parent_relations or not any(record.get(fk) for fk in parent_relations):
+                ui.label("No se encontraron registros padre.").classes("text-gray-500 p-2")
                 return
 
             for fk_field, rel_info in parent_relations.items():
-                parent_id = record.get(fk_field)
-                if parent_id is None:
-                    continue
+                if parent_id := record.get(fk_field):
+                    parent_table = rel_info["view"]
+                    hidden_fields = TABLE_INFO.get(parent_table, {}).get("hidden_fields", [])
 
-                parent_table_name = rel_info["view"]
-                hidden_fields = TABLE_INFO.get(parent_table_name, {}).get(
-                    "hidden_fields", []
-                )
+                    try:
+                        parents = await self.api.get_records(parent_table, filters={"id": f"eq.{parent_id}"})
+                        if not parents: continue
 
-                try:
-                    parents = await self.api.get_records(
-                        parent_table_name, filters={"id": f"eq.{parent_id}"}
-                    )
-                    if not parents:
-                        continue
+                        with ui.expansion(f"Padre en '{parent_table}' (ID: {parent_id})", icon="arrow_upward").classes("w-full"):
+                            for key, value in parents[0].items():
+                                # In 'admin' view, show all fields. Otherwise, hide configured fields.
+                                if calling_view == 'admin' or key not in hidden_fields:
+                                    with ui.row():
+                                        ui.label(f"{key}:").classes("font-semibold w-32")
+                                        ui.label(str(value) if value not in [None, ""] else "-")
+                    except Exception as e:
+                        ui.notify(f"Error al cargar padre de '{parent_table}': {e}", type="negative")
 
-                    with ui.expansion(
-                        f"Padre en '{parent_table_name}' (ID: {parent_id})",
-                        icon="arrow_upward",
-                    ).classes("w-full"):
-                        for key, value in parents[0].items():
-                            if key not in hidden_fields:
-                                with ui.row():
-                                    ui.label(f"{key}:").classes("font-semibold w-32")
-                                    display_value = (
-                                        value
-                                        if value is not None and value != ""
-                                        else "-"
-                                    )
-                                    ui.label(str(display_value))
-                except Exception as e:
-                    ui.notify(
-                        f"Error al cargar padre de '{parent_table_name}': {e}",
-                        type="negative",
-                    )
-
-    async def _display_child_relations(self, record_id: int, table_info: Dict):
-        """Fetches and displays child records within a card."""
+    async def _display_child_relations(self, record_id: int, table_info: Dict, calling_view: str):
+        """Fetches and displays child records, respecting the calling view context."""
         child_relations = table_info.get("child_relations", [])
-        child_relations = (
-            [child_relations] if isinstance(child_relations, dict) else child_relations
-        )
-
         with ui.card().classes("w-full"):
             if not child_relations:
-                ui.label("No hay relaciones hija configuradas.").classes(
-                    "text-gray-500 p-2"
-                )
+                ui.label("No hay relaciones hija configuradas.").classes("text-gray-500 p-2")
                 return
 
             for relation in child_relations:
-                child_table_name, fk = relation["table"], relation["foreign_key"]
-                hidden_fields = TABLE_INFO.get(child_table_name, {}).get(
-                    "hidden_fields", []
-                )
+                child_table, fk = relation["table"], relation["foreign_key"]
+
+                hidden_fields = set(TABLE_INFO.get(child_table, {}).get("hidden_fields", []))
+                # In views, also hide the foreign key linking back to the parent.
+                if calling_view == 'views':
+                    hidden_fields.add(fk)
 
                 try:
-                    children = await self.api.get_records(
-                        child_table_name, filters={fk: f"eq.{record_id}"}
-                    )
-                    with ui.expansion(
-                        f"Hijos en '{child_table_name}' ({len(children)})",
-                        icon="arrow_downward",
-                    ).classes("w-full"):
+                    children = await self.api.get_records(child_table, filters={fk: f"eq.{record_id}"})
+                    with ui.expansion(f"Hijos en '{child_table}' ({len(children)})", icon="arrow_downward").classes("w-full"):
                         if not children:
-                            ui.label("No se encontraron registros.").classes(
-                                "text-gray-500 p-2"
-                            )
+                            ui.label("No se encontraron registros.").classes("text-gray-500 p-2")
                             continue
+
                         for child in children:
                             with ui.card().classes("w-full my-1"):
                                 for key, value in child.items():
-                                    if key not in hidden_fields:
+                                    # In 'admin' view, show all fields. Otherwise, respect the hidden set.
+                                    if calling_view == 'admin' or key not in hidden_fields:
                                         with ui.row():
-                                            ui.label(f"{key}:").classes(
-                                                "font-semibold w-32"
-                                            )
-                                            display_value = (
-                                                value
-                                                if value is not None and value != ""
-                                                else "-"
-                                            )
-                                            ui.label(str(display_value))
+                                            ui.label(f"{key}:").classes("font-semibold w-32")
+                                            ui.label(str(value) if value not in [None, ""] else "-")
                 except Exception as e:
-                    ui.notify(
-                        f"Error al cargar hijos de '{child_table_name}': {e}",
-                        type="negative",
-                    )
+                    ui.notify(f"Error al cargar hijos de '{child_table}': {e}", type="negative")

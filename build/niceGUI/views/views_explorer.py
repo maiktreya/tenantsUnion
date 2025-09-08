@@ -73,9 +73,9 @@ class ViewsExplorerView:
         return container
 
     async def _on_row_click(self, record: Dict):
-        """Handles a row click by invoking the RelationshipExplorer component."""
+        """Handles a row click by invoking the RelationshipExplorer with views context."""
         view_name = self.state.selected_view.value
-        await self.relationship_explorer.show_details(record, view_name, is_view=True)
+        await self.relationship_explorer.show_details(record, view_name, calling_view='views')
 
     async def _load_view_data(self, view_name: str = None):
         """Loads data for the selected view and dynamically creates the data table."""

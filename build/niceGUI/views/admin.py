@@ -82,11 +82,9 @@ class AdminView:
         return container
 
     async def _on_row_click(self, record: Dict):
-        """Handles a row click by invoking the RelationshipExplorer component."""
+        """Handles a row click by invoking the RelationshipExplorer with admin context."""
         table_name = self.state.selected_table.value
-        await self.relationship_explorer.show_details(record, table_name, is_view=False)
-
-    # ... (the rest of the file remains the same)
+        await self.relationship_explorer.show_details(record, table_name, calling_view='admin')
 
     async def _load_table_data(self, table_name: str = None):
         if self.detail_container:
