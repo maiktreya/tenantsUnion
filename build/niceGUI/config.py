@@ -270,7 +270,6 @@ TABLE_INFO = {
                     "puerta a puerta",
                     "comunicación enviada",
                     "llamada",
-                    "acción",
                     "reunión de negociación",
                     "informe vulnerabilidad",
                     "MASC",
