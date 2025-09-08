@@ -477,6 +477,61 @@ INSERT INTO diario_conflictos (conflicto_id, usuario_id, estado, accion, notas, 
     (4, 2, 'En proceso', 'acción', 'Reunión con la comunidad de propietarios para abordar las reparaciones.', 'Inspección técnica', '2024-11-15 11:00:00'),
     (5, 3, 'Abierto', 'nota simple', 'Primera entrevista con la afiliada. Documentación de incidentes.', 'Recopilación de pruebas', '2024-12-20 10:30:00');
 
+
+-- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
+-- This procedure assigns nodo_id to bloques based on the most common nodo_id among their pisos' CPs
+-- It assumes the existence of a mapping table 'nodos_cp_mapping' with columns
+CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    bloque_record RECORD;
+    most_common_nodo_id INTEGER;
+BEGIN
+    -- Itera sobre cada bloque que no tiene un nodo asignado
+    FOR bloque_record IN SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL LOOP
+        -- Encuentra el nodo_id más común entre los pisos de este bloque
+        SELECT ncm.nodo_id INTO most_common_nodo_id
+        FROM sindicato_inq.pisos p
+        JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
+        WHERE p.bloque_id = bloque_record.id
+        GROUP BY ncm.nodo_id
+        ORDER BY COUNT(*) DESC
+        LIMIT 1;
+
+        -- Si se encontró un nodo común, actualiza el bloque
+        IF FOUND AND most_common_nodo_id IS NOT NULL THEN
+            UPDATE sindicato_inq.bloques
+            SET nodo_id = most_common_nodo_id
+            WHERE id = bloque_record.id;
+        END IF;
+    END LOOP;
+END;
+$$;
+
+
+-- TRIGGER TO AUTOMATICALLY SYNC BLOQUES WHEN A PISO IS INSERTED OR UPDATED
+-- This trigger updates the nodo_id of the parent bloque whenever a piso's CP is set or changed
+-- It uses the mapping table 'nodos_cp_mapping' to find the corresponding nodo_id
+CREATE OR REPLACE FUNCTION sync_bloque_nodo()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Cuando se inserta o actualiza un piso...
+    -- Se busca el nodo correspondiente a su CP y se actualiza el bloque padre.
+    UPDATE sindicato_inq.bloques
+    SET nodo_id = (SELECT nodo_id FROM sindicato_inq.nodos_cp_mapping WHERE cp = NEW.cp)
+    WHERE id = NEW.bloque_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- El trigger se activa cada vez que se crea o modifica un piso.
+CREATE TRIGGER trigger_sync_bloque_nodo
+AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
+FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
+
+
+
 -- =====================================================================
 -- CONFIRMACIÓN
 -- =====================================================================
