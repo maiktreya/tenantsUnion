@@ -7,9 +7,9 @@ SET search_path TO sindicato_inq, public;
 
 SELECT
     p.id AS piso_id,
-    p.direccion AS direccion1,
+    p.direccion AS direccion1_piso,
     p.bloque_id,
-    b.direccion AS direccion2,
+    b.direccion AS direccion2_bloque,
     -- A boolean column to clearly indicate if a link was successfully made.
     (p.bloque_id IS NOT NULL) AS linked,
     -- Calculate the similarity score between the normalized addresses.
