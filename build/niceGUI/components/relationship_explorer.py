@@ -1,6 +1,6 @@
 # /build/niceGUI/components/relationship_explorer.py
 
-from typing import Dict
+from typing import Dict, List, Set
 from nicegui import ui
 from api.client import APIClient
 from config import TABLE_INFO, VIEW_INFO
@@ -43,14 +43,14 @@ class RelationshipExplorer:
             return
 
         with self.container:
-            ui.label(f"Relationships for record from '{source_name}' (ID: {record_id})").classes("text-h5 mb-2")
+            ui.label(f"Explorador de relaciones de la tabla '{source_name}' (para el registro con ID nº: {record_id})").classes("text-h6 mb-2")
             with ui.row().classes("w-full gap-4 flex-wrap"):
                 with ui.column().classes("w-full md:flex-1"):
-                    ui.label("Registros Padre:").classes("text-h6")
+                    ui.label("Integraciones:").classes("text-h7")
                     await self._display_parent_relations(record, table_info, calling_view)
 
                 with ui.column().classes("w-full md:flex-1"):
-                    ui.label("Registros Hijos:").classes("text-h6")
+                    ui.label("Dependencias:").classes("text-h7")
                     await self._display_child_relations(record_id, table_info, calling_view)
 
     async def _display_parent_relations(self, record: Dict, table_info: Dict, calling_view: str):
@@ -72,7 +72,6 @@ class RelationshipExplorer:
 
                         with ui.expansion(f"Padre en '{parent_table}' (ID: {parent_id})", icon="arrow_upward").classes("w-full"):
                             for key, value in parents[0].items():
-                                # In 'admin' view, show all fields. Otherwise, hide configured fields.
                                 if calling_view == 'admin' or key not in hidden_fields:
                                     with ui.row():
                                         ui.label(f"{key}:").classes("font-semibold w-32")
@@ -80,8 +79,40 @@ class RelationshipExplorer:
                     except Exception as e:
                         ui.notify(f"Error al cargar padre de '{parent_table}': {e}", type="negative")
 
+    async def _get_replacement_maps(self, records: List[Dict], table_info: Dict) -> Dict:
+        """
+        Pre-fetches all related records for foreign keys to create replacement maps.
+        This is much more performant than fetching one record at a time.
+        """
+        relations = table_info.get("relations", {})
+        if not relations:
+            return {}
+
+        replacement_maps = {}
+        for fk_field, rel_info in relations.items():
+            # Collect all unique IDs for this foreign key from the records
+            all_ids: Set[int] = {r.get(fk_field) for r in records if r.get(fk_field) is not None}
+            if not all_ids:
+                continue
+
+            # Fetch all related records in a single batch
+            target_view = rel_info["view"]
+            display_field = rel_info["display_field"]
+            id_list_str = ",".join(map(str, all_ids))
+
+            related_records = await self.api.get_records(target_view, filters={'id': f'in.({id_list_str})'})
+
+            # Create a simple mapping from ID to the desired display value
+            id_to_display_map = {
+                r['id']: " ".join(str(r.get(df, "")) for df in display_field.split(",")).strip()
+                for r in related_records
+            }
+            replacement_maps[fk_field] = id_to_display_map
+
+        return replacement_maps
+
     async def _display_child_relations(self, record_id: int, table_info: Dict, calling_view: str):
-        """Fetches and displays child records, respecting the calling view context."""
+        """Fetches and displays child records, replacing foreign keys with display names."""
         child_relations = table_info.get("child_relations", [])
         with ui.card().classes("w-full"):
             if not child_relations:
@@ -91,25 +122,34 @@ class RelationshipExplorer:
             for relation in child_relations:
                 child_table, fk = relation["table"], relation["foreign_key"]
 
-                hidden_fields = set(TABLE_INFO.get(child_table, {}).get("hidden_fields", []))
-                # In views, also hide the foreign key linking back to the parent.
-                if calling_view == 'views':
-                    hidden_fields.add(fk)
-
                 try:
                     children = await self.api.get_records(child_table, filters={fk: f"eq.{record_id}"})
+                    child_table_info = TABLE_INFO.get(child_table, {})
+
+                    # Pre-fetch replacement data for all foreign keys in the children
+                    replacement_maps = await self._get_replacement_maps(children, child_table_info)
+
                     with ui.expansion(f"Hijos en '{child_table}' ({len(children)})", icon="arrow_downward").classes("w-full"):
                         if not children:
                             ui.label("No se encontraron registros.").classes("text-gray-500 p-2")
                             continue
 
+                        hidden_fields = set(child_table_info.get("hidden_fields", []))
+                        if calling_view == 'views':
+                            hidden_fields.add(fk)
+
                         for child in children:
                             with ui.card().classes("w-full my-1"):
                                 for key, value in child.items():
-                                    # In 'admin' view, show all fields. Otherwise, respect the hidden set.
                                     if calling_view == 'admin' or key not in hidden_fields:
+                                        # If the key is a foreign key with a replacement, show the replacement
+                                        if key in replacement_maps:
+                                            display_value = replacement_maps[key].get(value, f"ID: {value}")
+                                        else:
+                                            display_value = value if value not in [None, ""] else "-"
+
                                         with ui.row():
                                             ui.label(f"{key}:").classes("font-semibold w-32")
-                                            ui.label(str(value) if value not in [None, ""] else "-")
+                                            ui.label(str(display_value))
                 except Exception as e:
                     ui.notify(f"Error al cargar hijos de '{child_table}': {e}", type="negative")
