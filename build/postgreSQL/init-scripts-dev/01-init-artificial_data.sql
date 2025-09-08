@@ -412,8 +412,8 @@ INSERT INTO pisos (bloque_id, direccion, municipio, cp, api, prop_vertical, por_
 
 -- Insertar usuarios (incluyendo el admin)
 INSERT INTO usuarios (alias, nombre, apellidos, email, roles, is_active) VALUES
-    ('admin', 'Administrador', 'Sistema', 'admin@inquilinato.org', 'admin', TRUE),
     ('sumate', 'Sumate', '(sistemas)', 'sumate@inquilinato.org', 'admin', TRUE),
+    ('admin', 'Administrador', 'Sistema', 'admin@inquilinato.org', 'admin', TRUE),
     ('gestor1', 'Laura', 'Gómez', 'laura.gomez@inquilinato.org', 'gestor', TRUE),
     ('tecnico1', 'Miguel', 'López', 'miguel.lopez@inquilinato.org', 'técnico', TRUE),
     ('usuario1', 'Ana', 'Martínez', 'ana.martinez@inquilinato.org', 'usuario', TRUE),
@@ -422,12 +422,12 @@ INSERT INTO usuarios (alias, nombre, apellidos, email, roles, is_active) VALUES
 -- Insertar credenciales para usuarios
 -- Hash para password "12345678" usando bcrypt con cost 12: $2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui
 INSERT INTO usuario_credenciales (usuario_id, password_hash) VALUES
-    (1, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- admin
-    (2, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- sumate
-    (3, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- gestor1
-    (4, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- tecnico1
-    (5, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- usuario1
-    (6, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'); -- usuario2
+    (1, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- admin
+    (2, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- sumate
+    (3, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- gestor1
+    (4, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- tecnico1
+    (5, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'), -- usuario1
+    (6, $2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'); -- usuario2
 
 -- Asignar roles a usuarios
 INSERT INTO usuario_roles (usuario_id, role_id) VALUES
@@ -493,7 +493,7 @@ INSERT INTO diario_conflictos (conflicto_id, usuario_id, estado, accion, notas, 
 -- This procedure assigns nodo_id to bloques based on the most common nodo_id among their pisos' CPs
 CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
 LANGUAGE plpgsql
-AS $
+AS $$
 DECLARE
     bloque_record RECORD;
     most_common_nodo_id INTEGER;
@@ -523,8 +523,7 @@ $;
 -- PASO 6: SINCRONIZACIÓN Y FINALIZACIÓN
 -- =====================================================================
 
--- Ejecutar sincronización de bloques con nodos
-CALL sync_all_bloques_to_nodos();
+-- La sincronización ya se ejecutó arriba con el bloque DO
 
 -- =====================================================================
 -- CONFIRMACIÓN Y ESTADÍSTICAS
