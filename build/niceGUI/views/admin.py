@@ -9,9 +9,7 @@ from components.dialogs import EnhancedRecordDialog
 from components.exporter import export_to_csv
 from components.importer import CSVImporterDialog
 from components.filters import FilterPanel
-from components.relationship_explorer import (
-    RelationshipExplorer,
-)  # IMPORT THE NEW COMPONENT
+from components.relationship_explorer import RelationshipExplorer
 from config import config, TABLE_INFO
 
 
