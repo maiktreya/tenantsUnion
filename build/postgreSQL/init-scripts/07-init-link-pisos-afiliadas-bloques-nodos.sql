@@ -9,3 +9,6 @@ SET
     bloque_id = find_best_match_bloque_id(direccion)
 WHERE
     bloque_id IS NULL;
+
+-- 4. SYNC BLOQUES TO NODOS: Ensure all bloques are linked to their nodos
+CALL sync_all_bloques_to_nodos ();
