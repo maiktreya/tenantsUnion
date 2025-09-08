@@ -60,6 +60,7 @@ CREATE TABLE usuarios (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Updated afiliadas table to include all new fields from CSV
 CREATE TABLE afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
@@ -70,10 +71,21 @@ CREATE TABLE afiliadas (
     genero TEXT,
     email TEXT,
     telefono TEXT,
+    seccion_sindical TEXT,
+    nivel_participacion TEXT,
+    comision TEXT,
+    cuota TEXT,
+    frecuencia_pago TEXT,
+    forma_pago TEXT,
+    cuenta_corriente TEXT,
     regimen TEXT,
     estado TEXT,
     fecha_alta DATE,
-    fecha_baja DATE
+    fecha_baja DATE,
+    prop_vertical TEXT,
+    api TEXT,
+    propiedad TEXT,
+    entramado TEXT
 );
 
 CREATE TABLE facturacion (
@@ -159,20 +171,26 @@ CREATE TABLE staging_afiliadas (
     apellidos TEXT,
     cif TEXT,
     genero TEXT,
+    email TEXT,
+    telefono TEXT,
+    seccion_sindical TEXT,
+    nivel_participacion TEXT,
+    comision TEXT,
     direccion TEXT,
+    municipio TEXT,
+    codigo_postal TEXT,
     cuota TEXT,
     frecuencia_pago TEXT,
     forma_pago TEXT,
     cuenta_corriente TEXT,
     regimen TEXT,
     estado TEXT,
+    fecha_alta TEXT,
+    fecha_baja TEXT,
+    prop_vertical TEXT,
     api TEXT,
     propiedad TEXT,
-    entramado TEXT,
-    email TEXT,
-    telefono TEXT,
-    fecha_alta TEXT,
-    fecha_baja TEXT
+    entramado TEXT
 );
 
 CREATE TABLE staging_empresas (
@@ -408,12 +426,23 @@ INSERT INTO
         apellidos,
         cif,
         genero,
-        email, -- Now included
-        telefono, -- Now included
+        email,
+        telefono,
+        seccion_sindical,
+        nivel_participacion,
+        comision,
+        cuota,
+        frecuencia_pago,
+        forma_pago,
+        cuenta_corriente,
         regimen,
         estado,
-        fecha_alta, -- Correctly uses the date from the file
-        fecha_baja, -- Correctly uses the date from the file
+        fecha_alta,
+        fecha_baja,
+        prop_vertical,
+        api,
+        propiedad,
+        entramado,
         piso_id -- Correctly links to pisos table
     )
 SELECT
@@ -424,20 +453,31 @@ SELECT
     s.genero,
     s.email,
     s.telefono,
+    s.seccion_sindical,
+    s.nivel_participacion,
+    s.comision,
+    s.cuota,
+    s.frecuencia_pago,
+    s.forma_pago,
+    s.cuenta_corriente,
     s.regimen,
     s.estado,
     to_date (
         NULLIF(s.fecha_alta, ''),
         'DD/MM/YYYY'
-    ), -- No longer uses CURRENT_DATE
+    ),
     to_date (
         NULLIF(s.fecha_baja, ''),
         'DD/MM/YYYY'
     ),
+    s.prop_vertical,
+    s.api,
+    s.propiedad,
+    s.entramado,
     p.id
 FROM
     staging_afiliadas s
-    LEFT JOIN pisos p ON s.direccion = p.direccion -- Uses the correct join
+    LEFT JOIN pisos p ON s.direccion = p.direccion -- Uses the correct join condition
     ON CONFLICT (num_afiliada) DO NOTHING;
 
 INSERT INTO

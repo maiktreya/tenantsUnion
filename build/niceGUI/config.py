@@ -56,7 +56,15 @@ TABLE_INFO = {
         "display_name": "Usuarios",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["alias", "nombre", "apellidos", "email", "roles", "is_active", "created_at"],
+        "fields": [
+            "alias",
+            "nombre",
+            "apellidos",
+            "email",
+            "roles",
+            "is_active",
+            "created_at",
+        ],
         "child_relations": [
             {"table": "usuario_credenciales", "foreign_key": "usuario_id"},
             {"table": "usuario_roles", "foreign_key": "usuario_id"},
@@ -70,15 +78,20 @@ TABLE_INFO = {
         "id_field": "cp",
         "hidden_fields": [],
         "fields": ["cp", "nodo_id"],
-        "relations": {
-            "nodo_id": {"view": "nodos", "display_field": "nombre"}
-        },
+        "relations": {"nodo_id": {"view": "nodos", "display_field": "nombre"}},
     },
     "empresas": {
         "display_name": "Empresas",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["nombre", "cif_nif_nie", "directivos", "api", "direccion_fiscal", "entramado_id"],
+        "fields": [
+            "nombre",
+            "cif_nif_nie",
+            "directivos",
+            "api",
+            "direccion_fiscal",
+            "entramado_id",
+        ],
         "relations": {
             "entramado_id": {"view": "entramado_empresas", "display_field": "nombre"}
         },
@@ -91,9 +104,7 @@ TABLE_INFO = {
         "id_field": "usuario_id",
         "hidden_fields": ["password_hash"],  # Hide sensitive data
         "fields": ["usuario_id", "password_hash"],
-        "relations": {
-            "usuario_id": {"view": "usuarios", "display_field": "alias"}
-        },
+        "relations": {"usuario_id": {"view": "usuarios", "display_field": "alias"}},
     },
     "usuario_roles": {
         "display_name": "Roles Asignados",
@@ -122,10 +133,16 @@ TABLE_INFO = {
         "display_name": "Pisos",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["direccion", "municipio", "cp", "api", "prop_vertical", "por_habitaciones", "bloque_id"],
-        "relations": {
-            "bloque_id": {"view": "bloques", "display_field": "direccion"}
-        },
+        "fields": [
+            "direccion",
+            "municipio",
+            "cp",
+            "api",
+            "prop_vertical",
+            "por_habitaciones",
+            "bloque_id",
+        ],
+        "relations": {"bloque_id": {"view": "bloques", "display_field": "direccion"}},
         "child_relations": [
             {"table": "afiliadas", "foreign_key": "piso_id"},
         ],
@@ -133,15 +150,35 @@ TABLE_INFO = {
     "afiliadas": {
         "display_name": "Afiliadas",
         "id_field": "id",
-        "hidden_fields": ["id"],
-        "fields": [
-            "num_afiliada", "nombre", "apellidos", "cif", "genero",
-            "email", "telefono", "regimen", "estado", "fecha_alta",
-            "fecha_baja", "piso_id"
+        "hidden_fields": [
+            "id",
+            "seccion_sindical",
+            "nivel_participacion",
+            "comision",
+            "cuota",
+            "frecuencia_pago",
+            "forma_pago",
+            "cuenta_corriente",
+            "prop_vertical",
+            "api",
+            "propiedad",
+            "entramado",
         ],
-        "relations": {
-            "piso_id": {"view": "pisos", "display_field": "direccion"}
-        },
+        "fields": [
+            "num_afiliada",
+            "nombre",
+            "apellidos",
+            "cif",
+            "genero",
+            "email",
+            "telefono",
+            "regimen",
+            "estado",
+            "fecha_alta",
+            "fecha_baja",
+            "piso_id",
+        ],
+        "relations": {"piso_id": {"view": "pisos", "display_field": "direccion"}},
         "child_relations": [
             {"table": "facturacion", "foreign_key": "afiliada_id"},
             {"table": "asesorias", "foreign_key": "afiliada_id"},
@@ -153,8 +190,13 @@ TABLE_INFO = {
         "id_field": "id",
         "hidden_fields": ["id"],
         "fields": [
-            "estado", "fecha_asesoria", "tipo_beneficiaria", "tipo",
-            "resultado", "afiliada_id", "tecnica_id"
+            "estado",
+            "fecha_asesoria",
+            "tipo_beneficiaria",
+            "tipo",
+            "resultado",
+            "afiliada_id",
+            "tecnica_id",
         ],
         "relations": {
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
@@ -166,28 +208,37 @@ TABLE_INFO = {
         "id_field": "id",
         "hidden_fields": ["id"],
         "fields": [
-            "estado", "ambito", "causa", "tarea_actual", "fecha_apertura",
-            "fecha_cierre", "descripcion", "resolucion", "afiliada_id",
-            "usuario_responsable_id"
+            "estado",
+            "ambito",
+            "causa",
+            "tarea_actual",
+            "fecha_apertura",
+            "fecha_cierre",
+            "descripcion",
+            "resolucion",
+            "afiliada_id",
+            "usuario_responsable_id",
         ],
         "field_options": {
             "estado": sorted(["Abierto", "En proceso", "Resuelto", "Cerrado"]),
             "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"],
-            "causa": sorted([
-                "No renovación",
-                "Fianza",
-                "Acoso inmobiliario",
-                "Renta Antigua",
-                "Subida de alquiler",
-                "Individualización Calefacción",
-                "Reparaciones / Habitabilidad",
-                "Venta de la vivienda",
-                "Honorarios",
-                "Requerimiento de la casa para uso propio",
-                "Impago",
-                "Actualización del precio (IPC)",
-                "Negociación del contrato",
-            ]),
+            "causa": sorted(
+                [
+                    "No renovación",
+                    "Fianza",
+                    "Acoso inmobiliario",
+                    "Renta Antigua",
+                    "Subida de alquiler",
+                    "Individualización Calefacción",
+                    "Reparaciones / Habitabilidad",
+                    "Venta de la vivienda",
+                    "Honorarios",
+                    "Requerimiento de la casa para uso propio",
+                    "Impago",
+                    "Actualización del precio (IPC)",
+                    "Negociación del contrato",
+                ]
+            ),
         },
         "relations": {
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
@@ -202,26 +253,32 @@ TABLE_INFO = {
         "id_field": "id",
         "hidden_fields": ["id", "created_at"],
         "fields": [
-            "estado", "accion", "notas", "tarea_actual",
-            "conflicto_id", "usuario_id"
+            "estado",
+            "accion",
+            "notas",
+            "tarea_actual",
+            "conflicto_id",
+            "usuario_id",
         ],
         "field_options": {
             "estado": sorted(["Abierto", "En proceso", "Resuelto", "Cerrado"]),
-            "accion": sorted([
-                "nota simple",
-                "nota localización propiedades",
-                "deposito fianza",
-                "puerta a puerta",
-                "comunicación enviada",
-                "llamada",
-                "acción",
-                "reunión de negociación",
-                "informe vulnerabilidad",
-                "MASC",
-                "justicia gratuita",
-                "demanda",
-                "sentencia",
-            ]),
+            "accion": sorted(
+                [
+                    "nota simple",
+                    "nota localización propiedades",
+                    "deposito fianza",
+                    "puerta a puerta",
+                    "comunicación enviada",
+                    "llamada",
+                    "acción",
+                    "reunión de negociación",
+                    "informe vulnerabilidad",
+                    "MASC",
+                    "justicia gratuita",
+                    "demanda",
+                    "sentencia",
+                ]
+            ),
         },
         "relations": {
             "conflicto_id": {"view": "conflictos", "display_field": "id"},
@@ -243,10 +300,7 @@ TABLE_INFO = {
 #  MATERIALIZED VIEW METADATA
 # =====================================================================
 VIEW_INFO = {
-    "v_resumen_nodos": {
-        "display_name": "Resumen de Nodos",
-        "base_table": "nodos"
-    },
+    "v_resumen_nodos": {"display_name": "Resumen de Nodos", "base_table": "nodos"},
     "v_resumen_entramados_empresas": {
         "display_name": "Resumen de Entramados",
         "base_table": "entramado_empresas",
@@ -267,9 +321,7 @@ VIEW_INFO = {
         "base_table": "diario_conflictos",
         "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
-    "comprobar_link_pisos_bloques": {
-        "display_name": "Comprobar Vínculo Pisos-Bloques"
-    },
+    "comprobar_link_pisos_bloques": {"display_name": "Comprobar Vínculo Pisos-Bloques"},
 }
 
 config = Config()
