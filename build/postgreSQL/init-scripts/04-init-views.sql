@@ -8,6 +8,7 @@
 -- =====================================================================
 
 SET search_path TO sindicato_inq, public;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- VISTA 1: AFILIADAS (AHORA INCLUYE IDs Y NOMBRE DEL NODO)
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
