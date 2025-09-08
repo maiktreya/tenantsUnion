@@ -376,13 +376,6 @@ INSERT INTO entramado_empresas (nombre, descripcion) VALUES
     ('Viviendas del Futuro S.L.', 'Una promotora especializada en la construcción y alquiler de viviendas sostenibles.'),
     ('Grupo Inmobiliario Madrid', 'Empresa local especializada en gestión de patrimonio inmobiliario urbano.');
 
--- Insertar usuarios
-INSERT INTO usuarios (alias, nombre, apellidos, email, roles, is_active) VALUES
-    ('admin_sistema', 'Administrador', 'del Sistema', 'admin@sindicato-inq.org', 'admin', true),
-    ('gestor_casos', 'Gestora', 'de Casos', 'gestor@sindicato-inq.org', 'gestor', true),
-    ('tecnico_legal', 'Técnico', 'Legal', 'tecnico@sindicato-inq.org', 'técnico', true),
-    ('usuario_prueba', 'Usuario', 'de Prueba', 'usuario@test.com', 'usuario', true);
-
 -- Insertar empresas
 INSERT INTO empresas (entramado_id, nombre, cif_nif_nie, directivos, api, direccion_fiscal) VALUES
     (1, 'Fidere Vivienda Madrid SL', 'B81234567', 'Juan Pérez García, Ana García López', 'No', 'Paseo de la Castellana, 1, Madrid, España'),
@@ -413,6 +406,38 @@ INSERT INTO pisos (bloque_id, direccion, municipio, cp, api, prop_vertical, por_
     (5, 'Calle Ejemplo, 15, Ático, Madrid', 'Madrid', 28028, 'Sí', true, true),
     (6, 'Avenida Test, 30, 1ºB, Madrid', 'Madrid', 28025, 'No', true, false);
 
+-- =====================================================================
+-- PASO 5: INSERTAR USUARIOS Y CONFIGURAR ADMIN
+-- =====================================================================
+
+-- Insertar usuarios (incluyendo el admin)
+INSERT INTO usuarios (alias, nombre, apellidos, email, roles, is_active) VALUES
+    ('admin', 'Administrador', 'Sistema', 'admin@inquilinato.org', 'admin', TRUE),
+    ('sumate', 'Sumate', '(sistemas)', 'sumate@inquilinato.org', 'admin', TRUE),
+    ('gestor1', 'Laura', 'Gómez', 'laura.gomez@inquilinato.org', 'gestor', TRUE),
+    ('tecnico1', 'Miguel', 'López', 'miguel.lopez@inquilinato.org', 'técnico', TRUE),
+    ('usuario1', 'Ana', 'Martínez', 'ana.martinez@inquilinato.org', 'usuario', TRUE),
+    ('usuario2', 'Carlos', 'Sánchez', 'carlos.sanchez@inquilinato.org', 'usuario', TRUE);
+
+-- Insertar credenciales para usuarios
+-- Hash para password "12345678" usando bcrypt con cost 12: $2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui
+INSERT INTO usuario_credenciales (usuario_id, password_hash) VALUES
+    (1, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- admin
+    (2, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- sumate
+    (3, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- gestor1
+    (4, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- tecnico1
+    (5, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'), -- usuario1
+    (6, '$2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui'); -- usuario2
+
+-- Asignar roles a usuarios
+INSERT INTO usuario_roles (usuario_id, role_id) VALUES
+    (1, 1), -- admin -> admin role
+    (2, 1), -- sumate -> admin role
+    (3, 2), -- gestor1 -> gestor role
+    (4, 3), -- tecnico1 -> técnico role
+    (5, 4), -- usuario1 -> usuario role
+    (6, 4); -- usuario2 -> usuario role
+
 -- Insertar afiliadas
 INSERT INTO afiliadas (piso_id, num_afiliada, nombre, apellidos, cif, genero, email, telefono, regimen, estado, fecha_alta) VALUES
     (1, 'A0001', 'Lucía', 'García Pérez', '12345678A', 'Mujer', 'lucia.garcia@email.com', '600123456', 'Alquiler', 'Alta', '2023-01-15'),
@@ -439,51 +464,36 @@ INSERT INTO facturacion (afiliada_id, cuota, periodicidad, forma_pago, iban) VAL
 
 -- Insertar asesorías
 INSERT INTO asesorias (afiliada_id, tecnica_id, estado, fecha_asesoria, tipo_beneficiaria, tipo, resultado) VALUES
-    (1, 3, 'Resuelto', '2024-05-23', 'Afiliada', 'Asesoría Jurídica', 'Duda resuelta satisfactoriamente'),
-    (2, 3, 'En proceso', '2024-12-15', 'Afiliada', 'Asesoría Técnica', 'Pendiente de documentación'),
-    (4, 2, 'Resuelto', '2024-11-20', 'Afiliada', 'Asesoría Jurídica', 'Se derivó a conflicto'),
-    (6, 3, 'Resuelto', '2024-10-10', 'Afiliada', 'Asesoría Gratuita', 'Información proporcionada');
-
--- Insertar credenciales (contraseña: "password" hasheada con bcrypt)
-INSERT INTO usuario_credenciales (usuario_id, password_hash) VALUES
-    (1, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'),
-    (2, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'),
-    (3, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'),
-    (4, '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6');
-
--- Asignar roles a usuarios
-INSERT INTO usuario_roles (usuario_id, role_id) VALUES
-    (1, 1), -- admin_sistema -> admin
-    (2, 2), -- gestor_casos -> gestor
-    (3, 3), -- tecnico_legal -> técnico
-    (4, 4); -- usuario_prueba -> usuario
+    (1, 4, 'Completada', '2024-11-15', 'Inquilina', 'Legal', 'Resuelto favorablemente'),
+    (2, 4, 'En proceso', '2024-12-01', 'Inquilina', 'Técnica', 'Pendiente de documentación'),
+    (4, 4, 'Completada', '2024-10-20', 'Inquilina', 'Legal', 'Derivado a conflicto'),
+    (6, 4, 'Programada', '2025-01-25', 'Inquilina', 'Técnica', NULL),
+    (9, 4, 'Completada', '2024-09-10', 'Propietaria', 'Legal', 'Información proporcionada');
 
 -- Insertar conflictos
 INSERT INTO conflictos (afiliada_id, usuario_responsable_id, estado, ambito, causa, tarea_actual, fecha_apertura, descripcion, resolucion) VALUES
-    (1, 2, 'En proceso', 'Afiliada', 'No renovación', 'Comunicación con propietario', '2025-01-17', 'El propietario se niega a renovar el contrato sin justificación válida.', NULL),
-    (2, 2, 'Cerrado', 'Afiliada', 'Fianza', NULL, '2024-11-19', 'El propietario no devuelve la fianza alegando daños inexistentes.', 'Se recuperó la fianza tras la mediación legal.'),
-    (4, 2, 'Abierto', 'Afiliada', 'Subida de alquiler', 'Revisión de contrato', '2024-12-10', 'Incremento abusivo del alquiler superior al IPC.', NULL),
-    (6, 2, 'En proceso', 'Bloque', 'Reparaciones / Habitabilidad', 'Inspección técnica', '2024-11-05', 'Problemas de humedades y calefacción en el edificio.', NULL),
+    (1, 3, 'En proceso', 'Afiliada', 'No renovación', 'Comunicación con propietario', '2025-01-17', 'El propietario se niega a renovar el contrato sin justificación válida.', NULL),
+    (2, 3, 'Cerrado', 'Afiliada', 'Fianza', NULL, '2024-11-19', 'El propietario no devuelve la fianza alegando daños inexistentes.', 'Se recuperó la fianza tras la mediación legal.'),
+    (4, 3, 'Abierto', 'Afiliada', 'Subida de alquiler', 'Revisión de contrato', '2024-12-10', 'Incremento abusivo del alquiler superior al IPC.', NULL),
+    (6, 3, 'En proceso', 'Bloque', 'Reparaciones / Habitabilidad', 'Inspección técnica', '2024-11-05', 'Problemas de humedades y calefacción en el edificio.', NULL),
     (8, 3, 'Abierto', 'Afiliada', 'Acoso inmobiliario', 'Recopilación de pruebas', '2024-12-20', 'Presiones constantes para abandonar la vivienda.', NULL);
 
 -- Insertar diario de conflictos
 INSERT INTO diario_conflictos (conflicto_id, usuario_id, estado, accion, notas, tarea_actual, created_at) VALUES
-    (1, 2, 'En proceso', 'comunicación enviada', 'Se envió burofax al propietario solicitando renovación del contrato.', 'Esperar respuesta', '2025-01-17 10:00:00'),
-    (1, 2, 'En proceso', 'llamada', 'Contacto telefónico con la afiliada para informar del estado.', 'Comunicación con propietario', '2025-01-20 15:30:00'),
-    (2, 2, 'En proceso', 'nota localización propiedades', 'Investigación de bienes del propietario para posible ejecución.', 'Preparar demanda', '2024-11-20 12:30:00'),
-    (2, 2, 'Cerrado', 'MASC', 'Mediación exitosa. El propietario acepta devolver la fianza.', NULL, '2024-12-01 16:45:00'),
-    (3, 2, 'Abierto', 'nota simple', 'Análisis del contrato de alquiler y comparación con índices oficiales.', 'Revisión de contrato', '2024-12-10 09:15:00'),
-    (4, 2, 'En proceso', 'informe vulnerabilidad', 'Elaborado informe de vulnerabilidad social de las afiliadas afectadas.', 'Inspección técnica', '2024-11-05 14:20:00'),
-    (4, 2, 'En proceso', 'acción', 'Reunión con la comunidad de propietarios para abordar las reparaciones.', 'Inspección técnica', '2024-11-15 11:00:00'),
+    (1, 3, 'En proceso', 'comunicación enviada', 'Se envió burofax al propietario solicitando renovación del contrato.', 'Esperar respuesta', '2025-01-17 10:00:00'),
+    (1, 3, 'En proceso', 'llamada', 'Contacto telefónico con la afiliada para informar del estado.', 'Comunicación con propietario', '2025-01-20 15:30:00'),
+    (2, 3, 'En proceso', 'nota localización propiedades', 'Investigación de bienes del propietario para posible ejecución.', 'Preparar demanda', '2024-11-20 12:30:00'),
+    (2, 3, 'Cerrado', 'MASC', 'Mediación exitosa. El propietario acepta devolver la fianza.', NULL, '2024-12-01 16:45:00'),
+    (3, 3, 'Abierto', 'nota simple', 'Análisis del contrato de alquiler y comparación con índices oficiales.', 'Revisión de contrato', '2024-12-10 09:15:00'),
+    (4, 3, 'En proceso', 'informe vulnerabilidad', 'Elaborado informe de vulnerabilidad social de las afiliadas afectadas.', 'Inspección técnica', '2024-11-05 14:20:00'),
+    (4, 3, 'En proceso', 'acción', 'Reunión con la comunidad de propietarios para abordar las reparaciones.', 'Inspección técnica', '2024-11-15 11:00:00'),
     (5, 3, 'Abierto', 'nota simple', 'Primera entrevista con la afiliada. Documentación de incidentes.', 'Recopilación de pruebas', '2024-12-20 10:30:00');
-
 
 -- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
 -- This procedure assigns nodo_id to bloques based on the most common nodo_id among their pisos' CPs
--- It assumes the existence of a mapping table 'nodos_cp_mapping' with columns
 CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
 LANGUAGE plpgsql
-AS $$
+AS $
 DECLARE
     bloque_record RECORD;
     most_common_nodo_id INTEGER;
@@ -507,38 +517,40 @@ BEGIN
         END IF;
     END LOOP;
 END;
-$$;
-
-
--- TRIGGER TO AUTOMATICALLY SYNC BLOQUES WHEN A PISO IS INSERTED OR UPDATED
--- This trigger updates the nodo_id of the parent bloque whenever a piso's CP is set or changed
--- It uses the mapping table 'nodos_cp_mapping' to find the corresponding nodo_id
-CREATE OR REPLACE FUNCTION sync_bloque_nodo()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Cuando se inserta o actualiza un piso...
-    -- Se busca el nodo correspondiente a su CP y se actualiza el bloque padre.
-    UPDATE sindicato_inq.bloques
-    SET nodo_id = (SELECT nodo_id FROM sindicato_inq.nodos_cp_mapping WHERE cp = NEW.cp)
-    WHERE id = NEW.bloque_id;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- El trigger se activa cada vez que se crea o modifica un piso.
-CREATE TRIGGER trigger_sync_bloque_nodo
-AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
-FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
-
-
+$;
 
 -- =====================================================================
--- CONFIRMACIÓN
+-- PASO 6: SINCRONIZACIÓN Y FINALIZACIÓN
+-- =====================================================================
+
+-- Ejecutar sincronización de bloques con nodos
+CALL sync_all_bloques_to_nodos();
+
+-- =====================================================================
+-- CONFIRMACIÓN Y ESTADÍSTICAS
 -- =====================================================================
 
 SELECT 'Base de datos poblada correctamente con datos artificiales' as mensaje;
 
--- Mostrar estadísticas
+-- Verificar que el usuario admin se creó correctamente
+SELECT
+    u.id,
+    u.alias,
+    u.nombre,
+    u.apellidos,
+    u.email,
+    r.nombre as rol,
+    CASE
+        WHEN uc.password_hash IS NOT NULL THEN 'Hash configurado'
+        ELSE 'Sin hash'
+    END as estado_password
+FROM usuarios u
+LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
+LEFT JOIN roles r ON ur.role_id = r.id
+LEFT JOIN usuario_credenciales uc ON u.id = uc.usuario_id
+WHERE u.alias = 'admin';
+
+-- Mostrar estadísticas generales
 SELECT
     'Nodos' as tabla, COUNT(*) as registros FROM nodos
 UNION ALL SELECT 'Entramados', COUNT(*) FROM entramado_empresas
@@ -552,3 +564,25 @@ UNION ALL SELECT 'Diario Conflictos', COUNT(*) FROM diario_conflictos
 UNION ALL SELECT 'Asesorías', COUNT(*) FROM asesorias
 UNION ALL SELECT 'Facturación', COUNT(*) FROM facturacion
 ORDER BY tabla;
+
+-- Verificar integridad de relaciones críticas
+SELECT 'Verificaciones de integridad:' as mensaje;
+
+SELECT
+    COUNT(*) as bloques_sin_nodo,
+    'bloques sin nodo asignado' as descripcion
+FROM bloques WHERE nodo_id IS NULL;
+
+SELECT
+    COUNT(*) as usuarios_sin_credenciales,
+    'usuarios sin credenciales' as descripcion
+FROM usuarios u
+LEFT JOIN usuario_credenciales uc ON u.id = uc.usuario_id
+WHERE uc.usuario_id IS NULL;
+
+SELECT
+    COUNT(*) as usuarios_sin_roles,
+    'usuarios sin roles asignados' as descripcion
+FROM usuarios u
+LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
+WHERE ur.usuario_id IS NULL;

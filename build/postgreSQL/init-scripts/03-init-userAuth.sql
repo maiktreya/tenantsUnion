@@ -28,7 +28,7 @@ CREATE INDEX idx_usuario_roles_usuario_id ON sindicato_inq.usuario_roles (usuari
 
 CREATE INDEX idx_usuario_roles_role_id ON sindicato_inq.usuario_roles (role_id);
 
--- If you want to populate credentials for existing users with the default password:
+-- populate credentials for existing users with the default password:
 INSERT INTO
     sindicato_inq.usuario_credenciales (usuario_id)
 SELECT id
@@ -39,7 +39,7 @@ WHERE
         FROM sindicato_inq.usuario_credenciales
     );
 
--- Ejemplo de inserción de datos (a modo de demostración)
+-- initial setup of roles
 INSERT INTO
     sindicato_inq.roles (nombre, descripcion)
 VALUES (
@@ -61,8 +61,8 @@ VALUES (
         'Perfil básico para gestionar actas y documentos'
     );
 
--- Para asignar el rol 'admin' al usuario con id 1:
--- INSERT INTO sindicato_inq.usuario_roles (usuario_id, role_id) VALUES (1, 1);
+-- Assign the 'admin' role to the first user (assumed to be the superuser)
+-- and reset their password to "12345678" (hashed).
 
 UPDATE sindicato_inq.usuario_credenciales
 SET

@@ -7,10 +7,75 @@
 -- la funcionalidad del explorador de relaciones en la interfaz.
 -- =====================================================================
 
+
+-- =====================================================================
+-- LISTADO DE VISTAS DISPONIBLES EN LA INTERFAZ NICEGUI (DESCRITAS  en build/niceGUI/config.py)
+-- =====================================================================
+
 SET search_path TO sindicato_inq, public;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- VISTA 1: AFILIADAS (AHORA INCLUYE IDs Y NOMBRE DEL NODO)
+-- VISTA 1: ENTRAMADO_EMPRESAS (AHORA CON MÉTRICAS AMPLIADAS Y AGRUPACIÓN CORRECTA)
+-- NOTA: Esta es una vista de resumen. Al hacer clic en una fila, se mostrarán las empresas hijas (child records).
+CREATE OR REPLACE VIEW v_resumen_entramados_empresas AS
+SELECT ee.id, -- ID primario del entramado (para buscar hijos)
+    ee.nombre AS "Entramado", ee.descripcion AS "Descripción", COUNT(DISTINCT e.id) AS "Núm. Empresas", COUNT(DISTINCT b.id) AS "Núm. Bloques", COUNT(DISTINCT p.id) AS "Núm. Pisos", COUNT(DISTINCT a.id) AS "Núm. Afiliadas"
+FROM
+    entramado_empresas ee
+    LEFT JOIN empresas e ON ee.id = e.entramado_id
+    LEFT JOIN bloques b ON e.id = b.empresa_id
+    LEFT JOIN pisos p ON b.id = p.bloque_id
+    LEFT JOIN afiliadas a ON p.id = a.piso_id
+GROUP BY
+    ee.id,
+    ee.nombre,
+    ee.descripcion;
+
+-- VISTA 2: RESUMEN POR NODO TERRITORIAL
+CREATE OR REPLACE VIEW v_resumen_nodos AS
+SELECT
+    n.id,
+    n.nombre AS "Nodo Territorial",
+    n.descripcion AS "Descripción",
+    COUNT(DISTINCT b.id) AS "Núm. Bloques",
+    COUNT(DISTINCT e.id) AS "Núm. Empresas Activas",
+    COUNT(DISTINCT a.id) AS "Núm. Afiliadas",
+    COUNT(DISTINCT c.id) AS "Total Conflictos",
+    COUNT(DISTINCT c.id) FILTER (
+        WHERE
+            c.estado = 'Abierto'
+    ) AS "Conflictos Abiertos"
+FROM
+    nodos n
+    LEFT JOIN bloques b ON n.id = b.nodo_id
+    LEFT JOIN empresas e ON b.empresa_id = e.id
+    LEFT JOIN pisos p ON b.id = p.bloque_id
+    LEFT JOIN afiliadas a ON p.id = a.piso_id
+    LEFT JOIN conflictos c ON a.id = c.afiliada_id
+GROUP BY
+    n.id,
+    n.nombre,
+    n.descripcion
+ORDER BY "Núm. Afiliadas" DESC;
+
+-- VISTA 3: VISTA DE DETALLE DE CONFLICTOS (UNIFICADA)
+-- Esta vista combina la información de la afiliada, el nodo y el responsable, reemplazando las vistas anteriores.
+CREATE OR REPLACE VIEW v_conflictos_detalle AS
+SELECT
+    c.*,
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
+    u.alias AS usuario_responsable_alias,
+    n.nombre AS nodo_nombre,
+    p.direccion AS direccion_piso
+FROM
+    sindicato_inq.conflictos c
+    LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
+    LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
+    LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id
+    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
+
+-- VISTA 4: AFILIADAS (AHORA INCLUYE IDs Y NOMBRE DEL NODO)
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
     a.id, -- ID primario de la afiliada (para buscar hijos)
@@ -34,62 +99,6 @@ LEFT JOIN empresas e ON b.empresa_id = e.id
 LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
 LEFT JOIN nodos n ON b.nodo_id = n.id;
 
--- VISTA 2: ENTRAMADO_EMPRESAS (AHORA CON MÉTRICAS AMPLIADAS Y AGRUPACIÓN CORRECTA)
--- NOTA: Esta es una vista de resumen. Al hacer clic en una fila, se mostrarán las empresas hijas (child records).
-CREATE OR REPLACE VIEW v_resumen_entramados_empresas AS
-SELECT ee.id, -- ID primario del entramado (para buscar hijos)
-    ee.nombre AS "Entramado", ee.descripcion AS "Descripción", COUNT(DISTINCT e.id) AS "Núm. Empresas", COUNT(DISTINCT b.id) AS "Núm. Bloques", COUNT(DISTINCT p.id) AS "Núm. Pisos", COUNT(DISTINCT a.id) AS "Núm. Afiliadas"
-FROM
-    entramado_empresas ee
-    LEFT JOIN empresas e ON ee.id = e.entramado_id
-    LEFT JOIN bloques b ON e.id = b.empresa_id
-    LEFT JOIN pisos p ON b.id = p.bloque_id
-    LEFT JOIN afiliadas a ON p.id = a.piso_id
-GROUP BY
-    ee.id,
-    ee.nombre,
-    ee.descripcion;
-
--- VISTA 3: BLOQUES (YA TENÍA ID, PERO SE AÑADEN FORÁNEOS PARA CLARIDAD)
-CREATE OR REPLACE VIEW v_bloques AS
-SELECT
-    b.id, -- ID primario del bloque (para buscar hijos)
-    b.empresa_id, -- ID foráneo de la empresa (para buscar padre)
-    b.nodo_id, -- ID foráneo del nodo (para buscar padre)
-    b.direccion AS "Dirección",
-    b.estado AS "Estado",
-    b.api AS "API",
-    e.nombre AS "Propiedad",
-    ee.nombre AS "Entramado",
-    COUNT(DISTINCT a.id) AS "Núm.Afiliadas"
-FROM
-    bloques b
-    LEFT JOIN empresas e ON b.empresa_id = e.id
-    LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
-    LEFT JOIN pisos p ON b.id = p.bloque_id
-    LEFT JOIN afiliadas a ON p.id = a.piso_id
-GROUP BY
-    b.id,
-    e.nombre,
-    ee.nombre;
-
--- VISTA 4: VISTA DE DETALLE DE CONFLICTOS (UNIFICADA)
--- Esta vista combina la información de la afiliada, el nodo y el responsable, reemplazando las vistas anteriores.
-CREATE OR REPLACE VIEW v_conflictos_detalle AS
-SELECT
-    c.*,
-    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
-    u.alias AS usuario_responsable_alias,
-    n.nombre AS nodo_nombre,
-    p.direccion AS direccion_piso
-FROM
-    sindicato_inq.conflictos c
-    LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
-    LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id
-    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
-
 -- VISTA 5: DIARIO DE CONFLICTOS CON DETALLES
 CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
 SELECT
@@ -102,7 +111,10 @@ FROM
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN usuarios u ON d.usuario_id = u.id;
 
--- VISTA 6: VISTA MEJORADA PARA LA INTERFAZ DE CONFLICTOS
+-- =====================================================================
+-- VISTA INTERNA VISTA CONFLICTOS (NO DISPONIBLE EN LA INTERFAZ NI EN CONFIG.PY)
+-- =====================================================================
+
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS
 SELECT
     c.id,
@@ -157,33 +169,6 @@ FROM
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
     LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id
     LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
-
--- VISTA 7: RESUMEN POR NODO TERRITORIAL
-CREATE OR REPLACE VIEW v_resumen_nodos AS
-SELECT
-    n.id,
-    n.nombre AS "Nodo Territorial",
-    n.descripcion AS "Descripción",
-    COUNT(DISTINCT b.id) AS "Núm. Bloques",
-    COUNT(DISTINCT e.id) AS "Núm. Empresas Activas",
-    COUNT(DISTINCT a.id) AS "Núm. Afiliadas",
-    COUNT(DISTINCT c.id) AS "Total Conflictos",
-    COUNT(DISTINCT c.id) FILTER (
-        WHERE
-            c.estado = 'Abierto'
-    ) AS "Conflictos Abiertos"
-FROM
-    nodos n
-    LEFT JOIN bloques b ON n.id = b.nodo_id
-    LEFT JOIN empresas e ON b.empresa_id = e.id
-    LEFT JOIN pisos p ON b.id = p.bloque_id
-    LEFT JOIN afiliadas a ON p.id = a.piso_id
-    LEFT JOIN conflictos c ON a.id = c.afiliada_id
-GROUP BY
-    n.id,
-    n.nombre,
-    n.descripcion
-ORDER BY "Núm. Afiliadas" DESC;
 
 -- =====================================================================
 -- PROCEDIMIENTO: SINCRONIZACIÓN MASIVA DE NODOS PARA BLOQUES
