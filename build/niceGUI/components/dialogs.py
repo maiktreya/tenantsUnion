@@ -51,6 +51,8 @@ class EnhancedRecordDialog:
         mode: str = "create",
         on_success: Optional[Callable] = None,
         on_save: Optional[Callable[[Dict], Awaitable[bool]]] = None,
+        # --- NEW: ADDED PARAMETER TO ACCEPT PRE-FETCHED OPTIONS ---
+        custom_options: Optional[Dict[str, Dict]] = None,
     ):
         self.api = api
         self.table = table
@@ -58,6 +60,8 @@ class EnhancedRecordDialog:
         self.mode = mode
         self.on_success = on_success
         self.on_save = on_save
+        # --- NEW: STORE THE CUSTOM OPTIONS ---
+        self.custom_options = custom_options or {}
         self.dialog = None
         self.inputs = {}
 
@@ -119,7 +123,19 @@ class EnhancedRecordDialog:
             label = field.replace("_", " ").title()
             lower_field = field.lower()
 
-            if field in relations:
+            # --- MODIFIED BLOCK: CHECK FOR CUSTOM OPTIONS FIRST ---
+            if field in self.custom_options:
+                options = self.custom_options[field]
+                current_value = value
+                if current_value not in options:
+                    current_value = None
+
+                self.inputs[field] = (
+                    ui.select(options=options, label=label, value=current_value)
+                    .classes("w-full")
+                    .props("use-input")
+                )
+            elif field in relations:
                 relation = relations[field]
                 view_name = relation["view"]
                 display_field = relation["display_field"]

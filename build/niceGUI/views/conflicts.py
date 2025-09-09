@@ -23,6 +23,8 @@ class ConflictsView:
         self.all_conflicts = []
         self.filtered_conflicts = []
         self.nodos_list = []
+        # --- NEW: STATE TO HOLD ALL AFILIADAS FOR THE DIALOG ---
+        self.all_afiliadas_options = {}
         self.filter_nodo = None
         self.filter_estado = None
         self.filter_causa = None
@@ -118,7 +120,27 @@ class ConflictsView:
 
     async def _initialize_data(self):
         await self._load_nodos()
+        # --- NEW: LOAD THE AFILIADAS LIST ON STARTUP ---
+        await self._load_afiliadas_for_dialog()
         await self._load_conflicts()
+
+    # --- NEW: METHOD TO PRE-FETCH AND FORMAT ALL AFILIADAS ---
+    async def _load_afiliadas_for_dialog(self):
+        """Fetches all afiliadas to be used in the 'create conflict' dialog."""
+        try:
+            # Use the detailed view for better display names
+            records = await self.api.get_records("v_afiliadas_detalle", limit=5000)
+            options = {
+                r[
+                    "id"
+                ]: f'{r.get("Nombre", "")} {r.get("Apellidos", "")} (ID: {r.get("id")})'
+                for r in records
+            }
+            self.all_afiliadas_options = options
+        except Exception as e:
+            ui.notify(
+                f"Error cargando la lista de afiliadas: {str(e)}", type="negative"
+            )
 
     async def _load_nodos(self):
         try:
@@ -192,32 +214,32 @@ class ConflictsView:
         ui.timer(0.1, self._apply_filters, once=True)
 
     def _display_statistics(self):
-            if not self.stats_card:
-                return
-            self.stats_card.clear()
-            with self.stats_card:
-                ui.label("Estadísticas").classes("text-h6 mb-2")
-                status_counts = {}
-                for conflict in self.filtered_conflicts:
-                    # Ensure the key is always a string, defaulting None to "Sin estado"
-                    estado = conflict.get("estado") or "Sin estado"
-                    status_counts[estado] = status_counts.get(estado, 0) + 1
+        if not self.stats_card:
+            return
+        self.stats_card.clear()
+        with self.stats_card:
+            ui.label("Estadísticas").classes("text-h6 mb-2")
+            status_counts = {}
+            for conflict in self.filtered_conflicts:
+                # Ensure the key is always a string, defaulting None to "Sin estado"
+                estado = conflict.get("estado") or "Sin estado"
+                status_counts[estado] = status_counts.get(estado, 0) + 1
 
-                with ui.row().classes("w-full gap-4 flex-wrap"):
-                    ui.chip(
-                        f"Total: {len(self.filtered_conflicts)}",
-                        color="blue",
-                        icon="inventory",
-                    )
-                    # This sorted() call is now safe because all keys are strings.
-                    for estado, count in sorted(status_counts.items()):
-                        color = {
-                            "Abierto": "red",
-                            "En proceso": "orange",
-                            "Resuelto": "green",
-                            "Cerrado": "gray",
-                        }.get(estado, "blue")
-                        ui.chip(f"{estado}: {count}", color=color)
+            with ui.row().classes("w-full gap-4 flex-wrap"):
+                ui.chip(
+                    f"Total: {len(self.filtered_conflicts)}",
+                    color="blue",
+                    icon="inventory",
+                )
+                # This sorted() call is now safe because all keys are strings.
+                for estado, count in sorted(status_counts.items()):
+                    color = {
+                        "Abierto": "red",
+                        "En proceso": "orange",
+                        "Resuelto": "green",
+                        "Cerrado": "gray",
+                    }.get(estado, "blue")
+                    ui.chip(f"{estado}: {count}", color=color)
 
     async def _on_conflict_change(self, conflict_id: Optional[int]):
         if not conflict_id:
@@ -394,11 +416,14 @@ class ConflictsView:
         await dialog.open()
 
     async def _create_conflict(self):
+        """Creates a new conflict, passing the full list of afiliadas to the dialog."""
+        # --- MODIFIED: PASS THE PRE-FETCHED OPTIONS TO THE DIALOG ---
         dialog = EnhancedRecordDialog(
             api=self.api,
             table="conflictos",
             mode="create",
             on_success=self._load_conflicts,
+            custom_options={"afiliada_id": self.all_afiliadas_options},
         )
         await dialog.open()
 
