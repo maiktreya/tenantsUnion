@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - /var/lib/postgresql/data  # Explicit anonymous volume for --renew-anon-volumes
+      - /var/lib/postgresql/data # Explicit anonymous volume for --renew-anon-volumes
       - ${INIT_SCRIPTS_PATH:-./build/postgreSQL/init-scripts}:/docker-entrypoint-initdb.d
       - ./dev/back/SI_MAD/db_fork:/csv-data
     healthcheck:
@@ -40,7 +40,7 @@ services:
     working_dir: /app
     command: >
       sh -c "pip install --upgrade pip &&
-             pip install --root-user-action=ignore passlib==1.7.4 bcrypt==4.0.1 nicegui httpx pydantic[email] &&
+             pip install --root-user-action=ignore passlib==1.7.4 bcrypt==4.0.1 nicegui httpx pydantic[email] pandas &&
              python main.py"
     depends_on:
       - server

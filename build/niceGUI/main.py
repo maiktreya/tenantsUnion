@@ -13,6 +13,9 @@ from views.home import HomeView
 from views.admin import AdminView
 from views.views_explorer import ViewsExplorerView
 from views.conflicts import ConflictsView
+
+# --- NEW: IMPORT THE NEW VIEW ---
+from views.afiliadas_importer import AfiliadasImporterView
 from auth.login import create_login_page
 from auth.user_management import UserManagementView
 from auth.user_profile import UserProfileView
@@ -111,6 +114,12 @@ class Application:
                         ui.button(
                             "Vistas", on_click=lambda: self.show_view("views")
                         ).props("flat color=red-600")
+                        # --- NEW: ADD THE BUTTON FOR THE IMPORTER VIEW ---
+                        ui.button(
+                            "Importar Afiliadas",
+                            on_click=lambda: self.show_view("afiliadas_importer"),
+                        ).props("flat color=red-600")
+
                     if self.has_role("admin", "gestor", "actas"):
                         ui.button(
                             "Conflictos", on_click=lambda: self.show_view("conflicts")
@@ -186,6 +195,12 @@ class Application:
             if self.has_role("admin", "sistemas"):
                 self.views["admin"] = AdminView(self.api_client)
                 self.views["user_management"] = UserManagementView(self.api_client)
+
+            if self.has_role("admin", "gestor"):
+                # --- NEW: INITIALIZE THE IMPORTER VIEW ---
+                self.views["afiliadas_importer"] = AfiliadasImporterView(
+                    self.api_client
+                )
 
             if self.has_role("admin", "gestor", "actas"):
                 self.views["conflicts"] = ConflictsView(self.api_client)
