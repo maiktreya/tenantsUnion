@@ -30,6 +30,7 @@ from .schemas import (
     ConflictoUpdate,
     Conflicto,
 )
+from .validate import TableValidator, validator
 
 __all__ = [
     "RoleBase",
@@ -62,4 +63,6 @@ __all__ = [
     "ConflictoCreate",
     "ConflictoUpdate",
     "Conflicto",
+    "TableValidator",
+    "validator",
 ]

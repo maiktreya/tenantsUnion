@@ -1,57 +1,26 @@
-# /build/niceGUI/api/client.py
-
-from typing import Dict, List, Optional, Any, Type, TypeVar
 import httpx
+from typing import Dict, List, Optional, Any, Tuple
 from nicegui import ui
-from pydantic import BaseModel, ValidationError
-
-# Import the new Pydantic models
-from models import schemas
-
-# Generic TypeVar for Pydantic models to improve type hinting
-T = TypeVar("T", bound=BaseModel)
+from models.validate import validator
 
 class APIClient:
     """
-    PostgREST API client with a hybrid approach:
-    1. Generic methods for dynamic, table-based operations (e.g., Admin view).
-    2. Type-safe methods using Pydantic models for robust, specific operations.
+    Enhanced PostgREST API client with config-driven validation.
+    Uses TABLE_INFO from config.py as the single source of truth.
     """
 
-    _instance = None
-
-    def __new__(cls, base_url: str):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.base_url = base_url
-            cls._instance.client = None
-        return cls._instance
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+        self.client: Optional[httpx.AsyncClient] = None
 
     def _ensure_client(self) -> httpx.AsyncClient:
+        """Ensure the HTTP client is initialized."""
         if self.client is None:
             self.client = httpx.AsyncClient(timeout=30.0)
         return self.client
 
     # =====================================================================
-    #  PRIVATE HELPER FOR PARSING RESPONSES
-    # =====================================================================
-
-    def _parse_response(self, model: Type[T], response_data: Any) -> Optional[List[T]]:
-        """Safely parses API response data into a list of Pydantic models."""
-        if not response_data:
-            return []
-        try:
-            if isinstance(response_data, list):
-                return [model.model_validate(item) for item in response_data]
-            return [model.model_validate(response_data)]
-        except ValidationError as e:
-            ui.notify(f"Error de validación de datos: {e}", type='negative')
-            print(f"Pydantic Validation Error: {e}")
-            return None
-
-    # =====================================================================
-    #  LOW-LEVEL GENERIC METHODS (UNCHANGED)
-    #  Used by dynamic components like the Admin BBDD view
+    #  CORE CRUD OPERATIONS WITH CONFIG-DRIVEN VALIDATION
     # =====================================================================
 
     async def get_records(
@@ -60,9 +29,10 @@ class APIClient:
         filters: Optional[Dict[str, Any]] = None,
         order: Optional[str] = None,
         limit: Optional[int] = None,
-        offset: Optional[int] = None
+        offset: Optional[int] = None,
+        validate_response: bool = False
     ) -> List[Dict]:
-        """Get records as dictionaries (unvalidated)."""
+        """Get records as dictionaries with optional response validation."""
         client = self._ensure_client()
         url = f"{self.base_url}/{table}"
         params = filters or {}
@@ -74,7 +44,20 @@ class APIClient:
         try:
             response = await client.get(url, params=params)
             response.raise_for_status()
-            return response.json()
+            records = response.json()
+
+            # Optional validation of returned data
+            if validate_response and isinstance(records, list):
+                validated_records = []
+                for record in records:
+                    is_valid, errors = validator.validate_record(table, record, "read")
+                    if is_valid:
+                        validated_records.append(record)
+                    else:
+                        ui.notify(f'Invalid record in {table}: {"; ".join(errors)}', type='warning')
+                return validated_records
+
+            return records
         except httpx.HTTPStatusError as e:
             ui.notify(f'Error HTTP {e.response.status_code}: {e.response.text}', type='negative')
             return []
@@ -82,35 +65,89 @@ class APIClient:
             ui.notify(f'Error al obtener registros: {str(e)}', type='negative')
             return []
 
-    async def create_record(self, table: str, data: Dict) -> Optional[Dict]:
-        """Create a new record from a dictionary (unvalidated)."""
+    async def create_record(
+        self,
+        table: str,
+        data: Dict,
+        validate: bool = True,
+        show_validation_errors: bool = True
+    ) -> Optional[Dict]:
+        """Create a new record from a dictionary with optional validation."""
+
+        # Pre-creation validation
+        if validate:
+            is_valid, errors = validator.validate_record(table, data, "create")
+            if not is_valid:
+                if show_validation_errors:
+                    ui.notify(f'Validation errors: {"; ".join(errors)}', type='negative')
+                return None
+
         client = self._ensure_client()
         url = f"{self.base_url}/{table}"
         headers = {"Prefer": "return=representation"}
+
         try:
             response = await client.post(url, json=data, headers=headers)
             response.raise_for_status()
             result = response.json()
-            return result[0] if isinstance(result, list) else result
+            created_record = result[0] if isinstance(result, list) else result
+
+            # Optional post-creation validation
+            if validate:
+                is_valid, errors = validator.validate_record(table, created_record, "read")
+                if not is_valid and show_validation_errors:
+                    ui.notify(f'Warning - Created record has validation issues: {"; ".join(errors)}', type='warning')
+
+            return created_record
+
         except Exception as e:
             ui.notify(f'Error al crear registro: {str(e)}', type='negative')
             return None
 
-    async def update_record(self, table: str, record_id: Any, data: Dict) -> Optional[Dict]:
-        """Update a record from a dictionary (unvalidated)."""
+    async def update_record(
+        self,
+        table: str,
+        record_id: Any,
+        data: Dict,
+        validate: bool = True,
+        show_validation_errors: bool = True
+    ) -> Optional[Dict]:
+        """Update a record from a dictionary with optional validation."""
+
+        # Pre-update validation
+        if validate:
+            is_valid, errors = validator.validate_record(table, data, "update")
+            if not is_valid:
+                if show_validation_errors:
+                    ui.notify(f'Validation errors: {"; ".join(errors)}', type='negative')
+                return None
+
         client = self._ensure_client()
+
         # Handle composite keys or different primary key names
         pk_filter = f"id=eq.{record_id}"
-        if table == 'usuario_credenciales': pk_filter = f"usuario_id=eq.{record_id}"
-        elif table == 'nodos_cp_mapping': pk_filter = f"cp=eq.{record_id}"
+        if table == 'usuario_credenciales':
+            pk_filter = f"usuario_id=eq.{record_id}"
+        elif table == 'nodos_cp_mapping':
+            pk_filter = f"cp=eq.{record_id}"
 
         url = f"{self.base_url}/{table}?{pk_filter}"
         headers = {"Prefer": "return=representation"}
+
         try:
             response = await client.patch(url, json=data, headers=headers)
             response.raise_for_status()
             result = response.json()
-            return result[0] if isinstance(result, list) else result
+            updated_record = result[0] if isinstance(result, list) else result
+
+            # Optional post-update validation
+            if validate:
+                is_valid, errors = validator.validate_record(table, updated_record, "read")
+                if not is_valid and show_validation_errors:
+                    ui.notify(f'Warning - Updated record has validation issues: {"; ".join(errors)}', type='warning')
+
+            return updated_record
+
         except Exception as e:
             ui.notify(f'Error al actualizar registro: {str(e)}', type='negative')
             return None
@@ -119,6 +156,7 @@ class APIClient:
         """Delete a record by ID."""
         client = self._ensure_client()
         url = f"{self.base_url}/{table}?id=eq.{record_id}"
+
         try:
             response = await client.delete(url)
             response.raise_for_status()
@@ -128,41 +166,144 @@ class APIClient:
             return False
 
     # =====================================================================
-    #  HIGH-LEVEL TYPE-SAFE METHODS
-    #  Use these in application logic for robust, validated operations
+    #  ENHANCED UTILITY METHODS
     # =====================================================================
 
-    async def get_afiliadas_typed(self, filters: Optional[Dict] = None) -> List[schemas.Afiliada]:
-        """Gets a list of 'afiliadas' and validates them against the Pydantic model."""
-        records = await self.get_records("afiliadas", filters=filters)
-        validated_records = self._parse_response(schemas.Afiliada, records)
-        return validated_records or []
+    async def get_record_by_id(self, table: str, record_id: Any, validate: bool = False) -> Optional[Dict]:
+        """Get a single record by ID with optional validation."""
+        records = await self.get_records(
+            table,
+            filters={'id': f'eq.{record_id}'},
+            validate_response=validate
+        )
+        return records[0] if records else None
 
-    async def get_afiliada_by_id_typed(self, afiliada_id: int) -> Optional[schemas.Afiliada]:
-        """Gets a single 'afiliada' by ID, fully validated."""
-        records = await self.get_records("afiliadas", filters={'id': f'eq.{afiliada_id}'})
-        validated_records = self._parse_response(schemas.Afiliada, records)
-        return validated_records[0] if validated_records else None
+    async def batch_create(
+        self,
+        table: str,
+        records: List[Dict],
+        validate: bool = True,
+        stop_on_error: bool = False
+    ) -> Tuple[List[Dict], List[str]]:
+        """Create multiple records with optional validation and error handling."""
+        created = []
+        errors = []
 
-    async def create_afiliada_typed(self, data: schemas.AfiliadaCreate) -> Optional[schemas.Afiliada]:
-        """Creates an 'afiliada' using a validated Pydantic model."""
-        # .model_dump() converts the Pydantic model to a dict for JSON serialization
-        response_data = await self.create_record("afiliadas", data.model_dump())
-        validated_response = self._parse_response(schemas.Afiliada, response_data)
-        return validated_response[0] if validated_response else None
+        for i, record in enumerate(records):
+            result = await self.create_record(
+                table,
+                record,
+                validate=validate,
+                show_validation_errors=False
+            )
 
-    async def update_afiliada_typed(self, afiliada_id: int, data: schemas.AfiliadaUpdate) -> Optional[schemas.Afiliada]:
-        """Updates an 'afiliada' using a validated Pydantic model."""
-        # exclude_unset=True ensures we only send fields that were actually provided
-        update_data = data.model_dump(exclude_unset=True)
-        if not update_data:
-            ui.notify("No changes to update.", type='info')
-            return await self.get_afiliada_by_id_typed(afiliada_id) # Return current state
-        
-        response_data = await self.update_record("afiliadas", afiliada_id, update_data)
-        validated_response = self._parse_response(schemas.Afiliada, response_data)
-        return validated_response[0] if validated_response else None
-        
+            if result:
+                created.append(result)
+            else:
+                error_msg = f"Failed to create record {i+1}"
+                errors.append(error_msg)
+                if stop_on_error:
+                    break
+
+        return created, errors
+
+    async def validate_record_data(self, table: str, data: Dict, operation: str = "create") -> Tuple[bool, List[str]]:
+        """Explicitly validate record data without performing any database operations."""
+        return validator.validate_record(table, data, operation)
+
+    def get_table_schema(self, table: str) -> Optional[Dict]:
+        """Get table configuration from TABLE_INFO."""
+        from config import TABLE_INFO
+        return TABLE_INFO.get(table)
+
+    def get_field_constraints(self, table: str, field: str) -> Dict[str, Any]:
+        """Get validation constraints for a specific field."""
+        return validator.get_field_constraints(table, field)
+
+    def get_table_display_fields(self, table: str, record: Dict) -> Dict[str, Any]:
+        """Get only the fields that should be displayed in the UI."""
+        schema = self.get_table_schema(table)
+        if not schema:
+            return record
+
+        hidden_fields = set(schema.get("hidden_fields", []))
+        return {k: v for k, v in record.items() if k not in hidden_fields}
+
+    async def search_records(
+        self,
+        table: str,
+        search_term: str,
+        search_fields: Optional[List[str]] = None
+    ) -> List[Dict]:
+        """Search records across specified fields using PostgREST text search."""
+        schema = self.get_table_schema(table)
+        if not schema:
+            return []
+
+        # Use provided search fields or default to visible text fields
+        if not search_fields:
+            all_fields = schema.get("fields", [])
+            hidden_fields = set(schema.get("hidden_fields", []))
+            search_fields = [f for f in all_fields if f not in hidden_fields and not f.endswith('_id')]
+
+        # Build OR filters for text search
+        filters = {}
+        for field in search_fields:
+            filters[f"{field}"] = f"ilike.*{search_term}*"
+
+        # For PostgREST, we need to use the 'or' parameter
+        or_conditions = ",".join([f"{field}.ilike.*{search_term}*" for field in search_fields])
+        filters = {"or": f"({or_conditions})"}
+
+        return await self.get_records(table, filters=filters)
+
+    # =====================================================================
+    #  RELATIONSHIP HELPERS
+    # =====================================================================
+
+    async def get_related_records(self, table: str, record_id: Any, relation_table: str) -> List[Dict]:
+        """Get records related to a parent record."""
+        schema = self.get_table_schema(table)
+        if not schema:
+            return []
+
+        # Find the relationship configuration
+        child_relations = schema.get("child_relations", [])
+        relation_config = next(
+            (rel for rel in child_relations if rel["table"] == relation_table),
+            None
+        )
+
+        if not relation_config:
+            return []
+
+        foreign_key = relation_config["foreign_key"]
+        filters = {foreign_key: f"eq.{record_id}"}
+
+        return await self.get_records(relation_table, filters=filters)
+
+    async def get_parent_record(self, table: str, record: Dict, parent_field: str) -> Optional[Dict]:
+        """Get the parent record for a relationship field."""
+        schema = self.get_table_schema(table)
+        if not schema or parent_field not in record:
+            return None
+
+        relations = schema.get("relations", {})
+        if parent_field not in relations:
+            return None
+
+        parent_table = relations[parent_field]["view"]
+        parent_id = record[parent_field]
+
+        if not parent_id:
+            return None
+
+        return await self.get_record_by_id(parent_table, parent_id)
+
+    # =====================================================================
+    #  RESOURCE CLEANUP
+    # =====================================================================
+
     async def close(self):
         """Close the HTTP client."""
         if self.client:
