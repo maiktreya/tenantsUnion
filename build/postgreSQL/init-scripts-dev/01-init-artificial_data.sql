@@ -24,18 +24,6 @@ CREATE TABLE IF NOT EXISTS entramado_empresas (
     descripcion TEXT
 );
 
-CREATE TABLE IF NOT EXISTS nodos (
-    id SERIAL PRIMARY KEY,
-    nombre TEXT UNIQUE NOT NULL,
-    descripcion TEXT,
-    usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL
-);
-
-CREATE TABLE IF NOT EXISTS nodos_cp_mapping (
-    cp INTEGER PRIMARY KEY,
-    nodo_id INTEGER REFERENCES nodos (id) ON DELETE CASCADE NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS roles (
     id SERIAL PRIMARY KEY,
     nombre TEXT UNIQUE NOT NULL,
@@ -51,6 +39,18 @@ CREATE TABLE IF NOT EXISTS usuarios (
     roles TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS nodos (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT UNIQUE NOT NULL,
+    descripcion TEXT,
+    usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS nodos_cp_mapping (
+    cp INTEGER PRIMARY KEY,
+    nodo_id INTEGER REFERENCES nodos (id) ON DELETE CASCADE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS empresas (
@@ -1245,7 +1245,7 @@ BEGIN
         END IF;
     END LOOP;
 END;
-$;
+$$;
 
 -- =====================================================================
 -- PASO 6: SINCRONIZACIÓN Y FINALIZACIÓN
@@ -1271,25 +1271,47 @@ SELECT
         WHEN uc.password_hash IS NOT NULL THEN 'Hash configurado'
         ELSE 'Sin hash'
     END as estado_password
-FROM usuarios u
-LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
-LEFT JOIN roles r ON ur.role_id = r.id
-LEFT JOIN usuario_credenciales uc ON u.id = uc.usuario_id
-WHERE u.alias = 'admin';
+FROM
+    usuarios u
+    LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
+    LEFT JOIN roles r ON ur.role_id = r.id
+    LEFT JOIN usuario_credenciales uc ON u.id = uc.usuario_id
+WHERE
+    u.alias = 'admin';
 
 -- Mostrar estadísticas generales
-SELECT
-    'Nodos' as tabla, COUNT(*) as registros FROM nodos
-UNION ALL SELECT 'Entramados', COUNT(*) FROM entramado_empresas
-UNION ALL SELECT 'Empresas', COUNT(*) FROM empresas
-UNION ALL SELECT 'Bloques', COUNT(*) FROM bloques
-UNION ALL SELECT 'Pisos', COUNT(*) FROM pisos
-UNION ALL SELECT 'Usuarios', COUNT(*) FROM usuarios
-UNION ALL SELECT 'Afiliadas', COUNT(*) FROM afiliadas
-UNION ALL SELECT 'Conflictos', COUNT(*) FROM conflictos
-UNION ALL SELECT 'Diario Conflictos', COUNT(*) FROM diario_conflictos
-UNION ALL SELECT 'Asesorías', COUNT(*) FROM asesorias
-UNION ALL SELECT 'Facturación', COUNT(*) FROM facturacion
+SELECT 'Nodos' as tabla, COUNT(*) as registros
+FROM nodos
+UNION ALL
+SELECT 'Entramados', COUNT(*)
+FROM entramado_empresas
+UNION ALL
+SELECT 'Empresas', COUNT(*)
+FROM empresas
+UNION ALL
+SELECT 'Bloques', COUNT(*)
+FROM bloques
+UNION ALL
+SELECT 'Pisos', COUNT(*)
+FROM pisos
+UNION ALL
+SELECT 'Usuarios', COUNT(*)
+FROM usuarios
+UNION ALL
+SELECT 'Afiliadas', COUNT(*)
+FROM afiliadas
+UNION ALL
+SELECT 'Conflictos', COUNT(*)
+FROM conflictos
+UNION ALL
+SELECT 'Diario Conflictos', COUNT(*)
+FROM diario_conflictos
+UNION ALL
+SELECT 'Asesorías', COUNT(*)
+FROM asesorias
+UNION ALL
+SELECT 'Facturación', COUNT(*)
+FROM facturacion
 ORDER BY tabla;
 
 -- Verificar integridad de relaciones críticas
@@ -1298,18 +1320,23 @@ SELECT 'Verificaciones de integridad:' as mensaje;
 SELECT
     COUNT(*) as bloques_sin_nodo,
     'bloques sin nodo asignado' as descripcion
-FROM bloques WHERE nodo_id IS NULL;
+FROM bloques
+WHERE
+    nodo_id IS NULL;
 
 SELECT
     COUNT(*) as usuarios_sin_credenciales,
     'usuarios sin credenciales' as descripcion
-FROM usuarios u
-LEFT JOIN usuario_credenciales uc ON u.id = uc.usuario_id
-WHERE uc.usuario_id IS NULL;
+FROM
+    usuarios u
+    LEFT JOIN usuario_credenciales uc ON u.id = uc.usuario_id
+WHERE
+    uc.usuario_id IS NULL;
 
 SELECT
     COUNT(*) as usuarios_sin_roles,
     'usuarios sin roles asignados' as descripcion
 FROM usuarios u
-LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
-WHERE ur.usuario_id IS NULL;
+    LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
+WHERE
+    ur.usuario_id IS NULL;
