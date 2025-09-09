@@ -4,6 +4,9 @@ services:
   db:
     ports:
       - "5432:5432" # expose on local bind
+  server:
+    ports:
+      - "127.0.0.1:3001:3000" # expose on local bind
   nicegui-app:
     ports:
       - "8081:8081" # expose on local bind
