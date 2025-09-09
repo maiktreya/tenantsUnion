@@ -7,7 +7,6 @@ from typing import List, Dict, Any
 from nicegui import ui, events
 from api.client import APIClient
 
-
 class AfiliadasImporterView:
     """A view to import new 'afiliadas' from a WordPress CSV export."""
 
@@ -53,10 +52,7 @@ class AfiliadasImporterView:
                 io.BytesIO(content), header=None, quotechar='"', sep=","
             )
             self._parse_and_preview()
-            ui.notify(
-                "Archivo procesado. Revisa los datos antes de importar.",
-                type="positive",
-            )
+            ui.notify("Archivo procesado. Revisa los datos antes de importar.", type="positive")
         except Exception as ex:
             ui.notify(f"Error al leer el archivo: {ex}", type="negative")
 
@@ -76,7 +72,6 @@ class AfiliadasImporterView:
     def _transform_row(self, row: pd.Series) -> Dict[str, Any]:
         """Transforms a single row of the DataFrame into structured data for insertion."""
 
-        # --- CORRECTED HELPER FUNCTION ---
         # Helper to safely get data, convert to string, then strip whitespace.
         def get_val(index):
             raw_value = row.get(index)
@@ -98,9 +93,11 @@ class AfiliadasImporterView:
         }
 
         # --- 2. Extract and clean data for 'afiliadas' table ---
+        # FIX: Specifically handle the '<"Name"' issue in the first column
+        nombre = get_val(0).lstrip('<"')
         apellidos = f"{get_val(2)} {get_val(3)}".strip()
         afiliada_data = {
-            "nombre": get_val(0),
+            "nombre": nombre,
             "apellidos": apellidos,
             "genero": get_val(4),
             "cif": get_val(6),
@@ -108,25 +105,22 @@ class AfiliadasImporterView:
             "email": get_val(8),
             "fecha_alta": get_val(16),
             "regimen": get_val(17),
-            "estado": "Alta",  # Default state for new members
+            "estado": "Alta",
         }
 
         # --- 3. Extract and clean data for 'facturacion' table ---
-        cuota_str = get_val(24)
+        # FIX: Corrected column indices for cuota (25) and IBAN (26)
+        cuota_str = get_val(25)
         cuota_match = re.search(r"\|(\d+)", cuota_str)
         cuota_valor = float(cuota_match.group(1)) if cuota_match else 0.0
 
-        forma_pago = "Domiciliación" if get_val(25) else "Otro"
-
-        # Clean IBAN
-        iban_raw = get_val(25).replace(" ", "")
+        iban_raw = get_val(26).replace(" ", "")
+        forma_pago = "Domiciliación" if iban_raw else "Otro"
         iban = iban_raw.upper() if iban_raw else None
 
         facturacion_data = {
             "cuota": cuota_valor,
-            "periodicidad": (
-                12 if "año" in cuota_str else 1
-            ),  # Simple logic for periodicity
+            "periodicidad": 12 if "año" in cuota_str else 1,
             "forma_pago": forma_pago,
             "iban": iban,
         }
@@ -144,66 +138,38 @@ class AfiliadasImporterView:
             ui.label("Previsualización de Datos a Importar").classes("text-h6")
 
             if not self.preview_data:
-                ui.label("No se encontraron datos válidos para importar.").classes(
-                    "text-warning"
-                )
+                ui.label("No se encontraron datos válidos para importar.").classes("text-warning")
                 return
 
             columns = [
-                {
-                    "name": "nombre",
-                    "label": "Nombre",
-                    "field": "nombre",
-                    "align": "left",
-                },
-                {
-                    "name": "apellidos",
-                    "label": "Apellidos",
-                    "field": "apellidos",
-                    "align": "left",
-                },
-                {
-                    "name": "direccion",
-                    "label": "Dirección",
-                    "field": "direccion",
-                    "align": "left",
-                },
-                {
-                    "name": "cuota",
-                    "label": "Cuota (€)",
-                    "field": "cuota",
-                    "align": "right",
-                },
-                {"name": "iban", "label": "IBAN", "field": "iban", "align": "left"},
+                {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre', 'align': 'left'},
+                {'name': 'apellidos', 'label': 'Apellidos', 'field': 'apellidos', 'align': 'left'},
+                {'name': 'direccion', 'label': 'Dirección', 'field': 'direccion', 'align': 'left'},
+                {'name': 'cuota', 'label': 'Cuota (€)', 'field': 'cuota', 'align': 'right'},
+                {'name': 'iban', 'label': 'IBAN', 'field': 'iban', 'align': 'left'},
             ]
 
             table_rows = []
             for item in self.preview_data:
-                table_rows.append(
-                    {
-                        "nombre": item["afiliada"]["nombre"],
-                        "apellidos": item["afiliada"]["apellidos"],
-                        "direccion": item["piso"]["direccion"],
-                        "cuota": item["facturacion"]["cuota"],
-                        "iban": item["facturacion"]["iban"] or "---",
-                    }
-                )
+                table_rows.append({
+                    "nombre": item["afiliada"]["nombre"],
+                    "apellidos": item["afiliada"]["apellidos"],
+                    "direccion": item["piso"]["direccion"],
+                    "cuota": item["facturacion"]["cuota"],
+                    "iban": item["facturacion"]["iban"] or "---",
+                })
 
-            ui.table(columns=columns, rows=table_rows, row_key="nombre").classes(
-                "w-full"
-            )
+            ui.table(columns=columns, rows=table_rows, row_key='nombre').classes('w-full')
 
     async def _start_import(self):
         """Starts the process of importing the previewed data into the database."""
         if not self.preview_data:
-            ui.notify(
-                "No hay datos para importar. Por favor, sube un archivo CSV.",
-                type="warning",
-            )
+            ui.notify("No hay datos para importar. Por favor, sube un archivo CSV.", type="warning")
             return
 
         success_count = 0
-        failed_count = 0
+        # FIX: Collect error messages instead of notifying inside the loop
+        error_messages = []
 
         with ui.dialog() as dialog, ui.card():
             ui.label("Importando...").classes("text-h6")
@@ -213,11 +179,9 @@ class AfiliadasImporterView:
 
         for i, record in enumerate(self.preview_data):
             try:
-                # --- Step 1: Create or get 'piso' ---
+                # Step 1: Create or get 'piso'
                 piso_id = None
-                existing_pisos = await self.api.get_records(
-                    "pisos", {"direccion": f'eq.{record["piso"]["direccion"]}'}
-                )
+                existing_pisos = await self.api.get_records("pisos", {"direccion": f'eq.{record["piso"]["direccion"]}'})
                 if existing_pisos:
                     piso_id = existing_pisos[0]["id"]
                 else:
@@ -228,56 +192,43 @@ class AfiliadasImporterView:
                 if not piso_id:
                     raise Exception("No se pudo crear o encontrar el piso.")
 
-                # --- Step 2: Create 'afiliada' ---
+                # Step 2: Create 'afiliada'
                 record["afiliada"]["piso_id"] = piso_id
 
-                # Prevent duplicates by checking CIF/NIF
                 cif = record["afiliada"]["cif"]
-                existing_afiliada = await self.api.get_records(
-                    "afiliadas", {"cif": f"eq.{cif}"}
-                )
+                if not cif:
+                    raise Exception("El registro no contiene CIF/NIE.")
+
+                existing_afiliada = await self.api.get_records("afiliadas", {"cif": f'eq.{cif}'})
                 if existing_afiliada:
                     raise Exception(f"La afiliada con CIF {cif} ya existe.")
 
-                new_afiliada = await self.api.create_record(
-                    "afiliadas", record["afiliada"]
-                )
+                new_afiliada = await self.api.create_record("afiliadas", record["afiliada"])
                 if not new_afiliada:
                     raise Exception("No se pudo crear la afiliada.")
 
-                # --- Step 3: Create 'facturacion' ---
+                # Step 3: Create 'facturacion'
                 record["facturacion"]["afiliada_id"] = new_afiliada["id"]
-                new_facturacion = await self.api.create_record(
-                    "facturacion", record["facturacion"]
-                )
-                if not new_facturacion:
-                    # This is not critical, so we'll just log it
-                    print(
-                        f"Warning: Could not create billing for {new_afiliada['nombre']}"
-                    )
+                await self.api.create_record("facturacion", record["facturacion"])
 
                 success_count += 1
             except Exception as e:
-                failed_count += 1
-                ui.notify(
-                    f"Error importando a {record['afiliada']['nombre']}: {e}",
-                    type="negative",
-                )
+                # FIX: Append error message to list
+                error_messages.append(f"Error en {record['afiliada'].get('nombre', 'registro desconocido')}: {e}")
 
             progress.value = (i + 1) / len(self.preview_data)
 
         dialog.close()
 
+        # FIX: Show all notifications after the loop is complete and dialog is closed
         if success_count > 0:
-            ui.notify(
-                f"Se importaron {success_count} afiliadas exitosamente.",
-                type="positive",
-            )
-        if failed_count > 0:
-            ui.notify(
-                f"Fallaron {failed_count} registros durante la importación.",
-                type="negative",
-            )
+            ui.notify(f"Se importaron {success_count} afiliadas exitosamente.", type="positive")
+
+        for msg in error_messages:
+            ui.notify(msg, type="negative")
+
+        if not error_messages and success_count == 0:
+             ui.notify("No se importaron nuevos registros. Puede que ya existan en la BBDD.", type="info")
 
         # Clear the view for the next import
         self.preview_container.clear()
