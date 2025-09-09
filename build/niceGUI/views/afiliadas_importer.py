@@ -3,18 +3,21 @@
 import pandas as pd
 import io
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from nicegui import ui, events
 from api.client import APIClient
+# Note: We no longer need DataTable or a separate ImporterState for this view
+from state.base import BaseTableState
+
 
 class AfiliadasImporterView:
-    """A view to import new 'afiliadas' from a WordPress CSV export."""
+    """A view to import new 'afiliadas' from a WordPress CSV export with in-place editing."""
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-        self.raw_dataframe = None
-        self.preview_data = []
-        self.preview_container = None
+        # This list will hold the structured data that the UI will bind to and that will be imported
+        self.records_to_import: List[Dict] = []
+        self.preview_container = None # The UI container for the editable grid
 
     def create(self) -> ui.column:
         """Create the UI for the CSV importer view."""
@@ -22,9 +25,8 @@ class AfiliadasImporterView:
         with container:
             ui.label("Importar Nuevas Afiliadas desde CSV").classes("text-h4")
             ui.markdown(
-                "Esta herramienta está diseñada para procesar el CSV exportado desde el "
-                "formulario de afiliación de WordPress. Sube el archivo, revisa los "
-                "datos procesados y luego inicia la importación."
+                "Sube el archivo CSV. Los datos se mostrarán en una tabla editable a continuación. "
+                "Puedes corregir cualquier campo antes de iniciar la importación final."
             )
 
             with ui.row().classes("w-full gap-4 items-center"):
@@ -40,197 +42,153 @@ class AfiliadasImporterView:
                     on_click=self._start_import,
                 ).props("color=orange-600")
 
-            self.preview_container = ui.column().classes("w-full mt-4")
-        return container
+            ui.separator().classes("mt-4")
+            
+            # This container will hold our dynamic, editable table
+            self.preview_container = ui.column().classes("w-full")
 
+        return container
+    
     def _handle_upload(self, e: events.UploadEventArguments):
-        """Handle the file upload and trigger the parsing and preview."""
+        """Handle the file upload, parse data, and render the editable grid."""
         try:
             content = e.content.read()
-            # The CSV seems to be quote-less and header-less
-            self.raw_dataframe = pd.read_csv(
+            raw_dataframe = pd.read_csv(
                 io.BytesIO(content), header=None, quotechar='"', sep=","
             )
-            self._parse_and_preview()
-            ui.notify("Archivo procesado. Revisa los datos antes de importar.", type="positive")
+            
+            self.records_to_import = []
+            for _, row in raw_dataframe.iterrows():
+                nested_record = self._transform_row(row)
+                if nested_record:
+                    self.records_to_import.append(nested_record)
+
+            self._render_editable_grid() # Render the new editable UI
+            ui.notify("Archivo procesado. Ya puedes editar los datos en la tabla.", type="positive")
+
         except Exception as ex:
             ui.notify(f"Error al leer el archivo: {ex}", type="negative")
+            self.records_to_import = []
+            self.preview_container.clear()
 
-    def _parse_and_preview(self):
-        """Parse the raw DataFrame and generate a preview for the UI."""
-        if self.raw_dataframe is None:
-            return
 
-        self.preview_data = []
-        for _, row in self.raw_dataframe.iterrows():
-            processed_record = self._transform_row(row)
-            if processed_record:
-                self.preview_data.append(processed_record)
+    def _transform_row(self, row: pd.Series) -> Optional[Dict[str, Any]]:
+        """Transforms a single row into a structured dictionary. (Same as before)"""
+        try:
+            def get_val(index):
+                raw_value = row.get(index)
+                return "" if pd.isna(raw_value) else str(raw_value).strip()
 
-        self._display_preview()
+            nombre = get_val(0).lstrip('<"')
+            if not nombre: return None
 
-    def _transform_row(self, row: pd.Series) -> Dict[str, Any]:
-        """Transforms a single row of the DataFrame into structured data for insertion."""
+            afiliada_data = {
+                "nombre": nombre, "apellidos": f"{get_val(2)} {get_val(3)}".strip(),
+                "genero": get_val(4), "cif": get_val(6), "telefono": get_val(7),
+                "email": get_val(8), "fecha_alta": get_val(16), "regimen": get_val(17),
+                "estado": "Alta", "piso_id": None, # Will be set after piso creation
+            }
+            
+            piso_data = {
+                "direccion": re.sub(r"\s+", " ", f"{get_val(9)} {get_val(10)}, {get_val(11)} {get_val(12)}, {get_val(14)}, {get_val(13)}".strip(", ")).strip(),
+                "municipio": get_val(13), "cp": int(get_val(14)) if get_val(14).isdigit() else None,
+            }
 
-        # Helper to safely get data, convert to string, then strip whitespace.
-        def get_val(index):
-            raw_value = row.get(index)
-            if pd.isna(raw_value):
-                return ""
-            return str(raw_value).strip()
+            cuota_str = get_val(25)
+            cuota_match = re.search(r"\|(\d+)", cuota_str)
+            iban_raw = get_val(26).replace(" ", "")
 
-        # --- 1. Extract and clean data for 'pisos' table ---
-        direccion_completa = (
-            f"{get_val(9)} {get_val(10)}, "
-            f"{get_val(11)} {get_val(12)}, "
-            f"{get_val(14)}, {get_val(13)}"
-        ).strip(", ")
+            facturacion_data = {
+                "cuota": float(cuota_match.group(1)) if cuota_match else 0.0,
+                "periodicidad": 12 if "año" in cuota_str else 1,
+                "forma_pago": "Domiciliación" if iban_raw else "Otro",
+                "iban": iban_raw.upper() if iban_raw else None, "afiliada_id": None,
+            }
 
-        piso_data = {
-            "direccion": re.sub(r"\s+", " ", direccion_completa).strip(),
-            "municipio": get_val(13),
-            "cp": int(get_val(14)) if get_val(14).isdigit() else None,
-        }
+            return {"piso": piso_data, "afiliada": afiliada_data, "facturacion": facturacion_data}
+        except Exception as e:
+            print(f"Skipping row due to parsing error: {e}")
+            return None
 
-        # --- 2. Extract and clean data for 'afiliadas' table ---
-        # FIX: Specifically handle the '<"Name"' issue in the first column
-        nombre = get_val(0).lstrip('<"')
-        apellidos = f"{get_val(2)} {get_val(3)}".strip()
-        afiliada_data = {
-            "nombre": nombre,
-            "apellidos": apellidos,
-            "genero": get_val(4),
-            "cif": get_val(6),
-            "telefono": get_val(7),
-            "email": get_val(8),
-            "fecha_alta": get_val(16),
-            "regimen": get_val(17),
-            "estado": "Alta",
-        }
-
-        # --- 3. Extract and clean data for 'facturacion' table ---
-        # FIX: Corrected column indices for cuota (25) and IBAN (26)
-        cuota_str = get_val(25)
-        cuota_match = re.search(r"\|(\d+)", cuota_str)
-        cuota_valor = float(cuota_match.group(1)) if cuota_match else 0.0
-
-        iban_raw = get_val(26).replace(" ", "")
-        forma_pago = "Domiciliación" if iban_raw else "Otro"
-        iban = iban_raw.upper() if iban_raw else None
-
-        facturacion_data = {
-            "cuota": cuota_valor,
-            "periodicidad": 12 if "año" in cuota_str else 1,
-            "forma_pago": forma_pago,
-            "iban": iban,
-        }
-
-        return {
-            "piso": piso_data,
-            "afiliada": afiliada_data,
-            "facturacion": facturacion_data,
-        }
-
-    def _display_preview(self):
-        """Renders the preview data in a table in the UI."""
+    def _render_editable_grid(self):
+        """Dynamically renders an editable grid bound to the records_to_import data."""
         self.preview_container.clear()
         with self.preview_container:
-            ui.label("Previsualización de Datos a Importar").classes("text-h6")
-
-            if not self.preview_data:
-                ui.label("No se encontraron datos válidos para importar.").classes("text-warning")
+            if not self.records_to_import:
+                ui.label("No se encontraron datos válidos para previsualizar.").classes("text-warning")
                 return
 
-            columns = [
-                {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre', 'align': 'left'},
-                {'name': 'apellidos', 'label': 'Apellidos', 'field': 'apellidos', 'align': 'left'},
-                {'name': 'direccion', 'label': 'Dirección', 'field': 'direccion', 'align': 'left'},
-                {'name': 'cuota', 'label': 'Cuota (€)', 'field': 'cuota', 'align': 'right'},
-                {'name': 'iban', 'label': 'IBAN', 'field': 'iban', 'align': 'left'},
-            ]
+            ui.label("Previsualización de Datos a Importar").classes("text-h6 mb-2")
+            
+            # Create a header row
+            with ui.row().classes('w-full font-bold text-gray-600 gap-2 mb-1'):
+                ui.label('Nombre').classes('w-32')
+                ui.label('Apellidos').classes('w-48')
+                ui.label('CIF/NIE').classes('w-24')
+                ui.label('Dirección').classes('flex-grow')
+                ui.label('Cuota (€)').classes('w-20')
+                ui.label('IBAN').classes('w-48')
 
-            table_rows = []
-            for item in self.preview_data:
-                table_rows.append({
-                    "nombre": item["afiliada"]["nombre"],
-                    "apellidos": item["afiliada"]["apellidos"],
-                    "direccion": item["piso"]["direccion"],
-                    "cuota": item["facturacion"]["cuota"],
-                    "iban": item["facturacion"]["iban"] or "---",
-                })
-
-            ui.table(columns=columns, rows=table_rows, row_key='nombre').classes('w-full')
+            # Create an editable row for each record
+            with ui.scroll_area().classes('w-full h-96 border rounded-md p-2'):
+                for record in self.records_to_import:
+                    with ui.row().classes('w-full items-center gap-2 mb-2'):
+                        # Bind each input directly to the dictionary values
+                        ui.input(label=None).bind_value(record['afiliada'], 'nombre').classes('w-32')
+                        ui.input(label=None).bind_value(record['afiliada'], 'apellidos').classes('w-48')
+                        ui.input(label=None).bind_value(record['afiliada'], 'cif').classes('w-24')
+                        ui.input(label=None).bind_value(record['piso'], 'direccion').classes('flex-grow')
+                        ui.number(label=None, format='%.2f').bind_value(record['facturacion'], 'cuota').classes('w-20')
+                        ui.input(label=None).bind_value(record['facturacion'], 'iban').classes('w-48')
 
     async def _start_import(self):
-        """Starts the process of importing the previewed data into the database."""
-        if not self.preview_data:
-            ui.notify("No hay datos para importar. Por favor, sube un archivo CSV.", type="warning")
+        """Imports the data, which may have been edited by the user in the UI."""
+        if not self.records_to_import:
+            ui.notify("No hay datos para importar.", "warning")
             return
 
         success_count = 0
-        # FIX: Collect error messages instead of notifying inside the loop
         error_messages = []
-
+        
         with ui.dialog() as dialog, ui.card():
             ui.label("Importando...").classes("text-h6")
             progress = ui.linear_progress(0).classes("w-full")
-
+        
         dialog.open()
 
-        for i, record in enumerate(self.preview_data):
+        for i, record in enumerate(self.records_to_import):
             try:
-                # Step 1: Create or get 'piso'
+                # The import logic remains the same, but now uses the (potentially edited) data
                 piso_id = None
                 existing_pisos = await self.api.get_records("pisos", {"direccion": f'eq.{record["piso"]["direccion"]}'})
-                if existing_pisos:
-                    piso_id = existing_pisos[0]["id"]
-                else:
-                    new_piso = await self.api.create_record("pisos", record["piso"])
-                    if new_piso:
-                        piso_id = new_piso["id"]
+                piso_id = existing_pisos[0]["id"] if existing_pisos else (await self.api.create_record("pisos", record["piso"]))["id"]
+                
+                if not piso_id: raise Exception("No se pudo crear/encontrar el piso.")
 
-                if not piso_id:
-                    raise Exception("No se pudo crear o encontrar el piso.")
-
-                # Step 2: Create 'afiliada'
                 record["afiliada"]["piso_id"] = piso_id
-
                 cif = record["afiliada"]["cif"]
-                if not cif:
-                    raise Exception("El registro no contiene CIF/NIE.")
+                if not cif: raise Exception("CIF/NIE es obligatorio.")
 
-                existing_afiliada = await self.api.get_records("afiliadas", {"cif": f'eq.{cif}'})
-                if existing_afiliada:
+                if await self.api.get_records("afiliadas", {"cif": f'eq.{cif}'}):
                     raise Exception(f"La afiliada con CIF {cif} ya existe.")
 
                 new_afiliada = await self.api.create_record("afiliadas", record["afiliada"])
-                if not new_afiliada:
-                    raise Exception("No se pudo crear la afiliada.")
+                if not new_afiliada: raise Exception("No se pudo crear la afiliada.")
 
-                # Step 3: Create 'facturacion'
                 record["facturacion"]["afiliada_id"] = new_afiliada["id"]
                 await self.api.create_record("facturacion", record["facturacion"])
-
+                
                 success_count += 1
             except Exception as e:
-                # FIX: Append error message to list
-                error_messages.append(f"Error en {record['afiliada'].get('nombre', 'registro desconocido')}: {e}")
-
-            progress.value = (i + 1) / len(self.preview_data)
+                error_messages.append(f"Error en {record['afiliada'].get('nombre', 'registro')}: {e}")
+            
+            progress.value = (i + 1) / len(self.records_to_import)
 
         dialog.close()
-
-        # FIX: Show all notifications after the loop is complete and dialog is closed
-        if success_count > 0:
-            ui.notify(f"Se importaron {success_count} afiliadas exitosamente.", type="positive")
-
-        for msg in error_messages:
-            ui.notify(msg, type="negative")
-
-        if not error_messages and success_count == 0:
-             ui.notify("No se importaron nuevos registros. Puede que ya existan en la BBDD.", type="info")
-
-        # Clear the view for the next import
-        self.preview_container.clear()
-        self.preview_data = []
-        self.raw_dataframe = None
+        
+        if success_count > 0: ui.notify(f"Se importaron {success_count} afiliadas.", "positive")
+        for msg in error_messages: ui.notify(msg, "negative")
+        if not error_messages and success_count == 0: ui.notify("No se importaron nuevos registros.", "info")
+        
+        self.records_to_import = []
+        self._render_editable_grid() # Clear the grid
