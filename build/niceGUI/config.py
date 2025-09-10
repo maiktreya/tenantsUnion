@@ -141,6 +141,7 @@ TABLE_INFO = {
             "prop_vertical",
             "por_habitaciones",
             "bloque_id",
+            "fecha_firma",
         ],
         "relations": {"bloque_id": {"view": "bloques", "display_field": "direccion"}},
         "child_relations": [

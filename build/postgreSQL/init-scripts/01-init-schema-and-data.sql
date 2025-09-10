@@ -46,7 +46,8 @@ CREATE TABLE pisos (
     cp INTEGER,
     api TEXT,
     prop_vertical BOOLEAN,
-    por_habitaciones BOOLEAN
+    por_habitaciones BOOLEAN,
+    fecha_firma DATE
 );
 
 CREATE TABLE usuarios (

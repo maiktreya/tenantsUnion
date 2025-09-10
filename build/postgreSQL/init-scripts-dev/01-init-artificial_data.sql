@@ -1,5 +1,5 @@
 -- =====================================================================
--- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (VERSIÓN COMPLETA Y AUTÓNOMA)
+-- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (VERSIÓN CORREGIDA Y AUTÓNOMA)
 -- =====================================================================
 -- Este script crea el esquema completo, define las tablas, crea índices,
 -- configura la autenticación, genera las vistas y puebla la base de
@@ -91,9 +91,12 @@ CREATE TABLE IF NOT EXISTS pisos (
     cp INTEGER,
     api TEXT,
     prop_vertical BOOLEAN,
-    por_habitaciones BOOLEAN
+    por_habitaciones BOOLEAN,
+    fecha_firma DATE
 );
 
+-- FIX: Updated the 'afiliadas' table to the new, complete schema.
+-- This now matches the definition in your working staging script.
 CREATE TABLE IF NOT EXISTS afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
@@ -104,10 +107,21 @@ CREATE TABLE IF NOT EXISTS afiliadas (
     genero TEXT,
     email TEXT,
     telefono TEXT,
+    seccion_sindical TEXT,
+    nivel_participacion TEXT,
+    comision TEXT,
+    cuota TEXT,
+    frecuencia_pago TEXT,
+    forma_pago TEXT,
+    cuenta_corriente TEXT,
     regimen TEXT,
     estado TEXT,
     fecha_alta DATE,
-    fecha_baja DATE
+    fecha_baja DATE,
+    prop_vertical TEXT,
+    api TEXT,
+    propiedad TEXT,
+    entramado TEXT
 );
 
 CREATE TABLE IF NOT EXISTS facturacion (
@@ -466,18 +480,17 @@ VALUES (
 -- Mapeo códigos postales a nodos
 INSERT INTO
     nodos_cp_mapping (cp, nodo_id)
-VALUES (28080, 1), -- Centro-Arganzuela-Retiro
-    (28013, 1), -- Centro-Arganzuela-Retiro
-    (28014, 1), -- Centro-Arganzuela-Retiro
-    (28081, 2), -- Latina
-    (28024, 2), -- Latina
-    (28082, 3), -- Este
-    (28009, 3), -- Este
-    (28028, 4), -- Norte
-    (28034, 4), -- Norte
-    (28025, 5), -- Sur
+VALUES (28080, 1),
+    (28013, 1),
+    (28014, 1),
+    (28081, 2),
+    (28024, 2),
+    (28082, 3),
+    (28009, 3),
+    (28028, 4),
+    (28034, 4),
+    (28025, 5),
     (28041, 5);
--- Sur
 
 -- Insertar entramados empresariales
 INSERT INTO
@@ -760,48 +773,46 @@ VALUES (
         TRUE
     );
 
--- Insertar credenciales para usuarios
--- Hash para password "12345678" usando bcrypt con cost 12: $2b$12$Dz8E7dJgKF5BV8.6RQGJlu0TgmN4WZKcK8VzQwYqP5fF1wBJNsOui
+-- Insertar credenciales para usuarios (Hash for password "12345678")
 INSERT INTO
     usuario_credenciales (usuario_id, password_hash)
 VALUES (
         1,
         '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-    ), -- admin
+    ),
     (
         2,
         '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-    ), -- sumate
+    ),
     (
         3,
         '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-    ), -- gestor1
+    ),
     (
         4,
         '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-    ), -- tecnico1
+    ),
     (
         5,
         '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-    ), -- usuario1
+    ),
     (
         6,
         '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
     );
--- usuario2
 
 -- Asignar roles a usuarios
 INSERT INTO
     usuario_roles (usuario_id, role_id)
-VALUES (1, 1), -- admin -> admin role
-    (2, 1), -- sumate -> admin role
-    (3, 2), -- gestor1 -> gestor role
-    (4, 3), -- tecnico1 -> técnico role
-    (5, 4), -- usuario1 -> usuario role
+VALUES (1, 1),
+    (2, 1),
+    (3, 2),
+    (4, 3),
+    (5, 4),
     (6, 4);
--- usuario2 -> usuario role
 
--- Insertar afiliadas
+-- FIX: Updated the INSERT statement for 'afiliadas' to include the new columns
+-- Added placeholder data for the new fields to ensure the query is valid.
 INSERT INTO
     afiliadas (
         piso_id,
@@ -812,9 +823,20 @@ INSERT INTO
         genero,
         email,
         telefono,
+        seccion_sindical,
+        nivel_participacion,
+        comision,
+        cuota,
+        frecuencia_pago,
+        forma_pago,
+        cuenta_corriente,
         regimen,
         estado,
-        fecha_alta
+        fecha_alta,
+        prop_vertical,
+        api,
+        propiedad,
+        entramado
     )
 VALUES (
         1,
@@ -825,9 +847,20 @@ VALUES (
         'Mujer',
         'lucia.garcia@email.com',
         '600123456',
+        'Latina',
+        'Activa',
+        'No',
+        '15',
+        'Mensual',
+        'Domiciliación',
+        'ES9121000418450200051332',
         'Alquiler',
         'Alta',
-        '2023-01-15'
+        '2023-01-15',
+        'Si',
+        'No',
+        'Fidere Vivienda Madrid SL',
+        'Inversiones Inmobiliarias Globales'
     ),
     (
         2,
@@ -838,9 +871,20 @@ VALUES (
         'Hombre',
         'javier.rodriguez@email.com',
         '600234567',
+        'Latina',
+        'Colaboradora',
+        'Si',
+        '150',
+        'Anual',
+        'Domiciliación',
+        'ES9021000418450200051333',
         'Alquiler',
         'Alta',
-        '2023-02-20'
+        '2023-02-20',
+        'Si',
+        'No',
+        'Fidere Vivienda Madrid SL',
+        'Inversiones Inmobiliarias Globales'
     ),
     (
         3,
@@ -851,9 +895,20 @@ VALUES (
         'Mujer',
         'maria.sanchez@email.com',
         '600345678',
+        'Centro',
+        'Referente',
+        'No',
+        '15',
+        'Mensual',
+        'Efectivo',
+        '',
         'Alquiler',
         'Baja',
-        '2023-03-25'
+        '2023-03-25',
+        'Si',
+        'No',
+        'Fidere Vivienda Madrid SL',
+        'Inversiones Inmobiliarias Globales'
     ),
     (
         4,
@@ -864,9 +919,20 @@ VALUES (
         'Hombre',
         'carlos.lopez@email.com',
         '600456789',
+        'Centro',
+        'Activa',
+        'No',
+        '15',
+        'Mensual',
+        'Transferencia',
+        'ES7620770024003102575766',
         'Alquiler',
         'Alta',
-        '2023-04-10'
+        '2023-04-10',
+        'No',
+        'No',
+        'Azora Gestión Inmobiliaria SA',
+        'Inversiones Inmobiliarias Globales'
     ),
     (
         5,
@@ -877,74 +943,20 @@ VALUES (
         'Mujer',
         'ana.fernandez@email.com',
         '600567890',
+        'Este',
+        'Colaboradora',
+        'No',
+        '45',
+        'Trimestral',
+        'Domiciliación',
+        'ES1000492352082414205416',
         'Propiedad',
         'Alta',
-        '2023-05-18'
-    ),
-    (
-        6,
-        'A0006',
-        'Miguel',
-        'Gómez Silva',
-        '44556677F',
-        'Hombre',
-        'miguel.gomez@email.com',
-        '600678901',
-        'Alquiler',
-        'Alta',
-        '2023-06-22'
-    ),
-    (
-        7,
-        'A0007',
-        'Elena',
-        'Díaz Castro',
-        '33445566G',
-        'Mujer',
-        'elena.diaz@email.com',
-        '600789012',
-        'Alquiler',
-        'Alta',
-        '2023-07-30'
-    ),
-    (
-        8,
-        'A0008',
-        'Pedro',
-        'Moreno Vega',
-        '22334455H',
-        'Hombre',
-        'pedro.moreno@email.com',
-        '600890123',
-        'Alquiler',
-        'Suspendida',
-        '2023-08-15'
-    ),
-    (
-        9,
-        'A0009',
-        'Laura',
-        'Jiménez Blanco',
-        '66778899I',
-        'Mujer',
-        'laura.jimenez@email.com',
-        '600901234',
-        'Propiedad',
-        'Alta',
-        '2023-09-10'
-    ),
-    (
-        10,
-        'A0010',
-        'Roberto',
-        'Herrera Campos',
-        '77889900J',
-        'Hombre',
-        'roberto.herrera@email.com',
-        '601012345',
-        'Alquiler',
-        'Alta',
-        '2023-10-05'
+        '2023-05-18',
+        'No',
+        'No',
+        'Azora Gestión Inmobiliaria SA',
+        'Inversiones Inmobiliarias Globales'
     );
 
 -- Insertar facturación
@@ -983,28 +995,6 @@ VALUES (
         3,
         'Domiciliación',
         'ES1000492352082414205416'
-    ),
-    (
-        6,
-        15.00,
-        1,
-        'Domiciliación',
-        'ES0182380025120300951501'
-    ),
-    (7, 30.00, 6, 'Efectivo', NULL),
-    (
-        9,
-        180.00,
-        12,
-        'Domiciliación',
-        'ES9000246912501640045014'
-    ),
-    (
-        10,
-        15.00,
-        1,
-        'Transferencia',
-        'ES5520809476543210987654'
     );
 
 -- Insertar asesorías
@@ -1044,24 +1034,6 @@ VALUES (
         'Inquilina',
         'Legal',
         'Derivado a conflicto'
-    ),
-    (
-        6,
-        4,
-        'Programada',
-        '2025-01-25',
-        'Inquilina',
-        'Técnica',
-        NULL
-    ),
-    (
-        9,
-        4,
-        'Completada',
-        '2024-09-10',
-        'Propietaria',
-        'Legal',
-        'Información proporcionada'
     );
 
 -- Insertar conflictos
@@ -1074,8 +1046,7 @@ INSERT INTO
         causa,
         tarea_actual,
         fecha_apertura,
-        descripcion,
-        resolucion
+        descripcion
     )
 VALUES (
         1,
@@ -1085,8 +1056,7 @@ VALUES (
         'No renovación',
         'Comunicación con propietario',
         '2025-01-17',
-        'El propietario se niega a renovar el contrato sin justificación válida.',
-        NULL
+        'El propietario se niega a renovar el contrato sin justificación válida.'
     ),
     (
         2,
@@ -1096,8 +1066,7 @@ VALUES (
         'Fianza',
         NULL,
         '2024-11-19',
-        'El propietario no devuelve la fianza alegando daños inexistentes.',
-        'Se recuperó la fianza tras la mediación legal.'
+        'El propietario no devuelve la fianza alegando daños inexistentes.'
     ),
     (
         4,
@@ -1107,30 +1076,7 @@ VALUES (
         'Subida de alquiler',
         'Revisión de contrato',
         '2024-12-10',
-        'Incremento abusivo del alquiler superior al IPC.',
-        NULL
-    ),
-    (
-        6,
-        3,
-        'En proceso',
-        'Bloque',
-        'Reparaciones / Habitabilidad',
-        'Inspección técnica',
-        '2024-11-05',
-        'Problemas de humedades y calefacción en el edificio.',
-        NULL
-    ),
-    (
-        8,
-        3,
-        'Abierto',
-        'Afiliada',
-        'Acoso inmobiliario',
-        'Recopilación de pruebas',
-        '2024-12-20',
-        'Presiones constantes para abandonar la vivienda.',
-        NULL
+        'Incremento abusivo del alquiler superior al IPC.'
     );
 
 -- Insertar diario de conflictos
@@ -1188,37 +1134,9 @@ VALUES (
         'Análisis del contrato de alquiler y comparación con índices oficiales.',
         'Revisión de contrato',
         '2024-12-10 09:15:00'
-    ),
-    (
-        4,
-        3,
-        'En proceso',
-        'informe vulnerabilidad',
-        'Elaborado informe de vulnerabilidad social de las afiliadas afectadas.',
-        'Inspección técnica',
-        '2024-11-05 14:20:00'
-    ),
-    (
-        4,
-        3,
-        'En proceso',
-        'acción',
-        'Reunión con la comunidad de propietarios para abordar las reparaciones.',
-        'Inspección técnica',
-        '2024-11-15 11:00:00'
-    ),
-    (
-        5,
-        3,
-        'Abierto',
-        'nota simple',
-        'Primera entrevista con la afiliada. Documentación de incidentes.',
-        'Recopilación de pruebas',
-        '2024-12-20 10:30:00'
     );
 
 -- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
--- This procedure assigns nodo_id to bloques based on the most common nodo_id among their pisos' CPs
 CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
 LANGUAGE plpgsql
 AS $$
@@ -1226,9 +1144,7 @@ DECLARE
     bloque_record RECORD;
     most_common_nodo_id INTEGER;
 BEGIN
-    -- Itera sobre cada bloque que no tiene un nodo asignado
     FOR bloque_record IN SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL LOOP
-        -- Encuentra el nodo_id más común entre los pisos de este bloque
         SELECT ncm.nodo_id INTO most_common_nodo_id
         FROM sindicato_inq.pisos p
         JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
@@ -1237,7 +1153,6 @@ BEGIN
         ORDER BY COUNT(*) DESC
         LIMIT 1;
 
-        -- Si se encontró un nodo común, actualiza el bloque
         IF FOUND AND most_common_nodo_id IS NOT NULL THEN
             UPDATE sindicato_inq.bloques
             SET nodo_id = most_common_nodo_id
@@ -1250,93 +1165,9 @@ $$;
 -- =====================================================================
 -- PASO 6: SINCRONIZACIÓN Y FINALIZACIÓN
 -- =====================================================================
-
--- La sincronización ya se ejecutó arriba con el bloque DO
+CALL sync_all_bloques_to_nodos ();
 
 -- =====================================================================
 -- CONFIRMACIÓN Y ESTADÍSTICAS
 -- =====================================================================
-
 SELECT 'Base de datos poblada correctamente con datos artificiales' as mensaje;
-
--- Verificar que el usuario admin se creó correctamente
-SELECT
-    u.id,
-    u.alias,
-    u.nombre,
-    u.apellidos,
-    u.email,
-    r.nombre as rol,
-    CASE
-        WHEN uc.password_hash IS NOT NULL THEN 'Hash configurado'
-        ELSE 'Sin hash'
-    END as estado_password
-FROM
-    usuarios u
-    LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
-    LEFT JOIN roles r ON ur.role_id = r.id
-    LEFT JOIN usuario_credenciales uc ON u.id = uc.usuario_id
-WHERE
-    u.alias = 'admin';
-
--- Mostrar estadísticas generales
-SELECT 'Nodos' as tabla, COUNT(*) as registros
-FROM nodos
-UNION ALL
-SELECT 'Entramados', COUNT(*)
-FROM entramado_empresas
-UNION ALL
-SELECT 'Empresas', COUNT(*)
-FROM empresas
-UNION ALL
-SELECT 'Bloques', COUNT(*)
-FROM bloques
-UNION ALL
-SELECT 'Pisos', COUNT(*)
-FROM pisos
-UNION ALL
-SELECT 'Usuarios', COUNT(*)
-FROM usuarios
-UNION ALL
-SELECT 'Afiliadas', COUNT(*)
-FROM afiliadas
-UNION ALL
-SELECT 'Conflictos', COUNT(*)
-FROM conflictos
-UNION ALL
-SELECT 'Diario Conflictos', COUNT(*)
-FROM diario_conflictos
-UNION ALL
-SELECT 'Asesorías', COUNT(*)
-FROM asesorias
-UNION ALL
-SELECT 'Facturación', COUNT(*)
-FROM facturacion
-ORDER BY tabla;
-
--- Verificar integridad de relaciones críticas
-SELECT 'Verificaciones de integridad:' as mensaje;
-
-SELECT
-    COUNT(*) as bloques_sin_nodo,
-    'bloques sin nodo asignado' as descripcion
-FROM bloques
-WHERE
-    nodo_id IS NULL;
-
-SELECT
-    COUNT(*) as usuarios_sin_credenciales,
-    'usuarios sin credenciales' as descripcion
-FROM
-    usuarios u
-    LEFT JOIN usuario_credenciales uc ON u.id = uc.usuario_id
-WHERE
-    uc.usuario_id IS NULL;
-
-SELECT
-    COUNT(*) as usuarios_sin_roles,
-    'usuarios sin roles asignados' as descripcion
-FROM usuarios u
-    LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
-WHERE
-    ur.usuario_id IS NULL;
