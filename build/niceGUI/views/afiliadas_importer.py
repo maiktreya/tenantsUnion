@@ -95,6 +95,7 @@ class AfiliadasImporterView:
                 return None
 
             afiliada_data = {
+                "num_afiliada": get_val(29),
                 "nombre": nombre,
                 "apellidos": f"{get_val(2)} {get_val(3)}".strip(),
                 "genero": get_val(4),
@@ -103,6 +104,7 @@ class AfiliadasImporterView:
                 "email": get_val(8),
                 "fecha_alta": get_val(16),
                 "regimen": get_val(17),
+                "api": get_val(18),
                 "estado": "Alta",
                 "piso_id": None,
             }
@@ -119,13 +121,22 @@ class AfiliadasImporterView:
                 "cp": int(get_val(14)) if get_val(14).isdigit() else None,
             }
 
-            cuota_str = get_val(25)
-            cuota_match = re.search(r"\|(\d+)", cuota_str)
+            cuota_type = get_val(22)
+            if cuota_type == "Cuota de Apoyo":
+                cuota_str = get_val(23)
+            elif cuota_type == "Cuota Sindical":
+                cuota_str = get_val(24)
+            else:  # Cuota Social
+                cuota_str = get_val(25)
+
+            cuota_match = re.search(r"(\d+)\s*€\s*(mes|año)", cuota_str)
             iban_raw = get_val(26).replace(" ", "")
 
             facturacion_data = {
                 "cuota": float(cuota_match.group(1)) if cuota_match else 0.0,
-                "periodicidad": 12 if "año" in cuota_str else 1,
+                "periodicidad": (
+                    12 if cuota_match and cuota_match.group(2) == "año" else 1
+                ),
                 "forma_pago": "Domiciliación" if iban_raw else "Otro",
                 "iban": iban_raw.upper() if iban_raw else None,
                 "afiliada_id": None,
@@ -152,14 +163,19 @@ class AfiliadasImporterView:
             with ui.row().classes(
                 "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md"
             ):
+                ui.label("Nº Afiliada").classes("w-24")
                 ui.label("Nombre").classes("w-32")
                 ui.label("Apellidos").classes("w-48")
                 ui.label("CIF/NIE").classes("w-24")
                 ui.label("Email").classes("flex-grow")
                 ui.label("Teléfono").classes("w-24")
+                ui.label("API").classes("w-24")
             with ui.scroll_area().classes("w-full h-96"):
                 for record in self.records_to_import:
                     with ui.row().classes("w-full items-center gap-2 p-2 border-t"):
+                        ui.input(label=None).bind_value(
+                            record["afiliada"], "num_afiliada"
+                        ).classes("w-24")
                         ui.input(label=None).bind_value(
                             record["afiliada"], "nombre"
                         ).classes("w-32")
@@ -174,6 +190,9 @@ class AfiliadasImporterView:
                         ).classes("flex-grow")
                         ui.input(label=None).bind_value(
                             record["afiliada"], "telefono"
+                        ).classes("w-24")
+                        ui.input(label=None).bind_value(
+                            record["afiliada"], "api"
                         ).classes("w-24")
 
     def _render_pisos_panel(self):
@@ -264,11 +283,16 @@ class AfiliadasImporterView:
                     raise Exception("No se pudo crear/encontrar el piso.")
 
                 record["afiliada"]["piso_id"] = piso_id
-                cif = record["afiliada"]["cif"]
-                if not cif:
-                    raise Exception("CIF/NIE es obligatorio.")
-                if await self.api.get_records("afiliadas", {"cif": f"eq.{cif}"}):
-                    raise Exception(f"La afiliada con CIF {cif} ya existe.")
+
+                num_afiliada = record["afiliada"]["num_afiliada"]
+                if not num_afiliada:
+                    raise Exception("El Nº de Afiliada (ID Entrada) es obligatorio.")
+                if await self.api.get_records(
+                    "afiliadas", {"num_afiliada": f"eq.{num_afiliada}"}
+                ):
+                    raise Exception(
+                        f"La afiliada con Nº de Afiliada {num_afiliada} ya existe."
+                    )
 
                 new_afiliada = await self.api.create_record(
                     "afiliadas", record["afiliada"]
