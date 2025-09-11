@@ -84,7 +84,9 @@ def create_login_page(api_client: APIClient):
             return RedirectResponse("/")
 
         with ui.card().classes("absolute-center"):
-            ui.label("Gestión Sindicato INQ").classes("text-h6 self-center")
+            ui.label("Gestión Sindicato Inquilinas de Madrid").classes(
+                "text-h6 self-center"
+            )
             username = ui.input("Username").on("keydown.enter", try_login)
             password = ui.input(
                 "Password", password=True, password_toggle_button=True
