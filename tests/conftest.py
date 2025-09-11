@@ -11,7 +11,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from api.client import APIClient
+from tests.debug_client import DebugAPIClient  # <-- MODIFIED: Import the debug client
 from build.niceGUI.main import app as nicegui_app
 from build.niceGUI.views import HomeView, AdminView
 from nicegui import ui
@@ -28,13 +28,13 @@ def mock_api_url() -> str:
 
 
 @pytest.fixture
-def api_client(mock_api_url: str) -> APIClient:
+def api_client(mock_api_url: str) -> DebugAPIClient: # <-- MODIFIED: Updated type hint
     """
-    Provides an instance of the APIClient, configured to use the mock URL.
+    Provides an instance of the DebugAPIClient, configured to use the mock URL.
     This is used for unit-testing components that depend on the API client.
     """
     # We create a new instance for each test to ensure isolation
-    client = APIClient(base_url=mock_api_url)
+    client = DebugAPIClient(base_url=mock_api_url) # <-- MODIFIED: Instantiate the debug client
     # Ensure client is reset for each test run
     client.client = None
     return client
