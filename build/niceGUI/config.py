@@ -9,7 +9,7 @@ class Config:
     API_BASE_URL: str = os.environ.get("POSTGREST_API_URL", "http://localhost:3001")
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8081
-    APP_TITLE: str = "Gestión Sindicato INQ"
+    APP_TITLE: str = "Gestión Sindicato de Inquilinas de Madrid"
     PAGE_SIZE_OPTIONS: list = None
 
     def __post_init__(self):
