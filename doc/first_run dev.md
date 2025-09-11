@@ -34,7 +34,7 @@ Execute the following command from the root of the project:
  # if you have a local python enviroment with the requirements installed you could run the frontend directly from source
  docker compose up -f docker-compose.yaml -f docker-compose-dev.yaml -d && python build/niceGUI/main.py
 
- # for allowing an enviroment with a local postgreSQL instance with hot reload
+ # for allowing an enviroment with a local postgreSQL instance with hot reload and monitor logs
  docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml  up  -d --renew-anon-volumes && docker logs --follow tenantsunion-db-1
 ```
 
@@ -46,10 +46,22 @@ Start the **db**, **server**, and **nicegui-app** services in the background (-d
 
 The db service will automatically run the script specified by  `INIT_SCRIPTS_PATH`, creating the schema and populating it with artificial data in case `build/postgreSQL/init-scripts-dev/artificial_data.sql` is used.
 
-## 4. Accessing the Application
+## 4. Accessing the Application layers
 
 Once the containers are running, you can access the application directly in your web browser at:
 
 ```bash
 http://localhost:8081
+```
+
+The api would be available on your local network at (example endpoint to table afiliadas):
+
+```bash
+http://localhost:3001/afiliadas
+```
+
+And aslo locally available, you would be able to access the postgreSQL instance at:
+
+```bash
+postgresql://app_user:password@localhost:5432/mydb?search_path=sindicato_inq
 ```

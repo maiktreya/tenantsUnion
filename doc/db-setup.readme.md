@@ -1,10 +1,9 @@
----
 
 # Guía de Construcción del Esquema de la Base de Datos
 
 ---
-Este documento describe el proceso paso a paso utilizado para construir y poblar el esquema de la base de datos PostgreSQL de la app. El proceso está automatizado a través de una serie de scripts SQL ordenados ubicados en el directorio `/build/postgreSQL/init-scripts/`.
 
+Este documento describe el proceso paso a paso utilizado para construir y poblar el esquema de la base de datos PostgreSQL de la app. El proceso está automatizado a través de una serie de scripts SQL ordenados ubicados en el directorio `/build/postgreSQL/init-scripts/`.
 
 (**NOTA:** Muchas de las tablas de la versión interior se han ignorado directamente por ser **a) innecesarias** o redundantes **b) inconsistentes** desde el punto de vista de la integridad relacional de los datos **c) vulnerables** desde el punto de vista de la seguridad, como el almacenamiento en texto plano de passwords).
 
@@ -57,7 +56,7 @@ Este script construye la infraestructura necesaria para la gestión de usuarios 
 Para simplificar las consultas del frontend y mejorar el rendimiento, este script crea varias vistas de base de datos.
 
 1.  **Creación de Vistas**: Se ejecuta una serie de sentencias `CREATE OR REPLACE VIEW`.
-2.  **Desnormalización**: Estas vistas unen múltiples tablas para proporcionar una visión aplanada y completa de los datos. Por ejemplo, `v_afiliadas` combina información de `afiliadas`, `pisos`, `bloques` y `empresas` para presentar un registro completo de cada afiliada.
+2.  **Desnormalización**: Estas vistas unen múltiples tablas para proporcionar una visión aplanada y completa de los datos. Por ejemplo, `v_afiliadas_detalle` combina información de `afiliadas`, `pisos`, `bloques` y `empresas` para presentar un registro completo de cada afiliada.
 3.  **Propósito**: El objetivo principal es proporcionar fuentes de datos listas para usar para el "Explorador de Vistas" de la aplicación y otros módulos, reduciendo la necesidad de agregaciones de datos complejas en el lado del cliente.
 
 ---
@@ -66,5 +65,37 @@ Para simplificar las consultas del frontend y mejorar el rendimiento, este scrip
 
 Finalmente, este script puebla tablas de consulta esenciales que fueron creadas en los pasos anteriores.
 
-
 2.  **Datos de Nodos y CPs**: Como se mencionó en el Paso 2, este script es responsable de rellenar las tablas `nodos` y `nodos_cp_mapping` con los datos geográficos reales.
+
+---
+
+## Paso 6: Lógica de Negocio Embebida (`06-init-plpgsql_functions.sql`)
+
+Este script introduce lógica de negocio directamente en la base de datos a través de funciones y procedimientos almacenados en PL/pgSQL, lo que centraliza y automatiza tareas complejas.
+
+1.  **Función de Coincidencia de Direcciones**: Se crea la función `find_best_match_bloque_id` que utiliza la extensión `pg_trgm` para realizar una comparación difusa (fuzzy matching) de cadenas de texto. Su objetivo es encontrar el `bloque` más probable para un `piso` determinado comparando sus campos de `direccion` y devolviendo el ID del bloque si la similitud supera un umbral del 88%.
+2.  **Sincronización de Nodos en Bloques**: Se define el procedimiento `sync_all_bloques_to_nodos`, que asigna un `nodo_id` a los bloques basándose en el nodo más común entre los códigos postales de sus pisos asociados.
+3.  **Trigger de Actualización Automática**: Se establece el trigger `trigger_sync_bloque_nodo` que se dispara automáticamente al insertar o actualizar un `piso`, llamando a la función `sync_bloque_nodo` para mantener la consistencia geográfica del `bloque` padre.
+
+---
+
+## Paso 7: Disparadores de Configuración Inicial (`07-init-link-pisos-afiliadas-bloques-nodos.sql`)
+
+Una vez que los datos y la lógica de negocio están en su lugar, este script ejecuta las rutinas iniciales para vincular los registros existentes.
+
+1.  **Vinculación de Pisos a Bloques**: El script ejecuta una sentencia `UPDATE` masiva sobre la tabla `pisos`. Para cada piso que no tiene un `bloque_id` asignado, invoca a la función `find_best_match_bloque_id` para intentar encontrar y asignar el bloque correspondiente de forma automática.
+2.  **Sincronización de Nodos**: Inmediatamente después, se llama al procedimiento `sync_all_bloques_to_nodos()` para asegurar que todos los bloques queden correctamente asociados a su nodo territorial correspondiente, basándose en la información de los pisos recién vinculados.
+
+---
+
+## Paso 8: Medición de Precisión y Resumen (`08-init-measure-accuracy.sql`)
+
+El último paso del proceso está dedicado a la evaluación y presentación de los resultados del algoritmo de vinculación, proporcionando una visión clara de su efectividad.
+
+1.  **Análisis Detallado**: El script utiliza la vista `comprobar_link_pisos_bloques` para mostrar una lista detallada de cada `piso`, el `bloque` al que ha sido vinculado y el índice de similitud (`score`) que obtuvo en el proceso de matching. Esto permite una revisión manual de la calidad de las vinculaciones.
+2.  **Resumen Estadístico en Consola**: Se ejecuta una consulta de agregación que calcula y muestra en la consola un resumen final del proceso:
+    * **Total de registros** en la tabla `pisos`.
+    * **Número de registros vinculados** exitosamente a un `bloque`.
+    * **Número de registros no vinculados**.
+    * **Porcentaje de éxito** de la vinculación.
+    * **Similitud promedio** de todas las coincidencias exitosas.
