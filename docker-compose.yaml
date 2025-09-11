@@ -40,7 +40,7 @@ services:
     working_dir: /app
     command: >
       sh -c "pip install --upgrade pip &&
-             pip install --root-user-action=ignore passlib==1.7.4 bcrypt==4.0.1 nicegui httpx pydantic[email] pandas &&
+             pip install --root-user-action=ignore passlib==1.7.4 bcrypt==4.0.1 nicegui httpx pandas &&
              python main.py"
     depends_on:
       - server

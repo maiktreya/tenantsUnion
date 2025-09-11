@@ -1,7 +1,7 @@
 import pytest
 import respx
 from httpx import Response, ConnectError
-from build.niceGUI.api.client import APIClient
+from api.client import APIClient
 
 # Marks all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio

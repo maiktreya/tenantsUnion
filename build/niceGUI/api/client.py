@@ -1,7 +1,8 @@
 import httpx
 from typing import Dict, List, Optional, Any, Tuple
 from nicegui import ui
-from models.validate import validator
+from api.validate import validator
+
 
 class APIClient:
     """
@@ -30,16 +31,19 @@ class APIClient:
         order: Optional[str] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-        validate_response: bool = False
+        validate_response: bool = False,
     ) -> List[Dict]:
         """Get records as dictionaries with optional response validation."""
         client = self._ensure_client()
         url = f"{self.base_url}/{table}"
         params = filters or {}
 
-        if order: params['order'] = order
-        if limit: params['limit'] = limit
-        if offset: params['offset'] = offset
+        if order:
+            params["order"] = order
+        if limit:
+            params["limit"] = limit
+        if offset:
+            params["offset"] = offset
 
         try:
             response = await client.get(url, params=params)
@@ -54,15 +58,21 @@ class APIClient:
                     if is_valid:
                         validated_records.append(record)
                     else:
-                        ui.notify(f'Invalid record in {table}: {"; ".join(errors)}', type='warning')
+                        ui.notify(
+                            f'Invalid record in {table}: {"; ".join(errors)}',
+                            type="warning",
+                        )
                 return validated_records
 
             return records
         except httpx.HTTPStatusError as e:
-            ui.notify(f'Error HTTP {e.response.status_code}: {e.response.text}', type='negative')
+            ui.notify(
+                f"Error HTTP {e.response.status_code}: {e.response.text}",
+                type="negative",
+            )
             return []
         except Exception as e:
-            ui.notify(f'Error al obtener registros: {str(e)}', type='negative')
+            ui.notify(f"Error al obtener registros: {str(e)}", type="negative")
             return []
 
     async def create_record(
@@ -70,7 +80,7 @@ class APIClient:
         table: str,
         data: Dict,
         validate: bool = True,
-        show_validation_errors: bool = True
+        show_validation_errors: bool = True,
     ) -> Optional[Dict]:
         """Create a new record from a dictionary with optional validation."""
 
@@ -79,7 +89,9 @@ class APIClient:
             is_valid, errors = validator.validate_record(table, data, "create")
             if not is_valid:
                 if show_validation_errors:
-                    ui.notify(f'Validation errors: {"; ".join(errors)}', type='negative')
+                    ui.notify(
+                        f'Validation errors: {"; ".join(errors)}', type="negative"
+                    )
                 return None
 
         client = self._ensure_client()
@@ -94,14 +106,19 @@ class APIClient:
 
             # Optional post-creation validation
             if validate:
-                is_valid, errors = validator.validate_record(table, created_record, "read")
+                is_valid, errors = validator.validate_record(
+                    table, created_record, "read"
+                )
                 if not is_valid and show_validation_errors:
-                    ui.notify(f'Warning - Created record has validation issues: {"; ".join(errors)}', type='warning')
+                    ui.notify(
+                        f'Warning - Created record has validation issues: {"; ".join(errors)}',
+                        type="warning",
+                    )
 
             return created_record
 
         except Exception as e:
-            ui.notify(f'Error al crear registro: {str(e)}', type='negative')
+            ui.notify(f"Error al crear registro: {str(e)}", type="negative")
             return None
 
     async def update_record(
@@ -110,7 +127,7 @@ class APIClient:
         record_id: Any,
         data: Dict,
         validate: bool = True,
-        show_validation_errors: bool = True
+        show_validation_errors: bool = True,
     ) -> Optional[Dict]:
         """Update a record from a dictionary with optional validation."""
 
@@ -119,16 +136,18 @@ class APIClient:
             is_valid, errors = validator.validate_record(table, data, "update")
             if not is_valid:
                 if show_validation_errors:
-                    ui.notify(f'Validation errors: {"; ".join(errors)}', type='negative')
+                    ui.notify(
+                        f'Validation errors: {"; ".join(errors)}', type="negative"
+                    )
                 return None
 
         client = self._ensure_client()
 
         # Handle composite keys or different primary key names
         pk_filter = f"id=eq.{record_id}"
-        if table == 'usuario_credenciales':
+        if table == "usuario_credenciales":
             pk_filter = f"usuario_id=eq.{record_id}"
-        elif table == 'nodos_cp_mapping':
+        elif table == "nodos_cp_mapping":
             pk_filter = f"cp=eq.{record_id}"
 
         url = f"{self.base_url}/{table}?{pk_filter}"
@@ -142,14 +161,19 @@ class APIClient:
 
             # Optional post-update validation
             if validate:
-                is_valid, errors = validator.validate_record(table, updated_record, "read")
+                is_valid, errors = validator.validate_record(
+                    table, updated_record, "read"
+                )
                 if not is_valid and show_validation_errors:
-                    ui.notify(f'Warning - Updated record has validation issues: {"; ".join(errors)}', type='warning')
+                    ui.notify(
+                        f'Warning - Updated record has validation issues: {"; ".join(errors)}',
+                        type="warning",
+                    )
 
             return updated_record
 
         except Exception as e:
-            ui.notify(f'Error al actualizar registro: {str(e)}', type='negative')
+            ui.notify(f"Error al actualizar registro: {str(e)}", type="negative")
             return None
 
     async def delete_record(self, table: str, record_id: int) -> bool:
@@ -162,19 +186,19 @@ class APIClient:
             response.raise_for_status()
             return True
         except Exception as e:
-            ui.notify(f'Error al eliminar registro: {str(e)}', type='negative')
+            ui.notify(f"Error al eliminar registro: {str(e)}", type="negative")
             return False
 
     # =====================================================================
     #  ENHANCED UTILITY METHODS
     # =====================================================================
 
-    async def get_record_by_id(self, table: str, record_id: Any, validate: bool = False) -> Optional[Dict]:
+    async def get_record_by_id(
+        self, table: str, record_id: Any, validate: bool = False
+    ) -> Optional[Dict]:
         """Get a single record by ID with optional validation."""
         records = await self.get_records(
-            table,
-            filters={'id': f'eq.{record_id}'},
-            validate_response=validate
+            table, filters={"id": f"eq.{record_id}"}, validate_response=validate
         )
         return records[0] if records else None
 
@@ -183,7 +207,7 @@ class APIClient:
         table: str,
         records: List[Dict],
         validate: bool = True,
-        stop_on_error: bool = False
+        stop_on_error: bool = False,
     ) -> Tuple[List[Dict], List[str]]:
         """Create multiple records with optional validation and error handling."""
         created = []
@@ -191,10 +215,7 @@ class APIClient:
 
         for i, record in enumerate(records):
             result = await self.create_record(
-                table,
-                record,
-                validate=validate,
-                show_validation_errors=False
+                table, record, validate=validate, show_validation_errors=False
             )
 
             if result:
@@ -207,13 +228,16 @@ class APIClient:
 
         return created, errors
 
-    async def validate_record_data(self, table: str, data: Dict, operation: str = "create") -> Tuple[bool, List[str]]:
+    async def validate_record_data(
+        self, table: str, data: Dict, operation: str = "create"
+    ) -> Tuple[bool, List[str]]:
         """Explicitly validate record data without performing any database operations."""
         return validator.validate_record(table, data, operation)
 
     def get_table_schema(self, table: str) -> Optional[Dict]:
         """Get table configuration from TABLE_INFO."""
         from config import TABLE_INFO
+
         return TABLE_INFO.get(table)
 
     def get_field_constraints(self, table: str, field: str) -> Dict[str, Any]:
@@ -230,10 +254,7 @@ class APIClient:
         return {k: v for k, v in record.items() if k not in hidden_fields}
 
     async def search_records(
-        self,
-        table: str,
-        search_term: str,
-        search_fields: Optional[List[str]] = None
+        self, table: str, search_term: str, search_fields: Optional[List[str]] = None
     ) -> List[Dict]:
         """Search records across specified fields using PostgREST text search."""
         schema = self.get_table_schema(table)
@@ -244,7 +265,11 @@ class APIClient:
         if not search_fields:
             all_fields = schema.get("fields", [])
             hidden_fields = set(schema.get("hidden_fields", []))
-            search_fields = [f for f in all_fields if f not in hidden_fields and not f.endswith('_id')]
+            search_fields = [
+                f
+                for f in all_fields
+                if f not in hidden_fields and not f.endswith("_id")
+            ]
 
         # Build OR filters for text search
         filters = {}
@@ -252,7 +277,9 @@ class APIClient:
             filters[f"{field}"] = f"ilike.*{search_term}*"
 
         # For PostgREST, we need to use the 'or' parameter
-        or_conditions = ",".join([f"{field}.ilike.*{search_term}*" for field in search_fields])
+        or_conditions = ",".join(
+            [f"{field}.ilike.*{search_term}*" for field in search_fields]
+        )
         filters = {"or": f"({or_conditions})"}
 
         return await self.get_records(table, filters=filters)
@@ -261,7 +288,9 @@ class APIClient:
     #  RELATIONSHIP HELPERS
     # =====================================================================
 
-    async def get_related_records(self, table: str, record_id: Any, relation_table: str) -> List[Dict]:
+    async def get_related_records(
+        self, table: str, record_id: Any, relation_table: str
+    ) -> List[Dict]:
         """Get records related to a parent record."""
         schema = self.get_table_schema(table)
         if not schema:
@@ -270,8 +299,7 @@ class APIClient:
         # Find the relationship configuration
         child_relations = schema.get("child_relations", [])
         relation_config = next(
-            (rel for rel in child_relations if rel["table"] == relation_table),
-            None
+            (rel for rel in child_relations if rel["table"] == relation_table), None
         )
 
         if not relation_config:
@@ -282,7 +310,9 @@ class APIClient:
 
         return await self.get_records(relation_table, filters=filters)
 
-    async def get_parent_record(self, table: str, record: Dict, parent_field: str) -> Optional[Dict]:
+    async def get_parent_record(
+        self, table: str, record: Dict, parent_field: str
+    ) -> Optional[Dict]:
         """Get the parent record for a relationship field."""
         schema = self.get_table_schema(table)
         if not schema or parent_field not in record:

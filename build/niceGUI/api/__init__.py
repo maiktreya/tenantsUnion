@@ -1,3 +1,8 @@
 from .client import APIClient
+from .validate import TableValidator, validator
 
-__all__ = ['APIClient']
+__all__ = [
+    "TableValidator",
+    "validator",
+    "APIClient",
+]
