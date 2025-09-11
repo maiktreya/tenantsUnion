@@ -9,14 +9,15 @@ from datetime import date
 from nicegui import ui, events
 from api.client import APIClient
 from api.validate import validator
+from state.importer_state import ImporterState
 
 
 class AfiliadasImporterView:
-    """A view to import 'afiliadas' with live validation and an editable preview."""
+    """A view to import 'afiliadas' with live validation, sorting, and an editable preview."""
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-        self.records_to_import: List[Dict] = []
+        self.state = ImporterState()
         self.afiliadas_panel: Optional[ui.column] = None
         self.pisos_panel: Optional[ui.column] = None
         self.facturacion_panel: Optional[ui.column] = None
@@ -65,35 +66,29 @@ class AfiliadasImporterView:
         """Handle the file upload, parse, validate, and render the editable tabs."""
         try:
             content = e.content.read()
-            # More robust decoding to handle potential encoding issues
             decoded_content = content.decode("utf-8-sig")
             raw_dataframe = pd.read_csv(
                 io.StringIO(decoded_content), header=None, quotechar='"', sep=","
             )
 
-            self.records_to_import = [
+            records = [
                 record
-                for row in raw_dataframe.iterrows()
-                if (record := self._transform_and_validate_row(row[1])) is not None
+                for _, row in raw_dataframe.iterrows()
+                if (record := self._transform_and_validate_row(row)) is not None
             ]
+            self.state.set_records(records)
 
             self._render_preview_tabs()
             ui.notify(
                 "Archivo procesado. Revisa y corrige los datos antes de importar.",
                 type="positive",
             )
-        except UnicodeDecodeError:
-            ui.notify(
-                "Error de codificación. Asegúrate de que el archivo esté guardado en formato UTF-8.",
-                type="negative",
-            )
         except Exception as ex:
-            # Provide a more detailed error message for debugging
             ui.notify(
                 f"Error al procesar el archivo: {type(ex).__name__}: {ex}",
                 type="negative",
             )
-            self.records_to_import = []
+            self.state.set_records([])
             self._render_preview_tabs()
 
     def _transform_and_validate_row(self, row: pd.Series) -> Optional[Dict[str, Any]]:
@@ -173,13 +168,11 @@ class AfiliadasImporterView:
                 },
             }
         except Exception as e:
-            # This helps debug issues with specific rows during development
             print(f"Skipping row due to parsing error: {e}")
             return None
 
     def _render_preview_tabs(self):
         """Render all three preview panels and update the import button state."""
-        # --- FIX: Use the correct singular keys to match the data structure ---
         self._render_panel(
             "afiliada",
             self.afiliadas_panel,
@@ -198,7 +191,7 @@ class AfiliadasImporterView:
         self._update_import_button_state()
 
     def _render_panel(self, data_key: str, panel: ui.column, fields: List[str]):
-        """Generic function to render a preview panel for afiliadas, pisos, or facturacion."""
+        """Generic function to render a preview panel with sorting and reactive rows."""
         if not panel:
             return
         panel.clear()
@@ -223,23 +216,94 @@ class AfiliadasImporterView:
 
         with panel:
             with ui.row().classes(
-                "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md"
+                "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md items-center"
             ):
-                # Add a label for the afiliada column in all panels for context
+                with ui.row().classes("w-24 items-center cursor-pointer").on(
+                    "click", lambda: self._sort_by_column("is_valid")
+                ):
+                    ui.label("Estado")
+                    sort_info = next(
+                        (
+                            crit
+                            for crit in self.state.sort_criteria
+                            if crit[0] == "is_valid"
+                        ),
+                        None,
+                    )
+                    if sort_info:
+                        ui.icon(
+                            "arrow_upward" if sort_info[1] else "arrow_downward",
+                            size="sm",
+                        )
+
                 ui.label("Afiliada").classes("w-48")
                 for field in fields:
-                    # Dynamically set column width
                     width_class = (
                         "flex-grow"
                         if field in ["email", "direccion", "iban"]
                         else "w-32"
                     )
-                    ui.label(header_map.get(field, field.title())).classes(width_class)
+                    with ui.row().classes(
+                        f"{width_class} items-center cursor-pointer"
+                    ).on("click", lambda f=field: self._sort_by_column(f)):
+                        ui.label(header_map.get(field, field.title()))
+                        sort_info = next(
+                            (
+                                crit
+                                for crit in self.state.sort_criteria
+                                if crit[0] == field
+                            ),
+                            None,
+                        )
+                        if sort_info:
+                            ui.icon(
+                                "arrow_upward" if sort_info[1] else "arrow_downward",
+                                size="sm",
+                            )
 
             with ui.scroll_area().classes("w-full h-96"):
-                for record in self.records_to_import:
-                    row_classes = "w-full items-center gap-2 p-2 border-t"
-                    with ui.row().classes(row_classes) as row:
+                for record in self.state.records:
+                    if "ui_updaters" not in record:
+                        record["ui_updaters"] = {}
+
+                    with ui.row().classes(
+                        "w-full items-center gap-2 p-2 border-t"
+                    ) as row:
+
+                        def update_row_style(r=row, rec=record):
+                            is_valid = rec["validation"]["is_valid"]
+                            errors = rec["validation"]["errors"]
+                            r.classes(
+                                remove="bg-red-100 bg-green-50",
+                                add="bg-green-50" if is_valid else "bg-red-100",
+                            )
+                            r.tooltip(
+                                "\n".join(errors) if not is_valid else "Registro válido"
+                            )
+
+                        record["ui_updaters"][data_key] = update_row_style
+
+                        with ui.column().classes(
+                            "w-24 flex items-center justify-center"
+                        ):
+                            # --- FIX: Provide a default name when creating the icon ---
+                            status_icon = ui.icon("placeholder")
+
+                            def update_status_icon(rec=record, ic=status_icon):
+                                is_valid = rec["validation"]["is_valid"]
+                                ic.name = "check_circle" if is_valid else "cancel"
+                                ic.classes(
+                                    remove="text-green-500 text-red-500",
+                                    add=(
+                                        "text-green-500" if is_valid else "text-red-500"
+                                    ),
+                                )
+
+                            record["ui_updaters"][
+                                f"status_icon_{data_key}"
+                            ] = update_status_icon
+                            update_status_icon()
+
                         afiliada_label = f"{record['afiliada']['nombre']} {record['afiliada']['apellidos']}"
                         ui.label(afiliada_label).classes("w-48 text-sm text-gray-600")
 
@@ -261,24 +325,26 @@ class AfiliadasImporterView:
                                 "change", lambda r=record: self._revalidate_record(r)
                             )
 
-                    def update_row_style(rec, r=row):
-                        is_valid = rec["validation"]["is_valid"]
-                        errors = rec["validation"]["errors"]
-                        r.classes(
-                            remove="bg-red-100 bg-green-50",
-                            add="bg-green-50" if is_valid else "bg-red-100",
-                        )
-                        r.tooltip(
-                            "\n".join(errors) if not is_valid else "Registro válido"
-                        )
+                    update_row_style()
 
-                    update_row_style(record)
-                    record[f"update_style_{data_key}"] = (
-                        lambda rec=record: update_row_style(rec)
-                    )
+    def _sort_by_column(self, column: str):
+        """Handles sorting when a column header is clicked."""
+        existing_criterion = next(
+            (c for c in self.state.sort_criteria if c[0] == column), None
+        )
+        if column == "is_valid":
+            new_direction = True
+        elif existing_criterion:
+            new_direction = not existing_criterion[1]
+        else:
+            new_direction = True
+
+        self.state.sort_criteria = [(column, new_direction)]
+        self.state.apply_filters_and_sort()
+        self._render_preview_tabs()
 
     def _revalidate_record(self, record: Dict):
-        """Re-validates a single record after it has been edited in the UI."""
+        """Re-validates a single record and updates its UI in ALL tabs."""
         is_valid_afiliada, errors_afiliada = validator.validate_record(
             "afiliadas", record["afiliada"], "create"
         )
@@ -296,27 +362,23 @@ class AfiliadasImporterView:
             errors_afiliada + errors_piso + errors_facturacion
         )
 
-        for key in ["afiliada", "piso", "facturacion"]:
-            if f"update_style_{key}" in record:
-                record[f"update_style_{key}"]()
+        if "ui_updaters" in record:
+            for updater in record["ui_updaters"].values():
+                updater()
+
         self._update_import_button_state()
 
     def _update_import_button_state(self):
         """Enable or disable the import button based on validation status."""
         if self.import_button:
-            all_valid = all(r["validation"]["is_valid"] for r in self.records_to_import)
-            self.import_button.set_enabled(all_valid and bool(self.records_to_import))
-            self.import_button.tooltip(
-                "Corrige todos los errores antes de importar."
-                if not all_valid
-                else "Listo para importar"
-            )
+            all_valid = all(r["validation"]["is_valid"] for r in self.state.records)
+            self.import_button.set_enabled(all_valid and bool(self.state.records))
 
     async def _start_import(self):
-        """Starts the import process, skipping any invalid records."""
+        """Starts the import process, using the records from the state."""
         valid_records = [
             r
-            for r in self.records_to_import
+            for r in self.state.records
             if r.get("validation", {}).get("is_valid", False)
         ]
         if not valid_records:
@@ -418,5 +480,5 @@ class AfiliadasImporterView:
                 ui.button("Aceptar", on_click=summary_dialog.close)
         summary_dialog.open()
 
-        self.records_to_import = []
+        self.state.set_records([])
         self._render_preview_tabs()
