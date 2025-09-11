@@ -1,8 +1,10 @@
-# validation.py (new file)
-from typing import Dict, Any, List, Tuple, Optional
+# /build/niceGUI/models/validate.py
+
+from typing import Dict, Any, List, Tuple
 from config import TABLE_INFO
 import re
 from datetime import datetime
+
 
 class TableValidator:
     """Config-driven validation using TABLE_INFO metadata."""
@@ -10,8 +12,9 @@ class TableValidator:
     def __init__(self):
         self.table_info = TABLE_INFO
 
-    def validate_record(self, table: str, data: Dict[str, Any],
-                       operation: str = "create") -> Tuple[bool, List[str]]:
+    def validate_record(
+        self, table: str, data: Dict[str, Any], operation: str = "create"
+    ) -> Tuple[bool, List[str]]:
         """
         Validate a record against table configuration.
 
@@ -29,21 +32,24 @@ class TableValidator:
         # Validate field options (enums)
         field_options = config.get("field_options", {})
         for field, options in field_options.items():
-            if field in data and data[field] is not None:
+            if field in data and data[field] is not None and data[field] != "":
                 if data[field] not in options:
-                    errors.append(f"Invalid {field}: '{data[field]}'. Must be one of: {options}")
+                    errors.append(
+                        f"Invalid {field}: '{data[field]}'. Must be one of: {options}"
+                    )
 
         # Validate required fields (for create operations)
         if operation == "create":
             required_fields = config.get("required_fields", [])
             for field in required_fields:
-                if field not in data or data[field] is None:
+                value = data.get(field)
+                if value is None or value == "":
                     errors.append(f"Missing required field: {field}")
 
         # Validate field types based on common patterns
         errors.extend(self._validate_field_types(table, data))
 
-        # Validate relationships exist
+        # Validate relationships exist (optional, can be expanded)
         errors.extend(self._validate_relationships(table, data))
 
         return len(errors) == 0, errors
@@ -51,61 +57,62 @@ class TableValidator:
     def _validate_field_types(self, table: str, data: Dict[str, Any]) -> List[str]:
         """Validate field types based on naming conventions."""
         errors = []
-
         for field, value in data.items():
-            if value is None:
+            # --- ENHANCEMENT ---
+            # Skip validation for any field that is None or an empty string.
+            # This allows optional fields (like dates) to be truly empty.
+            if value is None or value == "":
                 continue
 
             # Email validation
-            if 'email' in field.lower() and value:
-                if not re.match(r'^[^@]+@[^@]+\.[^@]+$', str(value)):
-                    errors.append(f"Invalid email format: {field}")
+            if "email" in field.lower():
+                if not re.match(r"^[^@]+@[^@]+\.[^@]+$", str(value)):
+                    errors.append(f"Invalid email format for '{field}'")
 
             # Date validation
-            if any(date_word in field.lower() for date_word in ['fecha', 'date']):
+            if any(date_word in field.lower() for date_word in ["fecha", "date"]):
                 if not self._is_valid_date(value):
-                    errors.append(f"Invalid date format: {field}")
+                    errors.append(
+                        f"Invalid date format for '{field}' (expected YYYY-MM-DD)"
+                    )
 
             # ID field validation
-            if field.endswith('_id') and value:
+            if field.endswith("_id"):
                 try:
                     int(value)
                 except (ValueError, TypeError):
-                    errors.append(f"Invalid ID format: {field}")
+                    errors.append(f"Invalid ID format for '{field}' (must be a number)")
 
         return errors
 
     def _validate_relationships(self, table: str, data: Dict[str, Any]) -> List[str]:
-        """Validate foreign key relationships."""
+        """Placeholder for validating foreign key relationships."""
         errors = []
-        config = self.table_info[table]
-        relations = config.get("relations", {})
-
-        for field, relation_info in relations.items():
-            if field in data and data[field] is not None:
-                # Here you could add actual FK validation by querying the related table
-                # For now, just validate the field exists and has a reasonable value
-                if not data[field]:
-                    errors.append(f"Invalid relationship value for {field}")
-
+        # This section can be expanded in the future to perform database lookups
+        # to confirm that a foreign key (e.g., 'piso_id') actually exists.
+        # For now, basic type validation is handled in _validate_field_types.
         return errors
 
     def _is_valid_date(self, value: Any) -> bool:
-        """Check if value is a valid date."""
+        """Check if a value is a valid ISO 8601 date string (YYYY-MM-DD)."""
         if isinstance(value, datetime):
             return True
-
         if isinstance(value, str):
             try:
-                datetime.fromisoformat(value.replace('Z', '+00:00'))
+                # Use strptime for stricter format checking (YYYY-MM-DD)
+                datetime.strptime(value, "%Y-%m-%d")
                 return True
             except ValueError:
-                pass
-
+                # Fallback for full ISO format with time, etc.
+                try:
+                    datetime.fromisoformat(value.replace("Z", "+00:00"))
+                    return True
+                except ValueError:
+                    return False
         return False
 
     def get_field_constraints(self, table: str, field: str) -> Dict[str, Any]:
-        """Get validation constraints for a specific field."""
+        """Get validation constraints for a specific field from TABLE_INFO."""
         if table not in self.table_info:
             return {}
 
@@ -128,5 +135,6 @@ class TableValidator:
 
         return constraints
 
-# Create singleton instance
+
+# Create a singleton instance for easy import across the application
 validator = TableValidator()
