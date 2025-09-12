@@ -29,6 +29,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
   nicegui-app:
     image: python:3.11-slim
@@ -43,8 +48,8 @@ services:
              pip install --root-user-action=ignore passlib==1.7.4 bcrypt==4.0.1 nicegui httpx pandas &&
              python main.py"
     depends_on:
-      - server
-      - db
+      server:
+        condition: service_healthy
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
@@ -65,7 +70,8 @@ services:
       sh -c "envsubst '$$HOSTNAME' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
              nginx -g 'daemon off;'"
     depends_on:
-      - server
+      server:
+        condition: service_healthy
     restart: unless-stopped
 
   certbot:
