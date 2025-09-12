@@ -107,12 +107,16 @@ class AfiliadasImporterView:
                 "nombre": nombre,
                 "apellidos": f"{get_val(2)} {get_val(3)}".strip(),
                 "genero": get_val(4),
+                "fecha_nacimiento": get_val(5),
                 "cif": get_val(6),
                 "telefono": get_val(7),
                 "email": get_val(8),
-                "fecha_alta": date.today().isoformat(),
+                "fecha_alta": get_val(16),
                 "regimen": get_val(17),
                 "estado": "Alta",
+                "propiedad": get_val(17),
+                "trato_propiedad": bool(get_val(18)),
+                "prop_vertical": get_val(20),
                 "piso_id": None,
             }
             piso_data = {
@@ -125,7 +129,7 @@ class AfiliadasImporterView:
                 ).strip(),
                 "municipio": get_val(13),
                 "cp": int(get_val(14)) if get_val(14).isdigit() else None,
-                "fecha_firma": get_val(16),
+                "n_personas": int(get_val(15)) if get_val(15).isdigit() else None,
                 "api": get_val(18),
             }
             cuota_type = get_val(22)
@@ -176,12 +180,24 @@ class AfiliadasImporterView:
         self._render_panel(
             "afiliada",
             self.afiliadas_panel,
-            ["num_afiliada", "nombre", "apellidos", "cif", "email", "telefono"],
+            [
+                "num_afiliada",
+                "nombre",
+                "apellidos",
+                "cif",
+                "email",
+                "telefono",
+                "fecha_nacimiento",
+                "trato_propiedad",
+                "propiedad",
+                "prop_vertical",
+                "fecha_alta",
+            ],
         )
         self._render_panel(
             "piso",
             self.pisos_panel,
-            ["direccion", "municipio", "cp", "fecha_firma", "api"],
+            ["direccion", "municipio", "cp", "n_personas", "api"],
         )
         self._render_panel(
             "facturacion",
@@ -206,7 +222,12 @@ class AfiliadasImporterView:
             "direccion": "Dirección",
             "municipio": "Municipio",
             "cp": "CP",
-            "fecha_firma": "Fecha Firma",
+            "fecha_nacimiento": "Fecha Nacimiento",
+            "trato_propiedad": "Trato Directo",
+            "propiedad": "Propiedad",
+            "prop_vertical": "Prop. Vertical",
+            "fecha_alta": "Fecha Alta",
+            "n_personas": "Nº Personas",
             "api": "API",
             "cuota": "Cuota (€)",
             "periodicidad": "Periodicidad (m)",
@@ -214,20 +235,17 @@ class AfiliadasImporterView:
             "iban": "IBAN",
         }
 
-        with panel:
+        with panel, ui.scroll_area().classes("w-full h-[32rem]"):
+            # Header Row
             with ui.row().classes(
-                "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md items-center"
+                "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md items-center no-wrap sticky top-0 z-10"
             ):
-                with ui.row().classes("w-24 items-center cursor-pointer").on(
-                    "click", lambda: self._sort_by_column("is_valid")
-                ):
+                with ui.row().classes(
+                    "w-24 min-w-[6rem] items-center cursor-pointer"
+                ).on("click", lambda: self._sort_by_column("is_valid")):
                     ui.label("Estado")
                     sort_info = next(
-                        (
-                            crit
-                            for crit in self.state.sort_criteria
-                            if crit[0] == "is_valid"
-                        ),
+                        (c for c in self.state.sort_criteria if c[0] == "is_valid"),
                         None,
                     )
                     if sort_info:
@@ -236,24 +254,19 @@ class AfiliadasImporterView:
                             size="sm",
                         )
 
-                ui.label("Afiliada").classes("w-48")
+                ui.label("Afiliada").classes("w-48 min-w-[12rem]")
                 for field in fields:
                     width_class = (
-                        "flex-grow"
+                        "flex-grow min-w-[15rem]"
                         if field in ["email", "direccion", "iban"]
-                        else "w-32"
+                        else "w-32 min-w-[8rem]"
                     )
                     with ui.row().classes(
                         f"{width_class} items-center cursor-pointer"
                     ).on("click", lambda f=field: self._sort_by_column(f)):
                         ui.label(header_map.get(field, field.title()))
                         sort_info = next(
-                            (
-                                crit
-                                for crit in self.state.sort_criteria
-                                if crit[0] == field
-                            ),
-                            None,
+                            (c for c in self.state.sort_criteria if c[0] == field), None
                         )
                         if sort_info:
                             ui.icon(
@@ -261,71 +274,74 @@ class AfiliadasImporterView:
                                 size="sm",
                             )
 
-            with ui.scroll_area().classes("w-full h-96"):
-                for record in self.state.records:
-                    if "ui_updaters" not in record:
-                        record["ui_updaters"] = {}
+            # Data Rows
+            for record in self.state.records:
+                if "ui_updaters" not in record:
+                    record["ui_updaters"] = {}
 
-                    with ui.row().classes(
-                        "w-full items-center gap-2 p-2 border-t"
-                    ) as row:
+                with ui.row().classes(
+                    "w-full items-center gap-2 p-2 border-t no-wrap"
+                ) as row:
 
-                        def update_row_style(r=row, rec=record):
+                    def update_row_style(r=row, rec=record):
+                        is_valid = rec["validation"]["is_valid"]
+                        errors = rec["validation"]["errors"]
+                        r.classes(
+                            remove="bg-red-100 bg-green-50",
+                            add="bg-green-50" if is_valid else "bg-red-100",
+                        )
+                        r.tooltip(
+                            "\n".join(errors) if not is_valid else "Registro válido"
+                        )
+
+                    record["ui_updaters"][data_key] = update_row_style
+
+                    with ui.column().classes(
+                        "w-24 min-w-[6rem] flex items-center justify-center"
+                    ):
+                        status_icon = ui.icon("placeholder")
+
+                        def update_status_icon(rec=record, ic=status_icon):
                             is_valid = rec["validation"]["is_valid"]
-                            errors = rec["validation"]["errors"]
-                            r.classes(
-                                remove="bg-red-100 bg-green-50",
-                                add="bg-green-50" if is_valid else "bg-red-100",
-                            )
-                            r.tooltip(
-                                "\n".join(errors) if not is_valid else "Registro válido"
+                            ic.name = "check_circle" if is_valid else "cancel"
+                            ic.classes(
+                                remove="text-green-500 text-red-500",
+                                add="text-green-500" if is_valid else "text-red-500",
                             )
 
-                        record["ui_updaters"][data_key] = update_row_style
+                        record["ui_updaters"][
+                            f"status_icon_{data_key}"
+                        ] = update_status_icon
+                        update_status_icon()
 
-                        with ui.column().classes(
-                            "w-24 flex items-center justify-center"
-                        ):
-                            # --- FIX: Provide a default name when creating the icon ---
-                            status_icon = ui.icon("placeholder")
+                    afiliada_label = f"{record['afiliada']['nombre']} {record['afiliada']['apellidos']}"
+                    ui.label(afiliada_label).classes(
+                        "w-48 min-w-[12rem] text-sm text-gray-600"
+                    )
 
-                            def update_status_icon(rec=record, ic=status_icon):
-                                is_valid = rec["validation"]["is_valid"]
-                                ic.name = "check_circle" if is_valid else "cancel"
-                                ic.classes(
-                                    remove="text-green-500 text-red-500",
-                                    add=(
-                                        "text-green-500" if is_valid else "text-red-500"
-                                    ),
-                                )
-
-                            record["ui_updaters"][
-                                f"status_icon_{data_key}"
-                            ] = update_status_icon
-                            update_status_icon()
-
-                        afiliada_label = f"{record['afiliada']['nombre']} {record['afiliada']['apellidos']}"
-                        ui.label(afiliada_label).classes("w-48 text-sm text-gray-600")
-
-                        for field in fields:
-                            input_element = (
-                                ui.number(label=None, format="%.0f")
-                                if field == "cp"
+                    for field in fields:
+                        value = record[data_key].get(field)
+                        input_element = (
+                            ui.number(label=None, format="%.0f")
+                            if field in ["cp", "n_personas"]
+                            else (
+                                ui.checkbox()
+                                if isinstance(value, bool)
                                 else ui.input(label=None)
                             )
-                            width_class = (
-                                "flex-grow"
-                                if field in ["email", "direccion", "iban"]
-                                else "w-32"
-                            )
-                            input_element.bind_value(record[data_key], field).classes(
-                                width_class
-                            )
-                            input_element.on(
-                                "change", lambda r=record: self._revalidate_record(r)
-                            )
-
-                    update_row_style()
+                        )
+                        width_class = (
+                            "flex-grow min-w-[15rem]"
+                            if field in ["email", "direccion", "iban"]
+                            else "w-32 min-w-[8rem]"
+                        )
+                        input_element.bind_value(record[data_key], field).classes(
+                            width_class
+                        )
+                        input_element.on(
+                            "change", lambda r=record: self._revalidate_record(r)
+                        )
+                update_row_style()
 
     def _sort_by_column(self, column: str):
         """Handles sorting when a column header is clicked."""

@@ -47,6 +47,7 @@ CREATE TABLE pisos (
     api TEXT,
     prop_vertical BOOLEAN,
     por_habitaciones BOOLEAN,
+    n_personas INTEGER,
     fecha_firma DATE
 );
 
@@ -79,14 +80,16 @@ CREATE TABLE afiliadas (
     frecuencia_pago TEXT,
     forma_pago TEXT,
     cuenta_corriente TEXT,
-    regimen TEXT,
     estado TEXT,
     fecha_alta DATE,
     fecha_baja DATE,
+    regimen TEXT,
     prop_vertical TEXT,
     api TEXT,
     propiedad TEXT,
-    entramado TEXT
+    entramado TEXT,
+    trato_propiedad BOOLEAN,
+    fecha_nacimiento DATE
 );
 
 CREATE TABLE facturacion (
@@ -333,7 +336,8 @@ SELECT DISTINCT
 FROM staging_afiliadas
 WHERE
     entramado IS NOT NULL
-    AND entramado != '' ON CONFLICT (nombre) DO NOTHING;
+    AND entramado != ''
+ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO
     empresas (
@@ -347,7 +351,8 @@ INSERT INTO
 SELECT s.nombre, s.cif_nif_nie, s.directivos, s.api, s.direccion_fiscal, ee.id
 FROM
     staging_empresas s
-    LEFT JOIN entramado_empresas ee ON s.entramado = ee.nombre ON CONFLICT (cif_nif_nie) DO NOTHING;
+    LEFT JOIN entramado_empresas ee ON s.entramado = ee.nombre
+ON CONFLICT (cif_nif_nie) DO NOTHING;
 
 INSERT INTO
     bloques (
@@ -357,25 +362,32 @@ INSERT INTO
         api
     )
 SELECT s.direccion, e.id, s.estado, s.api
-FROM
-    staging_bloques s
-    JOIN empresas e ON s.propiedad = e.nombre ON CONFLICT (direccion) DO NOTHING;
+FROM staging_bloques s
+    JOIN empresas e ON s.propiedad = e.nombre
+ON CONFLICT (direccion) DO NOTHING;
 
-WITH BloqueCandidatos AS (
-    SELECT
-        p.direccion AS piso_direccion,
-        b.id AS bloque_id,
-        ROW_NUMBER() OVER(PARTITION BY p.direccion ORDER BY LENGTH(b.direccion) DESC) as rn
-    FROM
-        staging_pisos p
-    JOIN
-        bloques b ON p.direccion LIKE b.direccion || '%'
-    WHERE
-        p.direccion IS NOT NULL AND p.direccion != ''
-),
-MejorCoincidenciaBloque AS (
-    SELECT piso_direccion, bloque_id FROM BloqueCandidatos WHERE rn = 1
-)
+WITH
+    BloqueCandidatos AS (
+        SELECT
+            p.direccion AS piso_direccion,
+            b.id AS bloque_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY
+                    p.direccion
+                ORDER BY LENGTH(b.direccion) DESC
+            ) as rn
+        FROM staging_pisos p
+            JOIN bloques b ON p.direccion LIKE b.direccion || '%'
+        WHERE
+            p.direccion IS NOT NULL
+            AND p.direccion != ''
+    ),
+    MejorCoincidenciaBloque AS (
+        SELECT piso_direccion, bloque_id
+        FROM BloqueCandidatos
+        WHERE
+            rn = 1
+    )
 INSERT INTO
     pisos (
         direccion,
@@ -386,20 +398,33 @@ INSERT INTO
         prop_vertical,
         por_habitaciones
     )
-SELECT
-    s.direccion,
-    TRIM((string_to_array(s.direccion, ','))[array_upper(string_to_array(s.direccion, ','), 1)]),
-    CAST(NULLIF(regexp_replace((string_to_array(s.direccion, ','))[array_upper(string_to_array(s.direccion, ','), 1) - 1], '\D', '', 'g'), '') AS INTEGER),
-    NULLIF(s.api, ''),
-    mcb.bloque_id,
-    FALSE,
-    FALSE
+SELECT s.direccion, TRIM(
+        (
+            string_to_array(s.direccion, ',')
+        ) [
+            array_upper(
+                string_to_array(s.direccion, ','), 1
+            )
+        ]
+    ), CAST(
+        NULLIF(
+            regexp_replace(
+                (
+                    string_to_array(s.direccion, ',')
+                ) [
+                    array_upper(
+                        string_to_array(s.direccion, ','), 1
+                    ) - 1
+                ], '\D', '', 'g'
+            ), ''
+        ) AS INTEGER
+    ), NULLIF(s.api, ''), mcb.bloque_id, FALSE, FALSE
 FROM
     staging_pisos s
-LEFT JOIN
-    MejorCoincidenciaBloque mcb ON s.direccion = mcb.piso_direccion
+    LEFT JOIN MejorCoincidenciaBloque mcb ON s.direccion = mcb.piso_direccion
 WHERE
-    s.direccion IS NOT NULL AND s.direccion != ''
+    s.direccion IS NOT NULL
+    AND s.direccion != ''
 ON CONFLICT (direccion) DO NOTHING;
 
 INSERT INTO
@@ -416,8 +441,8 @@ SELECT
     apellidos,
     NULLIF(correo_electronico, ''),
     roles
-FROM
-    staging_usuarios ON CONFLICT (alias) DO NOTHING;
+FROM staging_usuarios
+ON CONFLICT (alias) DO NOTHING;
 
 -- FINAL VERSION: This INSERT statement now correctly uses all available columns from the definitive CSV file.
 INSERT INTO
@@ -463,11 +488,11 @@ SELECT
     s.cuenta_corriente,
     s.regimen,
     s.estado,
-    to_date (
+    to_date(
         NULLIF(s.fecha_alta, ''),
         'DD/MM/YYYY'
     ),
-    to_date (
+    to_date(
         NULLIF(s.fecha_baja, ''),
         'DD/MM/YYYY'
     ),
@@ -476,10 +501,9 @@ SELECT
     s.propiedad,
     s.entramado,
     p.id
-FROM
-    staging_afiliadas s
+FROM staging_afiliadas s
     LEFT JOIN pisos p ON s.direccion = p.direccion -- Uses the correct join condition
-    ON CONFLICT (num_afiliada) DO NOTHING;
+ON CONFLICT (num_afiliada) DO NOTHING;
 
 INSERT INTO
     facturacion (
@@ -491,7 +515,7 @@ INSERT INTO
     )
 SELECT
     CAST(
-        REPLACE (s.cuota, ',', '.') AS DECIMAL(8, 2)
+        REPLACE(s.cuota, ',', '.') AS DECIMAL(8, 2)
     ),
     CASE s.frecuencia_pago
         WHEN 'Anual' THEN 12
@@ -503,7 +527,8 @@ SELECT
     a.id
 FROM
     staging_afiliadas s
-    JOIN afiliadas a ON s.num_afiliada = a.num_afiliada ON CONFLICT (id) DO NOTHING;
+    JOIN afiliadas a ON s.num_afiliada = a.num_afiliada
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO
     conflictos (
@@ -513,14 +538,15 @@ INSERT INTO
         causa,
         fecha_apertura
     )
-SELECT a.id, s.estado, s.ambito, s.causa, to_date (
+SELECT a.id, s.estado, s.ambito, s.causa, to_date(
         NULLIF(s.fecha_apertura, ''), 'DD/MM/YYYY'
     )
 FROM
     staging_conflictos s
     LEFT JOIN afiliadas a ON (
         a.nombre || ' ' || a.apellidos
-    ) = s.afectada ON CONFLICT (id) DO NOTHING;
+    ) = s.afectada
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO
     asesorias (
@@ -532,7 +558,7 @@ INSERT INTO
         resultado,
         tipo_beneficiaria
     )
-SELECT a.id, u.id, s.estado, s.tipo, to_date (
+SELECT a.id, u.id, s.estado, s.tipo, to_date(
         NULLIF(s.fecha_asesoria, ''), 'DD/MM/YYYY'
     ), s.resultado, s.tipo_beneficiaria
 FROM
@@ -540,7 +566,8 @@ FROM
     LEFT JOIN afiliadas a ON (
         a.nombre || ' ' || a.apellidos
     ) = s.beneficiaria_nombre
-    LEFT JOIN usuarios u ON s.tecnica_alias = u.alias ON CONFLICT (id) DO NOTHING;
+    LEFT JOIN usuarios u ON s.tecnica_alias = u.alias
+ON CONFLICT (id) DO NOTHING;
 
 -- 2.4. Limpiar tablas Staging
 DROP TABLE staging_afiliadas;
