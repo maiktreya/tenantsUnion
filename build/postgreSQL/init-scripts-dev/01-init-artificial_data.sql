@@ -618,7 +618,8 @@ INSERT INTO
         cp,
         api,
         prop_vertical,
-        por_habitaciones
+        por_habitaciones,
+        n_personas
     )
 VALUES (
         1,
@@ -627,7 +628,8 @@ VALUES (
         28080,
         'No',
         true,
-        false
+        false,
+        2
     ),
     (
         1,
@@ -636,7 +638,8 @@ VALUES (
         28080,
         'No',
         true,
-        false
+        false,
+        3
     ),
     (
         1,
@@ -645,7 +648,8 @@ VALUES (
         28080,
         'No',
         true,
-        false
+        false,
+        1
     ),
     (
         2,
@@ -654,7 +658,8 @@ VALUES (
         28013,
         'No',
         false,
-        true
+        true,
+        4
     ),
     (
         2,
@@ -663,7 +668,8 @@ VALUES (
         28013,
         'No',
         false,
-        false
+        false,
+        2
     ),
     (
         3,
@@ -672,7 +678,8 @@ VALUES (
         28081,
         'Sí',
         true,
-        false
+        false,
+        3
     ),
     (
         3,
@@ -681,7 +688,8 @@ VALUES (
         28081,
         'Sí',
         true,
-        false
+        false,
+        2
     ),
     (
         4,
@@ -690,7 +698,8 @@ VALUES (
         28082,
         'No',
         true,
-        false
+        false,
+        1
     ),
     (
         5,
@@ -699,7 +708,8 @@ VALUES (
         28028,
         'Sí',
         true,
-        true
+        true,
+        5
     ),
     (
         6,
@@ -708,7 +718,8 @@ VALUES (
         28025,
         'No',
         true,
-        false
+        false,
+        2
     );
 
 -- =====================================================================
@@ -812,8 +823,7 @@ VALUES (1, 1),
     (5, 4),
     (6, 4);
 
--- FIX: Updated the INSERT statement for 'afiliadas' to include the new columns
--- Added placeholder data for the new fields to ensure the query is valid.
+-- Crear afiliadas
 INSERT INTO
     afiliadas (
         piso_id,
@@ -837,7 +847,9 @@ INSERT INTO
         prop_vertical,
         api,
         propiedad,
-        entramado
+        entramado,
+        trato_propiedad,
+        fecha_nacimiento
     )
 VALUES (
         1,
@@ -861,7 +873,9 @@ VALUES (
         'Si',
         'No',
         'Fidere Vivienda Madrid SL',
-        'Inversiones Inmobiliarias Globales'
+        'Inversiones Inmobiliarias Globales',
+        false,
+        '1985-03-15'
     ),
     (
         2,
@@ -885,7 +899,9 @@ VALUES (
         'Si',
         'No',
         'Fidere Vivienda Madrid SL',
-        'Inversiones Inmobiliarias Globales'
+        'Inversiones Inmobiliarias Globales',
+        true,
+        '1978-11-22'
     ),
     (
         3,
@@ -909,7 +925,9 @@ VALUES (
         'Si',
         'No',
         'Fidere Vivienda Madrid SL',
-        'Inversiones Inmobiliarias Globales'
+        'Inversiones Inmobiliarias Globales',
+        false,
+        '1992-07-08'
     ),
     (
         4,
@@ -933,7 +951,9 @@ VALUES (
         'No',
         'No',
         'Azora Gestión Inmobiliaria SA',
-        'Inversiones Inmobiliarias Globales'
+        'Inversiones Inmobiliarias Globales',
+        true,
+        '1980-12-03'
     ),
     (
         5,
@@ -957,7 +977,9 @@ VALUES (
         'No',
         'No',
         'Azora Gestión Inmobiliaria SA',
-        'Inversiones Inmobiliarias Globales'
+        'Inversiones Inmobiliarias Globales',
+        false,
+        '1975-09-17'
     );
 
 -- Insertar facturación
