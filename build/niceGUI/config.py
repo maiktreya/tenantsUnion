@@ -86,7 +86,6 @@ TABLE_INFO = {
         "display_name": "Afiliadas",
         "id_field": "id",
         "hidden_fields": ["id", "seccion_sindical", "nivel_participacion", "comision"],
-        # Cleaned and reordered fields
         "fields": [
             "piso_id",
             "num_afiliada",
@@ -110,7 +109,6 @@ TABLE_INFO = {
             {"table": "conflictos", "foreign_key": "afiliada_id"},
         ],
     },
-    # --- Other tables remain unchanged from the original ---
     "nodos": {
         "display_name": "Nodos Territoriales",
         "id_field": "id",
