@@ -92,11 +92,10 @@ CREATE TABLE IF NOT EXISTS pisos (
     api TEXT,
     prop_vertical BOOLEAN,
     por_habitaciones BOOLEAN,
-    fecha_firma DATE
+    fecha_firma DATE,
+    n_personas INTEGER
 );
 
--- FIX: Updated the 'afiliadas' table to the new, complete schema.
--- This now matches the definition in your working staging script.
 CREATE TABLE IF NOT EXISTS afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
@@ -121,7 +120,9 @@ CREATE TABLE IF NOT EXISTS afiliadas (
     prop_vertical TEXT,
     api TEXT,
     propiedad TEXT,
-    entramado TEXT
+    entramado TEXT,
+    trato_propiedad BOOLEAN,
+    fecha_nacimiento DATE
 );
 
 CREATE TABLE IF NOT EXISTS facturacion (
@@ -430,8 +431,7 @@ usuario_roles,
 usuarios,
 roles,
 nodos_cp_mapping,
-nodos
-RESTART IDENTITY CASCADE;
+nodos RESTART IDENTITY CASCADE;
 
 -- Insertar roles
 INSERT INTO
@@ -451,7 +451,8 @@ VALUES (
     (
         'usuario',
         'Usuario básico del sistema'
-    ) ON CONFLICT (nombre) DO NOTHING;
+    )
+ON CONFLICT (nombre) DO NOTHING;
 
 -- Insertar nodos territoriales
 INSERT INTO
