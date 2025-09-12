@@ -1,19 +1,23 @@
--- ACTUAL UPDATE STATEMENT
+-- =====================================================================
+-- A: LOGIC TO LINK PISOS TO BLOQUES AND BLOQUES TO NODOS
+-- =====================================================================
+
 -- This statement will iterate over each 'piso' that doesn't have a 'bloque_id'
 -- and will attempt to find a match using the function.
 SET search_path TO sindicato_inq, public;
 
+-- 1. LINK PISOS TO BLOQUES: Ensure all pisos are linked to their bloques
 UPDATE pisos
 SET
     bloque_id = find_best_match_bloque_id (direccion)
 WHERE
     bloque_id IS NULL;
 
--- 4. SYNC BLOQUES TO NODOS: Ensure all bloques are linked to their nodos
+-- 2. SYNC BLOQUES TO NODOS: Ensure all bloques are linked to their nodos
 CALL sync_all_bloques_to_nodos ();
 
 -- =====================================================================
--- NEW: LOGIC TO CAPTURE AND LINK ORPHANED EMPRESAS (APPENDED)
+-- B: LOGIC TO CAPTURE AND LINK ORPHANED EMPRESAS (APPENDED)
 -- =====================================================================
 -- This section identifies, creates, and links empresas from the legacy
 -- system that were not associated with a 'bloque'.
