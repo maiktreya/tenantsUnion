@@ -1,8 +1,10 @@
 -- =====================================================================
--- ARCHIVO 01: CREACIÓN DE ESQUEMA E IMPORTACIÓN (VERSIÓN FINAL)
+-- ARCHIVO 01: CREACIÓN DE ESQUEMA E IMPORTACIÓN (VERSIÓN FINAL MEJORADA)
 -- =====================================================================
 -- Este script crea el esquema, importa los datos, y aplica mejoras
 -- en la integridad referencial y la indexación para un diseño robusto.
+-- Se han refactorizado las tablas para eliminar datos duplicados y
+-- asegurar que cada dato resida en su tabla lógica correspondiente.
 -- =====================================================================
 
 -- CREACIÓN DEL ESQUEMA
@@ -11,7 +13,7 @@ CREATE SCHEMA IF NOT EXISTS sindicato_inq;
 SET search_path TO sindicato_inq, public;
 
 -- =====================================================================
--- PARTE 1: DEFINICIÓN DE LAS TABLAS FINALES Y NORMALIZADAS
+-- PARTE 1: DEFINICIÓN DE LAS TABLAS FINALES Y NORMALIZADAS (REFINADO)
 -- =====================================================================
 
 CREATE TABLE entramado_empresas (
@@ -26,16 +28,13 @@ CREATE TABLE empresas (
     nombre TEXT,
     cif_nif_nie TEXT UNIQUE,
     directivos TEXT,
-    api TEXT,
     direccion_fiscal TEXT
 );
 
 CREATE TABLE bloques (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
-    direccion TEXT UNIQUE,
-    estado TEXT,
-    api TEXT
+    direccion TEXT UNIQUE
 );
 
 CREATE TABLE pisos (
@@ -44,8 +43,8 @@ CREATE TABLE pisos (
     direccion TEXT NOT NULL UNIQUE,
     municipio TEXT,
     cp INTEGER,
-    api TEXT,
-    prop_vertical BOOLEAN,
+    api TEXT, -- Agencia Inmobiliaria (atributo del piso)
+    prop_vertical BOOLEAN, -- Propiedad Vertical (atributo del piso)
     por_habitaciones BOOLEAN,
     n_personas INTEGER,
     fecha_firma DATE
@@ -62,34 +61,29 @@ CREATE TABLE usuarios (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Updated afiliadas table to include all new fields from CSV
+-- Tabla 'afiliadas' refactorizada para máxima consistencia
 CREATE TABLE afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
+    -- Identificación
     num_afiliada TEXT UNIQUE,
     nombre TEXT,
     apellidos TEXT,
     cif TEXT UNIQUE,
+    fecha_nacimiento DATE,
     genero TEXT,
     email TEXT,
     telefono TEXT,
-    seccion_sindical TEXT,
-    nivel_participacion TEXT,
-    comision TEXT,
-    cuota TEXT,
-    frecuencia_pago TEXT,
-    forma_pago TEXT,
-    cuenta_corriente TEXT,
-    estado TEXT,
+    -- Estado y Régimen
+    estado TEXT, -- Estado de la afiliación (Alta, Baja, etc.)
+    regimen TEXT, -- Régimen de tenencia (Alquiler, etc.)
     fecha_alta DATE,
     fecha_baja DATE,
-    regimen TEXT,
-    prop_vertical TEXT,
-    api TEXT,
-    propiedad TEXT,
-    entramado TEXT,
     trato_propiedad BOOLEAN,
-    fecha_nacimiento DATE
+    -- Participación Interna
+    seccion_sindical TEXT,
+    nivel_participacion TEXT,
+    comision TEXT
 );
 
 CREATE TABLE facturacion (
@@ -167,8 +161,6 @@ CREATE INDEX idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 -- =====================================================================
 
 -- 2.1. Crear tablas Staging
-
--- FINAL VERSION: This table structure now exactly matches the final CSV file header.
 CREATE TABLE staging_afiliadas (
     num_afiliada TEXT,
     nombre TEXT,
@@ -268,8 +260,6 @@ CREATE TABLE staging_usuarios (
 -- =====================================================================
 -- PARTE 2.2: IMPORTACIÓN DE DATOS DESDE CSV
 -- =====================================================================
-
--- 2.2. Copiar datos desde CSV
 COPY staging_afiliadas
 FROM '/csv-data/Afiliadas.csv'
 WITH (
@@ -326,9 +316,10 @@ WITH (
         HEADER true
     );
 
--- 2.3. Migrar datos de Staging a tablas finales
+-- =====================================================================
+-- PARTE 2.3: MIGRACIÓN DE DATOS (REFACTORIZADA Y CORREGIDA)
+-- =====================================================================
 
--- RE-ENABLED: This logic is valid as the 'entramado' column is present.
 INSERT INTO
     entramado_empresas (nombre)
 SELECT DISTINCT
@@ -344,89 +335,110 @@ INSERT INTO
         nombre,
         cif_nif_nie,
         directivos,
-        api,
         direccion_fiscal,
         entramado_id
     )
-SELECT s.nombre, s.cif_nif_nie, s.directivos, s.api, s.direccion_fiscal, ee.id
+SELECT s.nombre, s.cif_nif_nie, s.directivos, s.direccion_fiscal, ee.id
 FROM
     staging_empresas s
     LEFT JOIN entramado_empresas ee ON s.entramado = ee.nombre
 ON CONFLICT (cif_nif_nie) DO NOTHING;
 
+-- Corregido: Ahora se vincula la empresa por su nombre desde staging_bloques
 INSERT INTO
-    bloques (
-        direccion,
-        empresa_id,
-        estado,
-        api
-    )
-SELECT s.direccion, e.id, s.estado, s.api
+    bloques (direccion, empresa_id)
+SELECT s.direccion, e.id
 FROM staging_bloques s
-    JOIN empresas e ON s.propiedad = e.nombre
+    LEFT JOIN empresas e ON s.propiedad = e.nombre
 ON CONFLICT (direccion) DO NOTHING;
 
-WITH
-    BloqueCandidatos AS (
-        SELECT
-            p.direccion AS piso_direccion,
-            b.id AS bloque_id,
-            ROW_NUMBER() OVER (
-                PARTITION BY
-                    p.direccion
-                ORDER BY LENGTH(b.direccion) DESC
-            ) as rn
-        FROM staging_pisos p
-            JOIN bloques b ON p.direccion LIKE b.direccion || '%'
-        WHERE
-            p.direccion IS NOT NULL
-            AND p.direccion != ''
-    ),
-    MejorCoincidenciaBloque AS (
-        SELECT piso_direccion, bloque_id
-        FROM BloqueCandidatos
-        WHERE
-            rn = 1
-    )
+-- Se crean los pisos a partir de las direcciones únicas en staging_afiliadas.
+-- Este es el primer paso para asegurar que cada piso exista antes de ser referenciado.
 INSERT INTO
-    pisos (
-        direccion,
-        municipio,
-        cp,
-        api,
-        bloque_id,
-        prop_vertical,
-        por_habitaciones
+    pisos (direccion, municipio, cp)
+SELECT DISTINCT
+    s.direccion,
+    s.municipio,
+    CAST(
+        NULLIF(s.codigo_postal, '') AS INTEGER
     )
-SELECT s.direccion, TRIM(
-        (
-            string_to_array(s.direccion, ',')
-        ) [
-            array_upper(
-                string_to_array(s.direccion, ','), 1
-            )
-        ]
-    ), CAST(
-        NULLIF(
-            regexp_replace(
-                (
-                    string_to_array(s.direccion, ',')
-                ) [
-                    array_upper(
-                        string_to_array(s.direccion, ','), 1
-                    ) - 1
-                ], '\D', '', 'g'
-            ), ''
-        ) AS INTEGER
-    ), NULLIF(s.api, ''), mcb.bloque_id, FALSE, FALSE
-FROM
-    staging_pisos s
-    LEFT JOIN MejorCoincidenciaBloque mcb ON s.direccion = mcb.piso_direccion
+FROM staging_afiliadas s
 WHERE
     s.direccion IS NOT NULL
     AND s.direccion != ''
 ON CONFLICT (direccion) DO NOTHING;
 
+-- *** NUEVO PASO: Actualizar 'pisos' con la información de propiedad de 'staging_afiliadas' ***
+-- Se enriquece la tabla de pisos con los datos que le pertenecen.
+UPDATE pisos p
+SET
+    api = s.api,
+    prop_vertical = CASE
+        WHEN s.prop_vertical = 'Si' THEN TRUE
+        ELSE FALSE
+    END
+FROM (
+        -- Usamos una subconsulta para obtener una única fila por dirección
+        SELECT DISTINCT
+            ON (direccion) direccion, api, prop_vertical
+        FROM staging_afiliadas
+        WHERE
+            direccion IS NOT NULL
+            AND direccion != ''
+    ) AS s
+WHERE
+    p.direccion = s.direccion;
+
+-- *** PASO REFACTORIZADO: Insertar en 'afiliadas' con una estructura limpia ***
+INSERT INTO
+    afiliadas (
+        piso_id,
+        num_afiliada,
+        nombre,
+        apellidos,
+        cif,
+        fecha_nacimiento,
+        genero,
+        email,
+        telefono,
+        estado,
+        regimen,
+        fecha_alta,
+        fecha_baja,
+        trato_propiedad,
+        seccion_sindical,
+        nivel_participacion,
+        comision
+    )
+SELECT
+    p.id,
+    s.num_afiliada,
+    s.nombre,
+    s.apellidos,
+    s.cif,
+    NULL,
+    s.genero,
+    s.email,
+    s.telefono,
+    s.estado,
+    s.regimen,
+    to_date(
+        NULLIF(s.fecha_alta, ''),
+        'DD/MM/YYYY'
+    ),
+    to_date(
+        NULLIF(s.fecha_baja, ''),
+        'DD/MM/YYYY'
+    ),
+    FALSE,
+    s.seccion_sindical,
+    s.nivel_participacion,
+    s.comision
+FROM staging_afiliadas s
+    JOIN pisos p ON s.direccion = p.direccion -- Se usa JOIN para asegurar la vinculación
+ON CONFLICT (num_afiliada) DO NOTHING;
+
+-- (El resto de las inserciones para usuarios, facturacion, conflictos, etc., permanecen igual)
 INSERT INTO
     usuarios (
         alias,
@@ -443,67 +455,6 @@ SELECT
     roles
 FROM staging_usuarios
 ON CONFLICT (alias) DO NOTHING;
-
--- FINAL VERSION: This INSERT statement now correctly uses all available columns from the definitive CSV file.
-INSERT INTO
-    afiliadas (
-        num_afiliada,
-        nombre,
-        apellidos,
-        cif,
-        genero,
-        email,
-        telefono,
-        seccion_sindical,
-        nivel_participacion,
-        comision,
-        cuota,
-        frecuencia_pago,
-        forma_pago,
-        cuenta_corriente,
-        regimen,
-        estado,
-        fecha_alta,
-        fecha_baja,
-        prop_vertical,
-        api,
-        propiedad,
-        entramado,
-        piso_id -- Correctly links to pisos table
-    )
-SELECT
-    s.num_afiliada,
-    s.nombre,
-    s.apellidos,
-    s.cif,
-    s.genero,
-    s.email,
-    s.telefono,
-    s.seccion_sindical,
-    s.nivel_participacion,
-    s.comision,
-    s.cuota,
-    s.frecuencia_pago,
-    s.forma_pago,
-    s.cuenta_corriente,
-    s.regimen,
-    s.estado,
-    to_date(
-        NULLIF(s.fecha_alta, ''),
-        'DD/MM/YYYY'
-    ),
-    to_date(
-        NULLIF(s.fecha_baja, ''),
-        'DD/MM/YYYY'
-    ),
-    s.prop_vertical,
-    s.api,
-    s.propiedad,
-    s.entramado,
-    p.id
-FROM staging_afiliadas s
-    LEFT JOIN pisos p ON s.direccion = p.direccion -- Uses the correct join condition
-ON CONFLICT (num_afiliada) DO NOTHING;
 
 INSERT INTO
     facturacion (

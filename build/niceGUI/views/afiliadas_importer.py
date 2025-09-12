@@ -102,6 +102,7 @@ class AfiliadasImporterView:
             if not nombre:
                 return None
 
+            # Afiliada data is now cleaner
             afiliada_data = {
                 "num_afiliada": get_val(29),
                 "nombre": nombre,
@@ -114,11 +115,11 @@ class AfiliadasImporterView:
                 "fecha_alta": get_val(16),
                 "regimen": get_val(17),
                 "estado": "Alta",
-                "propiedad": get_val(17),
                 "trato_propiedad": bool(get_val(18)),
-                "prop_vertical": get_val(20),
                 "piso_id": None,
             }
+
+            # Piso data now includes fields previously in afiliada
             piso_data = {
                 "direccion": re.sub(
                     r"\s+",
@@ -131,7 +132,9 @@ class AfiliadasImporterView:
                 "cp": int(get_val(14)) if get_val(14).isdigit() else None,
                 "n_personas": int(get_val(15)) if get_val(15).isdigit() else None,
                 "api": get_val(18),
+                "prop_vertical": get_val(20) == "Si",
             }
+
             cuota_type = get_val(22)
             cuota_str = (
                 get_val(23)
@@ -177,6 +180,7 @@ class AfiliadasImporterView:
 
     def _render_preview_tabs(self):
         """Render all three preview panels and update the import button state."""
+        # Revised fields for afiliadas panel
         self._render_panel(
             "afiliada",
             self.afiliadas_panel,
@@ -189,15 +193,14 @@ class AfiliadasImporterView:
                 "telefono",
                 "fecha_nacimiento",
                 "trato_propiedad",
-                "propiedad",
-                "prop_vertical",
                 "fecha_alta",
             ],
         )
+        # Revised fields for pisos panel
         self._render_panel(
             "piso",
             self.pisos_panel,
-            ["direccion", "municipio", "cp", "n_personas", "api"],
+            ["direccion", "municipio", "cp", "n_personas", "api", "prop_vertical"],
         )
         self._render_panel(
             "facturacion",
@@ -236,7 +239,6 @@ class AfiliadasImporterView:
         }
 
         with panel, ui.scroll_area().classes("w-full h-[32rem]"):
-            # Header Row
             with ui.row().classes(
                 "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md items-center no-wrap sticky top-0 z-10"
             ):
@@ -253,7 +255,6 @@ class AfiliadasImporterView:
                             "arrow_upward" if sort_info[1] else "arrow_downward",
                             size="sm",
                         )
-
                 ui.label("Afiliada").classes("w-48 min-w-[12rem]")
                 for field in fields:
                     width_class = (
@@ -273,12 +274,9 @@ class AfiliadasImporterView:
                                 "arrow_upward" if sort_info[1] else "arrow_downward",
                                 size="sm",
                             )
-
-            # Data Rows
             for record in self.state.records:
                 if "ui_updaters" not in record:
                     record["ui_updaters"] = {}
-
                 with ui.row().classes(
                     "w-full items-center gap-2 p-2 border-t no-wrap"
                 ) as row:
@@ -295,7 +293,6 @@ class AfiliadasImporterView:
                         )
 
                     record["ui_updaters"][data_key] = update_row_style
-
                     with ui.column().classes(
                         "w-24 min-w-[6rem] flex items-center justify-center"
                     ):
@@ -313,12 +310,10 @@ class AfiliadasImporterView:
                             f"status_icon_{data_key}"
                         ] = update_status_icon
                         update_status_icon()
-
                     afiliada_label = f"{record['afiliada']['nombre']} {record['afiliada']['apellidos']}"
                     ui.label(afiliada_label).classes(
                         "w-48 min-w-[12rem] text-sm text-gray-600"
                     )
-
                     for field in fields:
                         value = record[data_key].get(field)
                         input_element = (
@@ -348,13 +343,7 @@ class AfiliadasImporterView:
         existing_criterion = next(
             (c for c in self.state.sort_criteria if c[0] == column), None
         )
-        if column == "is_valid":
-            new_direction = True
-        elif existing_criterion:
-            new_direction = not existing_criterion[1]
-        else:
-            new_direction = True
-
+        new_direction = not existing_criterion[1] if existing_criterion else True
         self.state.sort_criteria = [(column, new_direction)]
         self.state.apply_filters_and_sort()
         self._render_preview_tabs()
@@ -370,18 +359,15 @@ class AfiliadasImporterView:
         is_valid_facturacion, errors_facturacion = validator.validate_record(
             "facturacion", record["facturacion"], "create"
         )
-
         record["validation"]["is_valid"] = (
             is_valid_afiliada and is_valid_piso and is_valid_facturacion
         )
         record["validation"]["errors"] = (
             errors_afiliada + errors_piso + errors_facturacion
         )
-
         if "ui_updaters" in record:
             for updater in record["ui_updaters"].values():
                 updater()
-
         self._update_import_button_state()
 
     def _update_import_button_state(self):
@@ -434,7 +420,11 @@ class AfiliadasImporterView:
                 )
                 if existing_pisos:
                     piso_id = existing_pisos[0]["id"]
-                    log_message(f"ℹ️ Piso encontrado: {record['piso']['direccion']}")
+                    # Update existing piso with new info from CSV
+                    await self.api.update_record("pisos", piso_id, record["piso"])
+                    log_message(
+                        f"ℹ️ Piso encontrado y actualizado: {record['piso']['direccion']}"
+                    )
                 else:
                     new_piso = await self.api.create_record("pisos", record["piso"])
                     if new_piso:

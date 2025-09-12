@@ -14,10 +14,9 @@ CREATE SCHEMA IF NOT EXISTS sindicato_inq;
 SET search_path TO sindicato_inq, public;
 
 -- =====================================================================
--- PASO 1: DEFINICIÓN DE TABLAS E ÍNDICES
+-- PASO 1: DEFINICIÓN DE TABLAS E ÍNDICES (ALINEADO CON PRODUCCIÓN)
 -- =====================================================================
 
--- Tablas principales ordenadas por dependencias
 CREATE TABLE IF NOT EXISTS entramado_empresas (
     id SERIAL PRIMARY KEY,
     nombre TEXT UNIQUE,
@@ -59,7 +58,6 @@ CREATE TABLE IF NOT EXISTS empresas (
     nombre TEXT,
     cif_nif_nie TEXT UNIQUE,
     directivos TEXT,
-    api TEXT,
     direccion_fiscal TEXT
 );
 
@@ -78,8 +76,6 @@ CREATE TABLE IF NOT EXISTS bloques (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
     direccion TEXT UNIQUE,
-    estado TEXT,
-    api TEXT,
     nodo_id INTEGER REFERENCES nodos (id) ON DELETE SET NULL
 );
 
@@ -96,33 +92,29 @@ CREATE TABLE IF NOT EXISTS pisos (
     n_personas INTEGER
 );
 
+-- Tabla 'afiliadas' refactorizada para máxima consistencia
 CREATE TABLE IF NOT EXISTS afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
+    -- Identificación
     num_afiliada TEXT UNIQUE,
     nombre TEXT,
     apellidos TEXT,
     cif TEXT UNIQUE,
+    fecha_nacimiento DATE,
     genero TEXT,
     email TEXT,
     telefono TEXT,
-    seccion_sindical TEXT,
-    nivel_participacion TEXT,
-    comision TEXT,
-    cuota TEXT,
-    frecuencia_pago TEXT,
-    forma_pago TEXT,
-    cuenta_corriente TEXT,
-    regimen TEXT,
+    -- Estado y Régimen
     estado TEXT,
+    regimen TEXT,
     fecha_alta DATE,
     fecha_baja DATE,
-    prop_vertical TEXT,
-    api TEXT,
-    propiedad TEXT,
-    entramado TEXT,
     trato_propiedad BOOLEAN,
-    fecha_nacimiento DATE
+    -- Participación Interna
+    seccion_sindical TEXT,
+    nivel_participacion TEXT,
+    comision TEXT
 );
 
 CREATE TABLE IF NOT EXISTS facturacion (
@@ -202,7 +194,7 @@ CREATE INDEX IF NOT EXISTS idx_diario_conflictos_conflicto_id ON diario_conflict
 CREATE INDEX IF NOT EXISTS idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 
 -- =====================================================================
--- PASO 2: FUNCIÓN Y TRIGGER PARA SINCRONIZACIÓN DE NODOS
+-- PASO 2: FUNCIÓN, PROCEDIMIENTO Y TRIGGER PARA SINCRONIZACIÓN
 -- =====================================================================
 
 CREATE OR REPLACE FUNCTION sync_bloque_nodo()
@@ -220,6 +212,32 @@ DROP TRIGGER IF EXISTS trigger_sync_bloque_nodo ON sindicato_inq.pisos;
 CREATE TRIGGER trigger_sync_bloque_nodo
 AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
 FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
+
+-- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
+CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    bloque_record RECORD;
+    most_common_nodo_id INTEGER;
+BEGIN
+    FOR bloque_record IN SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL LOOP
+        SELECT ncm.nodo_id INTO most_common_nodo_id
+        FROM sindicato_inq.pisos p
+        JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
+        WHERE p.bloque_id = bloque_record.id
+        GROUP BY ncm.nodo_id
+        ORDER BY COUNT(*) DESC
+        LIMIT 1;
+
+        IF FOUND AND most_common_nodo_id IS NOT NULL THEN
+            UPDATE sindicato_inq.bloques
+            SET nodo_id = most_common_nodo_id
+            WHERE id = bloque_record.id;
+        END IF;
+    END LOOP;
+END;
+$$;
 
 -- =====================================================================
 -- PASO 3: VISTAS PARA PRESENTACIÓN DE DATOS
@@ -520,7 +538,6 @@ INSERT INTO
         nombre,
         cif_nif_nie,
         directivos,
-        api,
         direccion_fiscal
     )
 VALUES (
@@ -528,7 +545,6 @@ VALUES (
         'Fidere Vivienda Madrid SL',
         'B81234567',
         'Juan Pérez García, Ana García López',
-        'No',
         'Paseo de la Castellana, 1, Madrid, España'
     ),
     (
@@ -536,7 +552,6 @@ VALUES (
         'Azora Gestión Inmobiliaria SA',
         'A81234568',
         'Carlos Sánchez Ruiz, María López Torres',
-        'Sí',
         'Calle de Serrano, 50, Madrid, España'
     ),
     (
@@ -544,7 +559,6 @@ VALUES (
         'Nestar Residencial Madrid SA',
         'A87654321',
         'Laura Martínez Silva, David Fernández Vega',
-        'Sí',
         'Calle de Serrano, 10, Madrid, España'
     ),
     (
@@ -552,7 +566,6 @@ VALUES (
         'Elix Housing SOCIMI',
         'A12345678',
         'Sofía Gómez Ruiz, David Fernández Castro',
-        'No',
         'Avenida de América, 5, Madrid, España'
     ),
     (
@@ -560,54 +573,30 @@ VALUES (
         'Inmobiliaria Centro Madrid SL',
         'B98765432',
         'Roberto Díaz Moreno, Elena Jiménez Blanco',
-        'No',
         'Gran Vía, 25, Madrid, España'
     );
 
 -- Insertar bloques
 INSERT INTO
-    bloques (
-        empresa_id,
-        direccion,
-        estado,
-        api
-    )
+    bloques (empresa_id, direccion)
 VALUES (
         1,
-        'Calle de la Invención, 10, Madrid',
-        'Activo',
-        'No'
+        'Calle de la Invención, 10, Madrid'
     ),
-    (
-        1,
-        'Calle Falsa, 123, Madrid',
-        'Activo',
-        'No'
-    ),
+    (1, 'Calle Falsa, 123, Madrid'),
     (
         2,
-        'Avenida de la Imaginación, 20, Madrid',
-        'Activo',
-        'Sí'
+        'Avenida de la Imaginación, 20, Madrid'
     ),
     (
         3,
-        'Plaza de la Creatividad, 5, Madrid',
-        'En renovación',
-        'No'
+        'Plaza de la Creatividad, 5, Madrid'
     ),
     (
         4,
-        'Calle Ejemplo, 15, Madrid',
-        'Activo',
-        'Sí'
+        'Calle Ejemplo, 15, Madrid'
     ),
-    (
-        5,
-        'Avenida Test, 30, Madrid',
-        'Activo',
-        'No'
-    );
+    (5, 'Avenida Test, 30, Madrid');
 
 -- Insertar pisos
 INSERT INTO
@@ -837,17 +826,9 @@ INSERT INTO
         seccion_sindical,
         nivel_participacion,
         comision,
-        cuota,
-        frecuencia_pago,
-        forma_pago,
-        cuenta_corriente,
         regimen,
         estado,
         fecha_alta,
-        prop_vertical,
-        api,
-        propiedad,
-        entramado,
         trato_propiedad,
         fecha_nacimiento
     )
@@ -863,17 +844,9 @@ VALUES (
         'Latina',
         'Activa',
         'No',
-        '15',
-        'Mensual',
-        'Domiciliación',
-        'ES9121000418450200051332',
         'Alquiler',
         'Alta',
         '2023-01-15',
-        'Si',
-        'No',
-        'Fidere Vivienda Madrid SL',
-        'Inversiones Inmobiliarias Globales',
         false,
         '1985-03-15'
     ),
@@ -889,17 +862,9 @@ VALUES (
         'Latina',
         'Colaboradora',
         'Si',
-        '150',
-        'Anual',
-        'Domiciliación',
-        'ES9021000418450200051333',
         'Alquiler',
         'Alta',
         '2023-02-20',
-        'Si',
-        'No',
-        'Fidere Vivienda Madrid SL',
-        'Inversiones Inmobiliarias Globales',
         true,
         '1978-11-22'
     ),
@@ -915,17 +880,9 @@ VALUES (
         'Centro',
         'Referente',
         'No',
-        '15',
-        'Mensual',
-        'Efectivo',
-        '',
         'Alquiler',
         'Baja',
         '2023-03-25',
-        'Si',
-        'No',
-        'Fidere Vivienda Madrid SL',
-        'Inversiones Inmobiliarias Globales',
         false,
         '1992-07-08'
     ),
@@ -941,17 +898,9 @@ VALUES (
         'Centro',
         'Activa',
         'No',
-        '15',
-        'Mensual',
-        'Transferencia',
-        'ES7620770024003102575766',
         'Alquiler',
         'Alta',
         '2023-04-10',
-        'No',
-        'No',
-        'Azora Gestión Inmobiliaria SA',
-        'Inversiones Inmobiliarias Globales',
         true,
         '1980-12-03'
     ),
@@ -967,17 +916,9 @@ VALUES (
         'Este',
         'Colaboradora',
         'No',
-        '45',
-        'Trimestral',
-        'Domiciliación',
-        'ES1000492352082414205416',
         'Propiedad',
         'Alta',
         '2023-05-18',
-        'No',
-        'No',
-        'Azora Gestión Inmobiliaria SA',
-        'Inversiones Inmobiliarias Globales',
         false,
         '1975-09-17'
     );
@@ -1158,32 +1099,6 @@ VALUES (
         'Revisión de contrato',
         '2024-12-10 09:15:00'
     );
-
--- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
-CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    bloque_record RECORD;
-    most_common_nodo_id INTEGER;
-BEGIN
-    FOR bloque_record IN SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL LOOP
-        SELECT ncm.nodo_id INTO most_common_nodo_id
-        FROM sindicato_inq.pisos p
-        JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-        WHERE p.bloque_id = bloque_record.id
-        GROUP BY ncm.nodo_id
-        ORDER BY COUNT(*) DESC
-        LIMIT 1;
-
-        IF FOUND AND most_common_nodo_id IS NOT NULL THEN
-            UPDATE sindicato_inq.bloques
-            SET nodo_id = most_common_nodo_id
-            WHERE id = bloque_record.id;
-        END IF;
-    END LOOP;
-END;
-$$;
 
 -- =====================================================================
 -- PASO 6: SINCRONIZACIÓN Y FINALIZACIÓN

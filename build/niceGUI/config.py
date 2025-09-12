@@ -18,11 +18,8 @@ class Config:
 
 
 # =====================================================================
-#  TABLE & RELATIONSHIP METADATA
+#  TABLE & RELATIONSHIP METADATA (REVISED)
 # =====================================================================
-# This dictionary is the engine for the Enhanced CRUD view.
-# 'hidden_fields' key is added to specify which columns to hide from UI cards.
-
 TABLE_INFO = {
     "entramado_empresas": {
         "display_name": "Entramado de Empresas",
@@ -33,6 +30,86 @@ TABLE_INFO = {
             {"table": "empresas", "foreign_key": "entramado_id"},
         ],
     },
+    "empresas": {
+        "display_name": "Empresas",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": [
+            "nombre",
+            "cif_nif_nie",
+            "directivos",
+            "direccion_fiscal",
+            "entramado_id",
+        ],
+        "relations": {
+            "entramado_id": {"view": "entramado_empresas", "display_field": "nombre"}
+        },
+        "child_relations": [
+            {"table": "bloques", "foreign_key": "empresa_id"},
+        ],
+    },
+    "bloques": {
+        "display_name": "Bloques",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": ["direccion", "empresa_id", "nodo_id"],
+        "relations": {
+            "empresa_id": {"view": "empresas", "display_field": "nombre"},
+            "nodo_id": {"view": "nodos", "display_field": "nombre"},
+        },
+        "child_relations": [
+            {"table": "pisos", "foreign_key": "bloque_id"},
+        ],
+    },
+    "pisos": {
+        "display_name": "Pisos",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": [
+            "direccion",
+            "municipio",
+            "cp",
+            "api",  # Correctly located here
+            "prop_vertical",  # Correctly located here
+            "por_habitaciones",
+            "n_personas",
+            "fecha_firma",
+            "bloque_id",
+        ],
+        "relations": {"bloque_id": {"view": "bloques", "display_field": "direccion"}},
+        "child_relations": [
+            {"table": "afiliadas", "foreign_key": "piso_id"},
+        ],
+    },
+    "afiliadas": {
+        "display_name": "Afiliadas",
+        "id_field": "id",
+        "hidden_fields": ["id", "seccion_sindical", "nivel_participacion", "comision"],
+        # Cleaned and reordered fields
+        "fields": [
+            "piso_id",
+            "num_afiliada",
+            "nombre",
+            "apellidos",
+            "cif",
+            "fecha_nacimiento",
+            "genero",
+            "email",
+            "telefono",
+            "estado",
+            "regimen",
+            "fecha_alta",
+            "fecha_baja",
+            "trato_propiedad",
+        ],
+        "relations": {"piso_id": {"view": "pisos", "display_field": "direccion"}},
+        "child_relations": [
+            {"table": "facturacion", "foreign_key": "afiliada_id"},
+            {"table": "asesorias", "foreign_key": "afiliada_id"},
+            {"table": "conflictos", "foreign_key": "afiliada_id"},
+        ],
+    },
+    # --- Other tables remain unchanged from the original ---
     "nodos": {
         "display_name": "Nodos Territoriales",
         "id_field": "id",
@@ -80,113 +157,22 @@ TABLE_INFO = {
         "fields": ["cp", "nodo_id"],
         "relations": {"nodo_id": {"view": "nodos", "display_field": "nombre"}},
     },
-    "empresas": {
-        "display_name": "Empresas",
-        "id_field": "id",
-        "hidden_fields": ["id"],
-        "fields": [
-            "nombre",
-            "cif_nif_nie",
-            "directivos",
-            "api",
-            "direccion_fiscal",
-            "entramado_id",
-        ],
-        "relations": {
-            "entramado_id": {"view": "entramado_empresas", "display_field": "nombre"}
-        },
-        "child_relations": [
-            {"table": "bloques", "foreign_key": "empresa_id"},
-        ],
-    },
     "usuario_credenciales": {
         "display_name": "Credenciales de Usuario",
         "id_field": "usuario_id",
-        "hidden_fields": ["password_hash"],  # Hide sensitive data
+        "hidden_fields": ["password_hash"],
         "fields": ["usuario_id", "password_hash"],
         "relations": {"usuario_id": {"view": "usuarios", "display_field": "alias"}},
     },
     "usuario_roles": {
         "display_name": "Roles Asignados",
-        "id_field": "usuario_id,role_id",  # Composite key
+        "id_field": "usuario_id,role_id",
         "hidden_fields": [],
         "fields": ["usuario_id", "role_id"],
         "relations": {
             "usuario_id": {"view": "usuarios", "display_field": "alias"},
             "role_id": {"view": "roles", "display_field": "nombre"},
         },
-    },
-    "bloques": {
-        "display_name": "Bloques",
-        "id_field": "id",
-        "hidden_fields": ["id"],
-        "fields": ["direccion", "estado", "api", "empresa_id", "nodo_id"],
-        "relations": {
-            "empresa_id": {"view": "empresas", "display_field": "nombre"},
-            "nodo_id": {"view": "nodos", "display_field": "nombre"},
-        },
-        "child_relations": [
-            {"table": "pisos", "foreign_key": "bloque_id"},
-        ],
-    },
-    "pisos": {
-        "display_name": "Pisos",
-        "id_field": "id",
-        "hidden_fields": ["id"],
-        "fields": [
-            "direccion",
-            "municipio",
-            "cp",
-            "api",
-            "prop_vertical",
-            "por_habitaciones",
-            "n_personas",
-            "bloque_id",
-            "fecha_firma",
-        ],
-        "relations": {"bloque_id": {"view": "bloques", "display_field": "direccion"}},
-        "child_relations": [
-            {"table": "afiliadas", "foreign_key": "piso_id"},
-        ],
-    },
-    "afiliadas": {
-        "display_name": "Afiliadas",
-        "id_field": "id",
-        "hidden_fields": [
-            "id",
-            "seccion_sindical",
-            "nivel_participacion",
-            "comision",
-            "cuota",
-            "frecuencia_pago",
-            "forma_pago",
-            "cuenta_corriente",
-            "prop_vertical",
-            "api",
-            "propiedad",
-            "entramado",
-        ],
-        "fields": [
-            "num_afiliada",
-            "nombre",
-            "apellidos",
-            "cif",
-            "genero",
-            "email",
-            "telefono",
-            "regimen",
-            "estado",
-            "fecha_alta",
-            "fecha_baja",
-            "fecha_nacimiento",
-            "piso_id",
-        ],
-        "relations": {"piso_id": {"view": "pisos", "display_field": "direccion"}},
-        "child_relations": [
-            {"table": "facturacion", "foreign_key": "afiliada_id"},
-            {"table": "asesorias", "foreign_key": "afiliada_id"},
-            {"table": "conflictos", "foreign_key": "afiliada_id"},
-        ],
     },
     "asesorias": {
         "display_name": "Asesorías",

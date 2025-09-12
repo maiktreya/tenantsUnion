@@ -7,19 +7,25 @@
 -- la funcionalidad del explorador de relaciones en la interfaz.
 -- =====================================================================
 
-
 -- =====================================================================
 -- LISTADO DE VISTAS DISPONIBLES EN LA INTERFAZ NICEGUI (DESCRITAS  en build/niceGUI/config.py)
 -- =====================================================================
 
 SET search_path TO sindicato_inq, public;
+
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- VISTA 1: ENTRAMADO_EMPRESAS (AHORA CON MÉTRICAS AMPLIADAS Y AGRUPACIÓN CORRECTA)
 -- NOTA: Esta es una vista de resumen. Al hacer clic en una fila, se mostrarán las empresas hijas (child records).
 CREATE OR REPLACE VIEW v_resumen_entramados_empresas AS
-SELECT ee.id, -- ID primario del entramado (para buscar hijos)
-    ee.nombre AS "Entramado", ee.descripcion AS "Descripción", COUNT(DISTINCT e.id) AS "Núm. Empresas", COUNT(DISTINCT b.id) AS "Núm. Bloques", COUNT(DISTINCT p.id) AS "Núm. Pisos", COUNT(DISTINCT a.id) AS "Núm. Afiliadas"
+SELECT
+    ee.id, -- ID primario del entramado (para buscar hijos)
+    ee.nombre AS "Entramado",
+    ee.descripcion AS "Descripción",
+    COUNT(DISTINCT e.id) AS "Núm. Empresas",
+    COUNT(DISTINCT b.id) AS "Núm. Bloques",
+    COUNT(DISTINCT p.id) AS "Núm. Pisos",
+    COUNT(DISTINCT a.id) AS "Núm. Afiliadas"
 FROM
     entramado_empresas ee
     LEFT JOIN empresas e ON ee.id = e.entramado_id
@@ -85,19 +91,27 @@ SELECT
     a.apellidos AS "Apellidos",
     a.cif AS "CIF",
     a.genero AS "Género",
-    TRIM(CONCAT_WS(', ', p.direccion, p.municipio, p.cp::text)) AS "Dirección",
+    TRIM(
+        CONCAT_WS(
+            ', ',
+            p.direccion,
+            p.municipio,
+            p.cp::text
+        )
+    ) AS "Dirección",
     a.regimen AS "Régimen",
     a.estado AS "Estado",
-    e.api AS "API",
+    p.api AS "API",
     e.nombre AS "Propiedad",
     COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
     COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"
-FROM afiliadas a
-LEFT JOIN pisos p ON a.piso_id = p.id
-LEFT JOIN bloques b ON p.bloque_id = b.id
-LEFT JOIN empresas e ON b.empresa_id = e.id
-LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
-LEFT JOIN nodos n ON b.nodo_id = n.id;
+FROM
+    afiliadas a
+    LEFT JOIN pisos p ON a.piso_id = p.id
+    LEFT JOIN bloques b ON p.bloque_id = b.id
+    LEFT JOIN empresas e ON b.empresa_id = e.id
+    LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
+    LEFT JOIN nodos n ON b.nodo_id = n.id;
 
 -- VISTA 5: DIARIO DE CONFLICTOS CON DETALLES
 CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
@@ -186,18 +200,24 @@ SELECT
     -- This uses the same logic as the matching function to show the exact score
     -- for the link that was made.
     -- The score will be NULL for unlinked pisos, as there is no 'b.direccion' to compare.
-    similarity(
-        trim(split_part(b.direccion, ',', 1)) || ', ' || trim(split_part(b.direccion, ',', 2)),
-        trim(split_part(p.direccion, ',', 1)) || ', ' || trim(split_part(p.direccion, ',', 2))
+    similarity (
+        trim(
+            split_part(b.direccion, ',', 1)
+        ) || ', ' || trim(
+            split_part(b.direccion, ',', 2)
+        ),
+        trim(
+            split_part(p.direccion, ',', 1)
+        ) || ', ' || trim(
+            split_part(p.direccion, ',', 2)
+        )
     ) AS score
-FROM
-    pisos p
--- We use a LEFT JOIN to include all records from 'pisos',
--- even if they didn't find a match in the 'bloques' table.
-LEFT JOIN
-    bloques b ON p.bloque_id = b.id
--- You can order by score to see the best or worst matches first.
--- For example, to see the weakest matches:
--- ORDER BY score ASC;
--- Or to see all the unlinked records first:
+FROM pisos p
+    -- We use a LEFT JOIN to include all records from 'pisos',
+    -- even if they didn't find a match in the 'bloques' table.
+    LEFT JOIN bloques b ON p.bloque_id = b.id
+    -- You can order by score to see the best or worst matches first.
+    -- For example, to see the weakest matches:
+    -- ORDER BY score ASC;
+    -- Or to see all the unlinked records first:
 ORDER BY linked DESC, score DESC;
