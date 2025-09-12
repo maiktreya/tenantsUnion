@@ -13,13 +13,12 @@ WHERE
 CALL sync_all_bloques_to_nodos ();
 
 -- =====================================================================
--- NEW: LEGACY DATA CONSISTENCY CHECK (APPENDED)
+-- NEW: LOGIC TO CAPTURE AND LINK ORPHANED EMPRESAS (APPENDED)
 -- =====================================================================
--- This section is designed to identify 'empresas' from the legacy system
--- that were associated with a 'piso' but were not linked to a 'bloque',
--- causing them to be missed during the initial data migration.
+-- This section identifies, creates, and links empresas from the legacy
+-- system that were not associated with a 'bloque'.
 
--- 1. Re-create the staging table for 'pisos' to access the original 'propiedad' field.
+-- 1. Re-create the staging table to access the original 'propiedad' field.
 CREATE TABLE IF NOT EXISTS staging_pisos_check (
     direccion TEXT,
     estado TEXT,
@@ -40,24 +39,46 @@ WITH (
         HEADER true
     );
 
--- 3. Perform the check: Find properties associated with unlinked pisos
---    that do not exist in the final 'empresas' table.
---    This query will return the names of the missing companies.
+-- 3. Add a new nullable foreign key column to 'pisos' to hold the link
+--    to these orphaned 'empresas'.
+ALTER TABLE sindicato_inq.pisos
+ADD COLUMN IF NOT EXISTS empresa_nobloque_id INTEGER REFERENCES sindicato_inq.empresas (id) ON DELETE SET NULL;
+
+-- 4. Insert the missing 'empresas' into the main 'empresas' table.
+--    This identifies properties from unlinked pisos that don't exist yet.
+INSERT INTO
+    sindicato_inq.empresas (nombre)
 SELECT DISTINCT
-    spc.propiedad AS empresa_faltante
+    spc.propiedad
 FROM
     pisos p
     JOIN staging_pisos_check spc ON p.direccion = spc.direccion
 WHERE
-    p.bloque_id IS NULL -- The piso is not linked to a bloque
-    AND spc.propiedad IS NOT NULL -- And it had a 'propiedad' in the original file
+    p.bloque_id IS NULL
+    AND spc.propiedad IS NOT NULL
     AND spc.propiedad != ''
-    AND NOT EXISTS ( -- And that 'propiedad' (company name) does not exist...
+    AND NOT EXISTS (
         SELECT 1
         FROM empresas e
         WHERE
-            e.nombre = spc.propiedad -- ...in the final 'empresas' table.
-    );
+            e.nombre = spc.propiedad
+    )
+ON CONFLICT (nombre) DO NOTHING;
+-- Avoids errors if a company name somehow exists but wasn't linked.
 
--- 4. Clean up the temporary staging table.
+-- 5. Update the 'pisos' table to link to these newly created 'empresas'.
+--    This joins 'pisos' with the staging table and the 'empresas' table
+--    to find the correct ID for the new 'empresa_nobloque_id' field.
+UPDATE pisos p
+SET
+    empresa_nobloque_id = e.id
+FROM
+    staging_pisos_check spc
+    JOIN empresas e ON spc.propiedad = e.nombre
+WHERE
+    p.direccion = spc.direccion
+    AND p.bloque_id IS NULL;
+-- Only update pisos that are not linked to a bloque.
+
+-- 6. Clean up the temporary staging table.
 DROP TABLE staging_pisos_check;
