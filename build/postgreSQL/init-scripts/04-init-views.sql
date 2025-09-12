@@ -101,7 +101,7 @@ SELECT
     ) AS "Dirección",
     a.regimen AS "Régimen",
     a.estado AS "Estado",
-    p.api AS "API",
+    p.inmobiliaria AS "Inmobiliaria",
     e.nombre AS "Propiedad",
     COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
     COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"

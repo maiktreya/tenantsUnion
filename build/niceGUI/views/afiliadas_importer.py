@@ -131,7 +131,7 @@ class AfiliadasImporterView:
                 "municipio": get_val(13),
                 "cp": int(get_val(14)) if get_val(14).isdigit() else None,
                 "n_personas": int(get_val(15)) if get_val(15).isdigit() else None,
-                "api": get_val(18),
+                "inmobiliaria": get_val(18),
                 "prop_vertical": get_val(20) == "Si",
             }
 
@@ -200,7 +200,14 @@ class AfiliadasImporterView:
         self._render_panel(
             "piso",
             self.pisos_panel,
-            ["direccion", "municipio", "cp", "n_personas", "api", "prop_vertical"],
+            [
+                "direccion",
+                "municipio",
+                "cp",
+                "n_personas",
+                "inmobiliaria",
+                "prop_vertical",
+            ],
         )
         self._render_panel(
             "facturacion",
@@ -231,7 +238,7 @@ class AfiliadasImporterView:
             "prop_vertical": "Prop. Vertical",
             "fecha_alta": "Fecha Alta",
             "n_personas": "Nº Personas",
-            "api": "API",
+            "inmobiliaria": "Inmobiliaria",
             "cuota": "Cuota (€)",
             "periodicidad": "Periodicidad (m)",
             "forma_pago": "Forma Pago",

@@ -43,7 +43,7 @@ CREATE TABLE pisos (
     direccion TEXT NOT NULL UNIQUE,
     municipio TEXT,
     cp INTEGER,
-    api TEXT, -- Agencia Inmobiliaria (atributo del piso)
+    inmobiliaria TEXT, -- Agencia Inmobiliaria (atributo del piso)
     prop_vertical BOOLEAN, -- Propiedad Vertical (atributo del piso)
     por_habitaciones BOOLEAN,
     n_personas INTEGER,
@@ -372,7 +372,7 @@ ON CONFLICT (direccion) DO NOTHING;
 -- Se enriquece la tabla de pisos con los datos que le pertenecen.
 UPDATE pisos p
 SET
-    api = s.api,
+    inmobiliaria = s.api,
     prop_vertical = CASE
         WHEN s.prop_vertical = 'Si' THEN TRUE
         ELSE FALSE

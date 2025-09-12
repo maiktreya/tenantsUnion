@@ -69,12 +69,13 @@ TABLE_INFO = {
             "direccion",
             "municipio",
             "cp",
-            "api",  # Correctly located here
-            "prop_vertical",  # Correctly located here
+            "inmobiliaria",
+            "prop_vertical",
             "por_habitaciones",
             "n_personas",
             "fecha_firma",
             "bloque_id",
+            "empresa_nobloque_id",
         ],
         "relations": {"bloque_id": {"view": "bloques", "display_field": "direccion"}},
         "child_relations": [

@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS pisos (
     direccion TEXT NOT NULL UNIQUE,
     municipio TEXT,
     cp INTEGER,
-    api TEXT,
+    inmobiliaria TEXT,
     prop_vertical BOOLEAN,
     por_habitaciones BOOLEAN,
     fecha_firma DATE,
@@ -605,7 +605,7 @@ INSERT INTO
         direccion,
         municipio,
         cp,
-        api,
+        inmobiliaria,
         prop_vertical,
         por_habitaciones,
         n_personas
