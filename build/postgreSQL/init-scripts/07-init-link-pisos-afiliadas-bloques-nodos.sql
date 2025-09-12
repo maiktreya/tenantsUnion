@@ -62,9 +62,7 @@ WHERE
         FROM empresas e
         WHERE
             e.nombre = spc.propiedad
-    )
-ON CONFLICT (nombre) DO NOTHING;
--- Avoids errors if a company name somehow exists but wasn't linked.
+    );
 
 -- 5. Update the 'pisos' table to link to these newly created 'empresas'.
 --    This joins 'pisos' with the staging table and the 'empresas' table
