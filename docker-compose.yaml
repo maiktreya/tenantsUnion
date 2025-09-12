@@ -2,21 +2,17 @@ services:
   db:
     image: postgres:17
     expose:
-      - "5432"
+      - "5432" # Internal only - no external access
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - /var/lib/postgresql/data
+      - /var/lib/postgresql/data # Explicit anonymous volume for --renew-anon-volumes
       - ${INIT_SCRIPTS_PATH:-./build/postgreSQL/init-scripts}:/docker-entrypoint-initdb.d
       - ./dev/back/SI_MAD/db_fork:/csv-data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'SELECT 1 FROM sindicato_inq.usuarios'",
-        ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,7 +20,7 @@ services:
   server:
     image: postgrest/postgrest:v12.2.8
     expose:
-      - "3000"
+      - "3000" # Internal only - no external access
     environment:
       PGRST_DB_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PGRST_OPENAPI_MODE: disabled
@@ -33,19 +29,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # V-- ADD THIS HEALTHCHECK BLOCK --V
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # A-------------------------------A
     restart: unless-stopped
   nicegui-app:
     image: python:3.11-slim
     profiles: ["Frontend", "Secured"]
     expose:
-      - "8081"
+      - "8081" # Internal only - no external access
     volumes:
       - ./build/niceGUI:/app${DEV_MODE:+:rw}${DEV_MODE:-:ro}
     working_dir: /app
@@ -54,8 +43,8 @@ services:
              pip install --root-user-action=ignore passlib==1.7.4 bcrypt==4.0.1 nicegui httpx pandas &&
              python main.py"
     depends_on:
-      server:
-        condition: service_healthy
+      - server
+      - db
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
@@ -78,11 +67,11 @@ services:
     depends_on:
       - server
     restart: unless-stopped
+
   certbot:
     build:
       context: ./build/certbot # custom image with duckdns integration
     profiles: ["Secured"]
     volumes:
       - ./build/nginx/certbot:/etc/letsencrypt
-      - ./build/nginx/certbot/www:/var/www/certbot
-    restart: no
+      - ./build/n
