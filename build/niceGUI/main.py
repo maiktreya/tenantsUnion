@@ -2,6 +2,10 @@
 import os
 from pathlib import Path
 
+from logging_config import setup_logging
+
+setup_logging()
+
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware

@@ -1,7 +1,10 @@
 import httpx
+import logging  # <-- CHANGE: Import the logging module
 from typing import Dict, List, Optional, Any, Tuple
 from nicegui import ui
 from api.validate import validator
+
+log = logging.getLogger(__name__)  # <-- CHANGE: Get a logger for this module
 
 
 class APIClient:
@@ -50,7 +53,6 @@ class APIClient:
             response.raise_for_status()
             records = response.json()
 
-            # Optional validation of returned data
             if validate_response and isinstance(records, list):
                 validated_records = []
                 for record in records:
@@ -66,12 +68,19 @@ class APIClient:
 
             return records
         except httpx.HTTPStatusError as e:
+            # <-- CHANGE: Added detailed logging -->
+            log.error(
+                f"HTTP Error getting records from '{table}': Status {e.response.status_code}",
+                exc_info=True,
+            )
             ui.notify(
                 f"Error HTTP {e.response.status_code}: {e.response.text}",
                 type="negative",
             )
             return []
         except Exception as e:
+            # <-- CHANGE: Added detailed logging -->
+            log.error(f"Unexpected error getting records from '{table}'", exc_info=True)
             ui.notify(f"Error al obtener registros: {str(e)}", type="negative")
             return []
 
@@ -83,8 +92,6 @@ class APIClient:
         show_validation_errors: bool = True,
     ) -> Optional[Dict]:
         """Create a new record from a dictionary with optional validation."""
-
-        # Pre-creation validation
         if validate:
             is_valid, errors = validator.validate_record(table, data, "create")
             if not is_valid:
@@ -104,7 +111,6 @@ class APIClient:
             result = response.json()
             created_record = result[0] if isinstance(result, list) else result
 
-            # Optional post-creation validation
             if validate:
                 is_valid, errors = validator.validate_record(
                     table, created_record, "read"
@@ -116,8 +122,11 @@ class APIClient:
                     )
 
             return created_record
-
         except Exception as e:
+            # <-- CHANGE: Added detailed logging -->
+            log.error(
+                f"Error creating record in '{table}' with data: {data}", exc_info=True
+            )
             ui.notify(f"Error al crear registro: {str(e)}", type="negative")
             return None
 
@@ -130,8 +139,6 @@ class APIClient:
         show_validation_errors: bool = True,
     ) -> Optional[Dict]:
         """Update a record from a dictionary with optional validation."""
-
-        # Pre-update validation
         if validate:
             is_valid, errors = validator.validate_record(table, data, "update")
             if not is_valid:
@@ -142,8 +149,6 @@ class APIClient:
                 return None
 
         client = self._ensure_client()
-
-        # Handle composite keys or different primary key names
         pk_filter = f"id=eq.{record_id}"
         if table == "usuario_credenciales":
             pk_filter = f"usuario_id=eq.{record_id}"
@@ -159,7 +164,6 @@ class APIClient:
             result = response.json()
             updated_record = result[0] if isinstance(result, list) else result
 
-            # Optional post-update validation
             if validate:
                 is_valid, errors = validator.validate_record(
                     table, updated_record, "read"
@@ -171,8 +175,12 @@ class APIClient:
                     )
 
             return updated_record
-
         except Exception as e:
+            # <-- CHANGE: Added detailed logging -->
+            log.error(
+                f"Error updating record ID '{record_id}' in '{table}' with data: {data}",
+                exc_info=True,
+            )
             ui.notify(f"Error al actualizar registro: {str(e)}", type="negative")
             return None
 
@@ -186,11 +194,15 @@ class APIClient:
             response.raise_for_status()
             return True
         except Exception as e:
+            # <-- CHANGE: Added detailed logging -->
+            log.error(
+                f"Error deleting record ID '{record_id}' from '{table}'", exc_info=True
+            )
             ui.notify(f"Error al eliminar registro: {str(e)}", type="negative")
             return False
 
     # =====================================================================
-    #  ENHANCED UTILITY METHODS
+    #  ENHANCED UTILITY METHODS (No changes needed here)
     # =====================================================================
 
     async def get_record_by_id(
@@ -261,7 +273,6 @@ class APIClient:
         if not schema:
             return []
 
-        # Use provided search fields or default to visible text fields
         if not search_fields:
             all_fields = schema.get("fields", [])
             hidden_fields = set(schema.get("hidden_fields", []))
@@ -271,12 +282,6 @@ class APIClient:
                 if f not in hidden_fields and not f.endswith("_id")
             ]
 
-        # Build OR filters for text search
-        filters = {}
-        for field in search_fields:
-            filters[f"{field}"] = f"ilike.*{search_term}*"
-
-        # For PostgREST, we need to use the 'or' parameter
         or_conditions = ",".join(
             [f"{field}.ilike.*{search_term}*" for field in search_fields]
         )
@@ -285,7 +290,7 @@ class APIClient:
         return await self.get_records(table, filters=filters)
 
     # =====================================================================
-    #  RELATIONSHIP HELPERS
+    #  RELATIONSHIP HELPERS (No changes needed here)
     # =====================================================================
 
     async def get_related_records(
@@ -296,7 +301,6 @@ class APIClient:
         if not schema:
             return []
 
-        # Find the relationship configuration
         child_relations = schema.get("child_relations", [])
         relation_config = next(
             (rel for rel in child_relations if rel["table"] == relation_table), None
