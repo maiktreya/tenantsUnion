@@ -242,7 +242,6 @@ $$;
 -- =====================================================================
 -- PASO 3: VISTAS PARA PRESENTACIÓN DE DATOS
 -- =====================================================================
-
 CREATE OR REPLACE VIEW v_resumen_nodos AS
 SELECT
     n.id,
