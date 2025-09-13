@@ -113,18 +113,29 @@ FROM
     LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
     LEFT JOIN nodos n ON b.nodo_id = n.id;
 
--- VISTA 5: DIARIO DE CONFLICTOS CON DETALLES
-CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
-SELECT
-    d.*,
-    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
-    u.alias AS autor_nota_alias
-FROM
-    diario_conflictos d
-    LEFT JOIN conflictos c ON d.conflicto_id = c.id
-    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN usuarios u ON d.usuario_id = u.id;
+-- VISTA 5: RESUMEN DE BLOQUES
 
+CREATE OR REPLACE VIEW v_resumen_bloques AS
+SELECT
+    b.id, -- Primary key for the block
+    b.empresa_id, -- Foreign key to empresas
+    b.nodo_id, -- Foreign key to nodos
+    b.direccion AS "Dirección",
+    e.nombre AS "Empresa Propietaria",
+    n.nombre AS "Nodo Territorial",
+    COUNT(DISTINCT p.id) AS "Pisos en el bloque",
+    COUNT(DISTINCT a.id) AS "Afiliadas en el bloque"
+FROM
+    bloques b
+    LEFT JOIN pisos p ON b.id = p.bloque_id
+    LEFT JOIN afiliadas a ON p.id = a.piso_id
+    LEFT JOIN empresas e ON b.empresa_id = e.id
+    LEFT JOIN nodos n ON b.nodo_id = n.id
+GROUP BY
+    b.id,
+    e.nombre,
+    n.nombre
+ORDER BY "Afiliadas en el bloque" DESC;
 -- =====================================================================
 -- VISTA INTERNA VISTA CONFLICTOS (NO DISPONIBLE EN LA INTERFAZ NI EN CONFIG.PY)
 -- =====================================================================

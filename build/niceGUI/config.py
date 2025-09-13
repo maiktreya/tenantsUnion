@@ -288,6 +288,11 @@ TABLE_INFO = {
 # =====================================================================
 VIEW_INFO = {
     "v_resumen_nodos": {"display_name": "Resumen de Nodos", "base_table": "nodos"},
+    "v_resumen_bloques": {
+        "display_name": "Resumen de Bloques",
+        "base_table": "bloques",
+        "hidden_fields": ["id", "empresa_id", "nodo_id"],
+    },
     "v_resumen_entramados_empresas": {
         "display_name": "Resumen de Entramados",
         "base_table": "entramado_empresas",
@@ -301,11 +306,6 @@ VIEW_INFO = {
     "v_conflictos_detalle": {
         "display_name": "Detalle de Conflictos",
         "base_table": "conflictos",
-        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
-    },
-    "v_diario_conflictos_con_afiliada": {
-        "display_name": "Historial de Conflictos (Diario)",
-        "base_table": "diario_conflictos",
         "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
     "comprobar_link_pisos_bloques": {"display_name": "Comprobar Vínculo Pisos-Bloques"},

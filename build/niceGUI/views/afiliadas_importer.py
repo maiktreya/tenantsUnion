@@ -249,6 +249,8 @@ class AfiliadasImporterView:
             with ui.row().classes(
                 "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md items-center no-wrap sticky top-0 z-10"
             ):
+                # --- MODIFIED: "Acciones" column is now first ---
+                ui.label("Acciones").classes("w-16 min-w-[4rem]")
                 with ui.row().classes(
                     "w-24 min-w-[6rem] items-center cursor-pointer"
                 ).on("click", lambda: self._sort_by_column("is_valid")):
@@ -281,6 +283,7 @@ class AfiliadasImporterView:
                                 "arrow_upward" if sort_info[1] else "arrow_downward",
                                 size="sm",
                             )
+
             for record in self.state.records:
                 if "ui_updaters" not in record:
                     record["ui_updaters"] = {}
@@ -300,6 +303,18 @@ class AfiliadasImporterView:
                         )
 
                     record["ui_updaters"][data_key] = update_row_style
+
+                    # --- MODIFIED: Drop button is now first in the row ---
+                    with ui.column().classes(
+                        "w-16 min-w-[4rem] flex items-center justify-center"
+                    ):
+                        ui.button(
+                            icon="delete",
+                            on_click=lambda r=record: self._drop_record(r),
+                        ).props("size=sm flat dense color=negative").tooltip(
+                            "Eliminar esta fila de la importación"
+                        )
+
                     with ui.column().classes(
                         "w-24 min-w-[6rem] flex items-center justify-center"
                     ):
@@ -344,6 +359,12 @@ class AfiliadasImporterView:
                             "change", lambda r=record: self._revalidate_record(r)
                         )
                 update_row_style()
+
+    def _drop_record(self, record_to_drop: Dict):
+        """Removes a record from the state and refreshes the UI."""
+        self.state.records.remove(record_to_drop)
+        self._render_preview_tabs()
+        ui.notify("Fila eliminada de la importación.", type="info")
 
     def _sort_by_column(self, column: str):
         """Handles sorting when a column header is clicked."""
