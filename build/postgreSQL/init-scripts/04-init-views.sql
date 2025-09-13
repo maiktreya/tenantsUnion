@@ -137,8 +137,18 @@ GROUP BY
     n.nombre
 ORDER BY "Afiliadas en el bloque" DESC;
 -- =====================================================================
--- VISTA INTERNA VISTA CONFLICTOS (NO DISPONIBLE EN LA INTERFAZ NI EN CONFIG.PY)
+-- VISTAS INTERNAS VISTA CONFLICTOS (NO DISPONIBLE EN LA INTERFAZ NI EN CONFIG.PY)
 -- =====================================================================
+CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
+SELECT
+    d.*,
+    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
+    u.alias AS autor_nota_alias
+FROM
+    diario_conflictos d
+    LEFT JOIN conflictos c ON d.conflicto_id = c.id
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN usuarios u ON d.usuario_id = u.id;
 
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS
 SELECT

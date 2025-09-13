@@ -2,7 +2,7 @@ import pytest
 import httpx
 import time
 from docker.models.containers import Container
-from api.client import APIClient
+from build.niceGUI.api.client import APIClient
 
 # Marks all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio

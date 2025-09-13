@@ -307,11 +307,6 @@ VIEW_INFO = {
         "display_name": "Detalle de Conflictos",
         "base_table": "conflictos",
         "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
-    "v_conflictos_con_afiliadas": {
-        "display_name": "Vista interna motor de conflictos",
-        "base_table": "afiliadas",
-        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
-    },
     },
     "comprobar_link_pisos_bloques": {"display_name": "Comprobar Vínculo Pisos-Bloques"},
 }
