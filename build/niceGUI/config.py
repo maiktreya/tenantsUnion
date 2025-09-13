@@ -18,7 +18,7 @@ class Config:
 
 
 # =====================================================================
-#  TABLE & RELATIONSHIP METADATA (REVISED)
+#  TABLE & RELATIONSHIP METADATA (REVISED & COMPLETE)
 # =====================================================================
 TABLE_INFO = {
     "entramado_empresas": {
@@ -52,7 +52,7 @@ TABLE_INFO = {
         "display_name": "Bloques",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["direccion", "empresa_id", "nodo_id"],
+        "fields": ["direccion", "empresa_id", "nodo_id", "estado", "api"],
         "relations": {
             "empresa_id": {"view": "empresas", "display_field": "nombre"},
             "nodo_id": {"view": "nodos", "display_field": "nombre"},
@@ -76,8 +76,12 @@ TABLE_INFO = {
             "fecha_firma",
             "bloque_id",
             "empresa_nobloque_id",
+            "api",
         ],
-        "relations": {"bloque_id": {"view": "bloques", "display_field": "direccion"}},
+        "relations": {
+            "bloque_id": {"view": "bloques", "display_field": "direccion"},
+            "empresa_nobloque_id": {"view": "empresas", "display_field": "nombre"},
+        },
         "child_relations": [
             {"table": "afiliadas", "foreign_key": "piso_id"},
         ],
@@ -113,7 +117,10 @@ TABLE_INFO = {
         "display_name": "Nodos Territoriales",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["nombre", "descripcion"],
+        "fields": ["nombre", "descripcion", "usuario_responsable_id"],
+        "relations": {
+            "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"}
+        },
         "child_relations": [
             {"table": "nodos_cp_mapping", "foreign_key": "nodo_id"},
             {"table": "bloques", "foreign_key": "nodo_id"},
@@ -147,6 +154,7 @@ TABLE_INFO = {
             {"table": "asesorias", "foreign_key": "tecnica_id"},
             {"table": "conflictos", "foreign_key": "usuario_responsable_id"},
             {"table": "diario_conflictos", "foreign_key": "usuario_id"},
+            {"table": "nodos", "foreign_key": "usuario_responsable_id"},
         ],
     },
     "nodos_cp_mapping": {
