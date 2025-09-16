@@ -91,8 +91,9 @@ Your project should have:
 project/
 ├── docker-compose.yaml
 ├── .env
-├── utils/init-letsencrypt-duckdns.sh
-├── utils/renew-certificates.sh
+├── utils/
+    ├──init-letsencrypt-duckdns.sh
+    ├──renew-certificates.sh
 └── build/
     └── nginx/
         ├── nginx.conf.template
