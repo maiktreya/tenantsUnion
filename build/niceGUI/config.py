@@ -355,7 +355,7 @@ IMPORTER_HEADER_MAP = {
     "direccion": "Dirección",
     "municipio": "Municipio",
     "cp": "CP",
-    "fecha_nacimiento": "Fecha Nacimiento",
+    "fecha_nac": "Fecha Nacimiento",
     "trato_propiedad": "Trato Directo",
     "propiedad": "Propiedad",
     "prop_vertical": "Prop. Vertical",
