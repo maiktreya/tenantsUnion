@@ -44,7 +44,8 @@ class FilterPanel:
         self.records = records
         self.on_filter_change = on_filter_change
         self.container = None
-        self.inputs = {}
+        self.inputs: Dict[str, ui.element] = {}
+        self.date_range_filters: Dict[str, Dict[str, str | None]] = {}
 
     def create(self) -> ui.column:
         """Create the filter panel UI based on the data provided."""
@@ -68,6 +69,7 @@ class FilterPanel:
 
         self.container.clear()
         self.inputs.clear()
+        self.date_range_filters.clear()
         columns = self.records[0].keys()
 
         with self.container:
@@ -81,11 +83,29 @@ class FilterPanel:
                 for column in columns:
                     unique_values = [r.get(column) for r in self.records if r.get(column) is not None]
                     unique_count = len(set(unique_values))
+                    
+                    is_date_column = any(substr in column.lower() for substr in ["fecha", "date"])
 
-                    if (1 < unique_count <= 16 and
+                    if is_date_column:
+                        with ui.row().classes('gap-2 items-center'):
+                            ui.label(f'Rango {column}:').classes('text-sm text-gray-600')
+                            self.date_range_filters[column] = {'start': None, 'end': None}
+                            
+                            start_date_input = ui.date(
+                                on_change=lambda e, col=column: self._on_date_change(col, 'start', e.value)
+                            ).props('dense outlined clearable').classes('w-32').tooltip(f'Fecha de inicio para {column}')
+                            
+                            end_date_input = ui.date(
+                                on_change=lambda e, col=column: self._on_date_change(col, 'end', e.value)
+                            ).props('dense outlined clearable').classes('w-32').tooltip(f'Fecha de fin para {column}')
+                            
+                            # Store the UI elements to be able to clear them later
+                            self.inputs[f'date_start_{column}'] = start_date_input
+                            self.inputs[f'date_end_{column}'] = end_date_input
+
+                    elif (1 < unique_count <= 16 and
                         'id' not in column.lower() and
                         unique_count < len(unique_values) * 0.8):
-
                         sorted_unique_vals = self._get_sorted_unique_values(column)
                         self.inputs[column] = ui.select(
                             options=sorted_unique_vals,
@@ -95,8 +115,21 @@ class FilterPanel:
                             on_change=lambda e, col=column: self.on_filter_change(col, e.value)
                         ).classes('w-64').props('dense outlined')
 
+    def _on_date_change(self, column: str, part: str, value: str):
+        """Updates the internal date range state and calls the main filter callback."""
+        if column in self.date_range_filters:
+            self.date_range_filters[column][part] = value
+            filter_key = f'date_range_{column}'
+            self.on_filter_change(filter_key, self.date_range_filters[column])
+
     def clear(self):
-        """Clear all filter inputs."""
-        for input_field in self.inputs.values():
+        """Clear all filter inputs and their corresponding state."""
+        for key, input_field in self.inputs.items():
             if hasattr(input_field, 'value'):
-                input_field.value = [] if getattr(input_field, 'multiple', False) else None
+                if isinstance(input_field, ui.select) and getattr(input_field, 'multiple', False):
+                    input_field.value = []
+                else:
+                    input_field.value = None
+        
+        # Clear the internal state for date ranges
+        self.date_range_filters.clear()
