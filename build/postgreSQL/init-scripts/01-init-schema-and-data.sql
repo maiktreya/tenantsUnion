@@ -45,7 +45,7 @@ CREATE TABLE pisos (
     municipio TEXT,
     cp INTEGER,
     inmobiliaria TEXT, -- Agencia Inmobiliaria (atributo del piso)
-    prop_vertical BOOLEAN, -- Propiedad Vertical (atributo del piso)
+    prop_vertical TEXT, -- Propiedad Vertical (atributo del piso)
     por_habitaciones BOOLEAN,
     n_personas INTEGER,
     fecha_firma DATE,
@@ -223,7 +223,8 @@ CREATE TABLE staging_pisos (
     entramado TEXT,
     num_afiliadas TEXT,
     num_preafiliadas TEXT,
-    num_inq_colaboradoras TEXT
+    num_inq_colaboradoras TEXT,
+    prop_vertical TEXT
 );
 
 CREATE TABLE staging_asesorias (
@@ -371,6 +372,7 @@ ON CONFLICT (direccion) DO NOTHING;
 -- *** NUEVO PASO: Actualizar 'pisos' con la información de propiedad de 'staging_afiliadas' ***
 -- Se enriquece la tabla de pisos con los datos que le pertenecen.
 UPDATE pisos p
+
 SET
     inmobiliaria = s.api,
     prop_vertical = CASE
@@ -380,11 +382,13 @@ SET
 FROM (
         -- Usamos una subconsulta para obtener una única fila por dirección
         SELECT DISTINCT
-            ON (direccion) direccion, api, prop_vertical
-        FROM staging_afiliadas
+            ON (sa.direccion) sa.direccion, sa.api, sp.prop_vertical
+        FROM
+            staging_afiliadas sa
+            LEFT JOIN staging_pisos sp ON sa.direccion = sp.direccion
         WHERE
-            direccion IS NOT NULL
-            AND direccion != ''
+            sa.direccion IS NOT NULL
+            AND sa.direccion != ''
     ) AS s
 WHERE
     p.direccion = s.direccion;
