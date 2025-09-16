@@ -105,3 +105,36 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_sync_bloque_nodo
 AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
 FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
+
+
+
+-- ACTIVATE AUTO-INCREMENT FOR FUTURE RECORDS
+-- =====================================================================
+-- This is the new section that handles the sequence logic.
+
+DO $$ -- Use a DO block to declare a variable
+DECLARE
+    max_id_num INTEGER;
+BEGIN
+    -- 3.1: Find the highest numeric part of the legacy 'num_afiliada'.
+    -- We use regexp_replace to strip the non-numeric prefix (like 'A') and cast to integer.
+    SELECT
+        COALESCE(MAX(CAST(regexp_replace(num_afiliada, '[^0-9]+', '', 'g') AS INTEGER)), 0)
+    INTO
+        max_id_num
+    FROM
+        afiliadas;
+
+    -- 3.2: Create the sequence for generating new affiliate numbers.
+    CREATE SEQUENCE IF NOT EXISTS sindicato_inq.afiliadas_num_afiliada_seq;
+
+    -- 3.3: "Fast-forward" the sequence to start from the next available number.
+    -- The third argument 'true' means the NEXT call to nextval() will return max_id_num + 1.
+    PERFORM setval('sindicato_inq.afiliadas_num_afiliada_seq', max_id_num, true);
+
+    -- 3.4: Now that legacy data is in and the sequence is set, apply the DEFAULT
+    -- constraint to the 'num_afiliada' column for all future inserts.
+    ALTER TABLE sindicato_inq.afiliadas
+    ALTER COLUMN num_afiliada SET DEFAULT 'A' || nextval('sindicato_inq.afiliadas_num_afiliada_seq'::regclass);
+
+END $$;

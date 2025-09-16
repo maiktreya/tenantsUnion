@@ -64,12 +64,12 @@ CREATE TABLE usuarios (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabla 'afiliadas' refactorizada para máxima consistencia
-CREATE TABLE afiliadas (
+CREATE SEQUENCE IF NOT EXISTS sindicato_inq.afiliadas_num_afiliada_seq;
+
+CREATE TABLE sindicato_inq.afiliadas (
     id SERIAL PRIMARY KEY,
-    piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
-    -- Identificación
-    num_afiliada TEXT UNIQUE,
+    piso_id INTEGER REFERENCES sindicato_inq.pisos (id) ON DELETE SET NULL,
+    num_afiliada TEXT UNIQUE, -- Notice: NO DEFAULT value here yet!
     nombre TEXT,
     apellidos TEXT,
     cif TEXT UNIQUE,
@@ -77,14 +77,11 @@ CREATE TABLE afiliadas (
     genero TEXT,
     email TEXT,
     telefono TEXT,
-    -- Estado y Régimen
-    estado TEXT, -- Estado de la afiliación (Alta, Baja, etc.)
-    regimen TEXT, -- Régimen de tenencia (Alquiler, etc.)
+    estado TEXT,
+    regimen TEXT,
     fecha_alta DATE,
     fecha_baja DATE,
     trato_propiedad BOOLEAN,
-    -- Participación Interna
-    seccion_sindical TEXT,
     nivel_participacion TEXT,
     comision TEXT
 );
@@ -409,9 +406,7 @@ INSERT INTO
         fecha_alta,
         fecha_baja,
         trato_propiedad,
-        seccion_sindical,
-        nivel_participacion,
-        comision
+        nivel_participacion
     )
 SELECT
     p.id,
@@ -434,9 +429,7 @@ SELECT
         'DD/MM/YYYY'
     ),
     FALSE,
-    s.seccion_sindical,
-    s.nivel_participacion,
-    s.comision
+    s.nivel_participacion
 FROM staging_afiliadas s
     JOIN pisos p ON s.direccion = p.direccion -- Se usa JOIN para asegurar la vinculación
 ON CONFLICT (num_afiliada) DO NOTHING;

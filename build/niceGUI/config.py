@@ -323,7 +323,6 @@ VIEW_INFO = {
 #  UI METADATA (HEADER MAPPINGS)
 # =====================================================================
 IMPORTER_HEADER_MAP = {
-    "num_afiliada": "Nº Afiliada",
     "nombre": "Nombre",
     "apellidos": "Apellidos",
     "cif": "CIF/NIE",

@@ -123,7 +123,6 @@ class AfiliadasImporterView:
             final_address = re.sub(r"\s+", " ", final_address).strip(", ")
 
             afiliada_data = {
-                "num_afiliada": get_val(29),
                 "nombre": nombre,
                 "apellidos": f"{get_val(2)} {get_val(3)}".strip(),
                 "genero": get_val(4),
@@ -197,7 +196,6 @@ class AfiliadasImporterView:
             "afiliada",
             self.afiliadas_panel,
             [
-                "num_afiliada",
                 "nombre",
                 "apellidos",
                 "cif",
@@ -403,7 +401,7 @@ class AfiliadasImporterView:
             return
 
         total_records, success_count = len(valid_records), 0
-        error_messages, full_log_messages = [], []
+        error_messages, full_log_messages, new_afiliadas = [], [], []
 
         with ui.dialog() as progress_dialog, ui.card().classes("min-w-[600px]"):
             ui.label("Iniciando Importación...").classes("text-h6")
@@ -447,24 +445,23 @@ class AfiliadasImporterView:
                 if not piso_id:
                     raise Exception("No se pudo crear o encontrar el piso.")
                 record["afiliada"]["piso_id"] = piso_id
-                num_afiliada = record["afiliada"]["num_afiliada"]
-                if not num_afiliada:
-                    raise Exception("El Nº de Afiliada (ID Entrada) es obligatorio.")
-                if await self.api.get_records(
-                    "afiliadas", {"num_afiliada": f"eq.{num_afiliada}"}
-                ):
-                    raise Exception(f"La afiliada con Nº {num_afiliada} ya existe.")
+
                 new_afiliada = await self.api.create_record(
                     "afiliadas", record["afiliada"]
                 )
                 if not new_afiliada:
                     raise Exception("No se pudo crear la afiliada.")
-                log_message(f"➕ Afiliada creada: {afiliada_name} ({num_afiliada})")
+
+                new_afiliadas.append(new_afiliada)
+                log_message(f"➕ Afiliada creada: {afiliada_name} ({new_afiliada.get('num_afiliada')})")
+
                 record["facturacion"]["afiliada_id"] = new_afiliada["id"]
                 await self.api.create_record("facturacion", record["facturacion"])
                 log_message(f"➕ Facturación añadida para {afiliada_name}")
+
                 success_count += 1
                 log_message(f"✅ ÉXITO: {afiliada_name} importada completamente.")
+
             except Exception as e:
                 error_msg = f"Error en {afiliada_name}: {e}"
                 error_messages.append(error_msg)
@@ -483,6 +480,21 @@ class AfiliadasImporterView:
                 ui.markdown(
                     f"❌ **Fallaron {len(error_messages)} de {total_records} registros.**"
                 ).classes("text-negative")
+
+            if new_afiliadas:
+                with ui.expansion("Ver Nuevas Afiliadas Creadas", icon="person_add").classes("w-full"):
+                    with ui.table(
+                        columns=[
+                            {'name': 'num_afiliada', 'label': 'Nº Afiliada', 'field': 'num_afiliada', 'sortable': True},
+                            {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre', 'sortable': True},
+                            {'name': 'apellidos', 'label': 'Apellidos', 'field': 'apellidos', 'sortable': True},
+                            {'name': 'email', 'label': 'Email', 'field': 'email'},
+                        ],
+                        rows=new_afiliadas,
+                        row_key='id'
+                    ).classes("w-full"):
+                        pass
+
             with ui.expansion(
                 "Ver Registro Completo del Proceso", icon="article"
             ).classes("w-full"):
