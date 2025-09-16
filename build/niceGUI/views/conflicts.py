@@ -1,5 +1,4 @@
 # /build/niceGUI/views/conflicts.py
-
 from typing import Optional, List, Dict, Awaitable, Callable
 from datetime import date
 from nicegui import ui, app
