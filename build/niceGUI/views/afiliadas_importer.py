@@ -10,7 +10,8 @@ from nicegui import ui, events
 from api.client import APIClient
 from api.validate import validator
 
-from state.importer_state import ImporterState
+# --- REFACTOR STEP 1: Import the generic state manager ---
+from state.app_state import GenericViewState
 
 from config import IMPORTER_HEADER_MAP
 
@@ -20,7 +21,8 @@ class AfiliadasImporterView:
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-        self.state = ImporterState()
+        # --- REFACTOR STEP 2: Use GenericViewState instead of ImporterState ---
+        self.state = GenericViewState()
         self.afiliadas_panel: Optional[ui.column] = None
         self.pisos_panel: Optional[ui.column] = None
         self.facturacion_panel: Optional[ui.column] = None
@@ -99,20 +101,18 @@ class AfiliadasImporterView:
     def _transform_and_validate_row(self, row: pd.Series) -> Optional[Dict[str, Any]]:
         """Transforms a single row, validates it, and adds validation status."""
 
-        # --- NEW: HELPER FUNCTION FOR ROBUST DATE PARSING ---
         def _parse_date(date_str: str) -> Optional[str]:
             """Parses a date string from common formats into ISO format (YYYY-MM-DD)."""
             if not date_str or pd.isna(date_str):
                 return None
             for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
                 try:
-                    return datetime.strptime(date_str, fmt).date().isoformat()
+                    return datetime.strptime(str(date_str), fmt).date().isoformat()
                 except (ValueError, TypeError):
                     continue
-            return None  # Return None if all formats fail
+            return None
 
         try:
-
             def get_val(index):
                 return "" if pd.isna(row.get(index)) else str(row.get(index)).strip()
 
@@ -136,7 +136,7 @@ class AfiliadasImporterView:
                 "nombre": nombre,
                 "apellidos": f"{get_val(2)} {get_val(3)}".strip(),
                 "genero": get_val(4),
-                "fecha_nacimiento": _parse_date(get_val(5)),  # Use parser
+                "fecha_nacimiento": _parse_date(get_val(5)),
                 "cif": get_val(6),
                 "telefono": get_val(7),
                 "email": get_val(8),
@@ -199,8 +199,6 @@ class AfiliadasImporterView:
         except Exception as e:
             print(f"Skipping row due to parsing error: {e}")
             return None
-
-    # ... (the rest of the file, including _render_preview_tabs, _start_import, etc., remains exactly the same) ...
 
     def _render_preview_tabs(self):
         """Render all three preview panels and update the import button state."""
@@ -363,15 +361,47 @@ class AfiliadasImporterView:
         self._render_preview_tabs()
         ui.notify("Fila eliminada de la importación.", type="info")
 
+    def _normalize_for_sorting(self, value: Any) -> str:
+        """
+        Helper function to normalize values for consistent sorting.
+        Handles None, numbers, strings, and accents.
+        """
+        if value is None:
+            return ""
+        return str(value).lower()
+
     def _sort_by_column(self, column: str):
-        """Handles sorting when a column header is clicked."""
+        """Handles sorting when a column header is clicked, with self-contained logic."""
         existing_criterion = next(
             (c for c in self.state.sort_criteria if c[0] == column), None
         )
         new_direction = not existing_criterion[1] if existing_criterion else True
         self.state.sort_criteria = [(column, new_direction)]
-        self.state.apply_filters_and_sort()
+
+        # --- REFACTORED LOGIC ---
+        sort_key = None
+        if column == "is_valid":
+            sort_key = lambda r: r["validation"].get("is_valid", True)
+        else:
+            # Access nested data for other columns
+            if column in self.state.records[0].get("afiliada", {}):
+                sort_key = lambda r: self._normalize_for_sorting(
+                    r.get("afiliada", {}).get(column)
+                )
+            elif column in self.state.records[0].get("piso", {}):
+                sort_key = lambda r: self._normalize_for_sorting(
+                    r.get("piso", {}).get(column)
+                )
+            elif column in self.state.records[0].get("facturacion", {}):
+                sort_key = lambda r: self._normalize_for_sorting(
+                    r.get("facturacion", {}).get(column)
+                )
+
+        if sort_key:
+            self.state.records.sort(key=sort_key, reverse=not new_direction)
+
         self._render_preview_tabs()
+
 
     def _revalidate_record(self, record: Dict):
         """Re-validates a single record and updates its UI in ALL tabs."""
@@ -451,97 +481,4 @@ class AfiliadasImporterView:
                     )
                 else:
                     new_piso = await self.api.create_record("pisos", record["piso"])
-                    if new_piso:
-                        piso_id = new_piso["id"]
-                        log_message(f"➕ Piso creado: {record['piso']['direccion']}")
-                if not piso_id:
-                    raise Exception("No se pudo crear o encontrar el piso.")
-                record["afiliada"]["piso_id"] = piso_id
-
-                new_afiliada = await self.api.create_record(
-                    "afiliadas", record["afiliada"]
-                )
-                if not new_afiliada:
-                    raise Exception("No se pudo crear la afiliada.")
-
-                new_afiliadas.append(new_afiliada)
-                log_message(
-                    f"➕ Afiliada creada: {afiliada_name} ({new_afiliada.get('num_afiliada')})"
-                )
-
-                record["facturacion"]["afiliada_id"] = new_afiliada["id"]
-                await self.api.create_record("facturacion", record["facturacion"])
-                log_message(f"➕ Facturación añadida para {afiliada_name}")
-
-                success_count += 1
-                log_message(f"✅ ÉXITO: {afiliada_name} importada completamente.")
-
-            except Exception as e:
-                error_msg = f"Error en {afiliada_name}: {e}"
-                error_messages.append(error_msg)
-                log_message(f"❌ FALLO: {error_msg}")
-            progress.value = (i + 1) / total_records
-            await asyncio.sleep(0.05)
-        progress_dialog.close()
-
-        with ui.dialog() as summary_dialog, ui.card().classes("min-w-[700px]"):
-            ui.label("Resultado de la Importación").classes("text-h6")
-            if success_count > 0:
-                ui.markdown(
-                    f"✅ **Se importaron {success_count} de {total_records} registros exitosamente.**"
-                ).classes("text-positive")
-            if error_messages:
-                ui.markdown(
-                    f"❌ **Fallaron {len(error_messages)} de {total_records} registros.**"
-                ).classes("text-negative")
-
-            if new_afiliadas:
-                with ui.expansion(
-                    "Ver Nuevas Afiliadas Creadas", icon="person_add"
-                ).classes("w-full"):
-                    with ui.table(
-                        columns=[
-                            {
-                                "name": "num_afiliada",
-                                "label": "Nº Afiliada",
-                                "field": "num_afiliada",
-                                "sortable": True,
-                            },
-                            {
-                                "name": "nombre",
-                                "label": "Nombre",
-                                "field": "nombre",
-                                "sortable": True,
-                            },
-                            {
-                                "name": "apellidos",
-                                "label": "Apellidos",
-                                "field": "apellidos",
-                                "sortable": True,
-                            },
-                            {"name": "email", "label": "Email", "field": "email"},
-                        ],
-                        rows=new_afiliadas,
-                        row_key="id",
-                    ).classes("w-full"):
-                        pass
-
-            with ui.expansion(
-                "Ver Registro Completo del Proceso", icon="article"
-            ).classes("w-full"):
-                ui.textarea(value="\n".join(full_log_messages)).props(
-                    "readonly outlined rows=15"
-                ).classes("w-full")
-            if error_messages:
-                with ui.expansion(
-                    "Ver Resumen de Errores", icon="report_problem"
-                ).classes("w-full"):
-                    with ui.scroll_area().classes("w-full h-48 border rounded p-2"):
-                        for msg in error_messages:
-                            ui.label(msg).classes("text-sm text-negative")
-            with ui.row().classes("w-full justify-end mt-4"):
-                ui.button("Aceptar", on_click=summary_dialog.close)
-        summary_dialog.open()
-
-        self.state.set_records([])
-        self._render_preview_tabs()
+       
