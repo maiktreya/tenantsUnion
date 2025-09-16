@@ -54,7 +54,7 @@ crontab -e
 docker compose --profile Frontend up -d
 
 # Then set up SSL
-./init-letsencrypt-duckdns.sh
+bash utils/init-letsencrypt-duckdns.sh
 
 # Finally start with SSL
 docker compose --profile Secured up -d
