@@ -288,6 +288,12 @@ TABLE_INFO = {
         "relations": {
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"}
         },
+        "field_patterns": {
+            "iban": {
+                "regex": "^ES[0-9]{22}$",
+                "error_message": "El IBAN debe tener el formato español (ej: ES0012345678901234567890).",
+            }
+        },
     },
 }
 

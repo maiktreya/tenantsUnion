@@ -1,4 +1,4 @@
-# /build/niceGUI/models/validate.py
+# /build/niceGUI/api/validate.py
 
 from typing import Dict, Any, List, Tuple
 from config import TABLE_INFO
@@ -16,12 +16,7 @@ class TableValidator:
         self, table: str, data: Dict[str, Any], operation: str = "create"
     ) -> Tuple[bool, List[str]]:
         """
-        Validate a record against table configuration.
-
-        Args:
-            table: Table name
-            data: Record data to validate
-            operation: 'create', 'update', or 'read'
+        Validate a record against table configuration using a prioritized set of rules.
         """
         if table not in self.table_info:
             return False, [f"Unknown table: {table}"]
@@ -29,27 +24,40 @@ class TableValidator:
         config = self.table_info[table]
         errors = []
 
-        # Validate field options (enums)
-        field_options = config.get("field_options", {})
-        for field, options in field_options.items():
-            if field in data and data[field] is not None and data[field] != "":
-                if data[field] not in options:
-                    errors.append(
-                        f"Invalid {field}: '{data[field]}'. Must be one of: {options}"
-                    )
-
-        # Validate required fields (for create operations)
+        # Rule 1: Validate required fields (for 'create' operations)
         if operation == "create":
             required_fields = config.get("required_fields", [])
             for field in required_fields:
                 value = data.get(field)
-                if value is None or value == "":
-                    errors.append(f"Missing required field: {field}")
+                if value is None or str(value).strip() == "":
+                    errors.append(f"Falta el campo obligatorio: {field}")
 
-        # Validate field types based on common patterns
+        # Rule 2: Validate field options (enums)
+        field_options = config.get("field_options", {})
+        for field, options in field_options.items():
+            value = data.get(field)
+            if value is not None and str(value).strip() != "":
+                if value not in options:
+                    errors.append(
+                        f"Valor inválido para {field}: '{value}'. Debe ser uno de: {options}"
+                    )
+
+        # Rule 3: Validate field patterns (regex for formats like IBAN, email, etc.)
+        field_patterns = config.get("field_patterns", {})
+        for field, pattern_info in field_patterns.items():
+            value = data.get(field)
+            if value is not None and str(value).strip() != "":
+                regex = pattern_info.get("regex")
+                if regex and not re.match(regex, str(value)):
+                    error_message = pattern_info.get(
+                        "error_message", f"Formato inválido para el campo '{field}'"
+                    )
+                    errors.append(error_message)
+
+        # Rule 4: Validate field types based on naming conventions (fallback)
         errors.extend(self._validate_field_types(table, data))
 
-        # Validate relationships exist (optional, can be expanded)
+        # Rule 5: Validate relationships (placeholder for future expansion)
         errors.extend(self._validate_relationships(table, data))
 
         return len(errors) == 0, errors
@@ -58,22 +66,21 @@ class TableValidator:
         """Validate field types based on naming conventions."""
         errors = []
         for field, value in data.items():
-            # --- ENHANCEMENT ---
-            # Skip validation for any field that is None or an empty string.
-            # This allows optional fields (like dates) to be truly empty.
-            if value is None or value == "":
+            if value is None or str(value).strip() == "":
                 continue
 
-            # Email validation
+            # Email validation (can be replaced by a pattern in config.py)
             if "email" in field.lower():
-                if not re.match(r"^[^@]+@[^@]+\.[^@]+$", str(value)):
-                    errors.append(f"Invalid email format for '{field}'")
+                # Avoid re-validating if a pattern already exists for this field
+                if not config.get("field_patterns", {}).get(field):
+                    if not re.match(r"^[^@]+@[^@]+\.[^@]+$", str(value)):
+                        errors.append(f"Formato de email inválido para '{field}'")
 
             # Date validation
             if any(date_word in field.lower() for date_word in ["fecha", "date"]):
                 if not self._is_valid_date(value):
                     errors.append(
-                        f"Invalid date format for '{field}' (expected YYYY-MM-DD)"
+                        f"Formato de fecha inválido para '{field}' (se esperaba AAAA-MM-DD)"
                     )
 
             # ID field validation
@@ -81,17 +88,13 @@ class TableValidator:
                 try:
                     int(value)
                 except (ValueError, TypeError):
-                    errors.append(f"Invalid ID format for '{field}' (must be a number)")
+                    errors.append(f"El formato del ID para '{field}' debe ser numérico")
 
         return errors
 
     def _validate_relationships(self, table: str, data: Dict[str, Any]) -> List[str]:
         """Placeholder for validating foreign key relationships."""
-        errors = []
-        # This section can be expanded in the future to perform database lookups
-        # to confirm that a foreign key (e.g., 'piso_id') actually exists.
-        # For now, basic type validation is handled in _validate_field_types.
-        return errors
+        return []
 
     def _is_valid_date(self, value: Any) -> bool:
         """Check if a value is a valid ISO 8601 date string (YYYY-MM-DD)."""
@@ -99,12 +102,11 @@ class TableValidator:
             return True
         if isinstance(value, str):
             try:
-                # Use strptime for stricter format checking (YYYY-MM-DD)
                 datetime.strptime(value, "%Y-%m-%d")
                 return True
             except ValueError:
-                # Fallback for full ISO format with time, etc.
                 try:
+                    # Fallback for full ISO format with time, etc.
                     datetime.fromisoformat(value.replace("Z", "+00:00"))
                     return True
                 except ValueError:
@@ -120,18 +122,19 @@ class TableValidator:
         constraints = {}
 
         # Field options (enums)
-        field_options = config.get("field_options", {})
-        if field in field_options:
-            constraints["options"] = field_options[field]
+        if field in config.get("field_options", {}):
+            constraints["options"] = config["field_options"][field]
 
         # Required fields
-        required_fields = config.get("required_fields", [])
-        constraints["required"] = field in required_fields
+        constraints["required"] = field in config.get("required_fields", [])
+
+        # Pattern validation
+        if field in config.get("field_patterns", {}):
+            constraints["pattern"] = config["field_patterns"][field]
 
         # Relationships
-        relations = config.get("relations", {})
-        if field in relations:
-            constraints["relationship"] = relations[field]
+        if field in config.get("relations", {}):
+            constraints["relationship"] = config["relations"][field]
 
         return constraints
 
