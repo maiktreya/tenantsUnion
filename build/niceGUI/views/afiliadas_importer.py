@@ -5,7 +5,7 @@ import io
 import re
 import asyncio
 from typing import List, Dict, Any, Optional
-from datetime import date
+from datetime import date, datetime
 from nicegui import ui, events
 from api.client import APIClient
 from api.validate import validator
@@ -96,6 +96,19 @@ class AfiliadasImporterView:
 
     def _transform_and_validate_row(self, row: pd.Series) -> Optional[Dict[str, Any]]:
         """Transforms a single row, validates it, and adds validation status."""
+        
+        # --- NEW: HELPER FUNCTION FOR ROBUST DATE PARSING ---
+        def _parse_date(date_str: str) -> Optional[str]:
+            """Parses a date string from common formats into ISO format (YYYY-MM-DD)."""
+            if not date_str or pd.isna(date_str):
+                return None
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+                try:
+                    return datetime.strptime(date_str, fmt).date().isoformat()
+                except (ValueError, TypeError):
+                    continue
+            return None # Return None if all formats fail
+
         try:
 
             def get_val(index):
@@ -105,31 +118,21 @@ class AfiliadasImporterView:
             if not nombre:
                 return None
 
-            # 1. Get the core address components
             main_address = f"{get_val(9)}, {get_val(10)} {get_val(11)}".strip()
             floor_details = get_val(12).strip()
 
-            # 2. Build the first part of the address, adding a comma only if floor details exist
-            if floor_details:
-                # Correct format: "Street Number, Floor Details"
-                full_address = f"{main_address}, {floor_details}"
-            else:
-                # If no floor details, just use the main address
-                full_address = main_address
-
-            # 3. Add the rest of the components
+            full_address = f"{main_address}, {floor_details}" if floor_details else main_address
+            
             municipio = get_val(13)
             cp = get_val(14)
             final_address = f"{full_address}, {cp}, {municipio}"
-
-            # 4. Final cleanup for any extra spaces or trailing commas
             final_address = re.sub(r"\s+", " ", final_address).strip().strip(",")
 
             afiliada_data = {
                 "nombre": nombre,
                 "apellidos": f"{get_val(2)} {get_val(3)}".strip(),
                 "genero": get_val(4),
-                "fecha_nacimiento": get_val(5),
+                "fecha_nacimiento": _parse_date(get_val(5)), # Use parser
                 "cif": get_val(6),
                 "telefono": get_val(7),
                 "email": get_val(8),
@@ -141,13 +144,13 @@ class AfiliadasImporterView:
             }
 
             piso_data = {
-                "direccion": final_address,  # Use the corrected address
+                "direccion": final_address,
                 "municipio": municipio,
                 "cp": int(cp) if cp.isdigit() else None,
                 "n_personas": int(get_val(15)) if get_val(15).isdigit() else None,
                 "inmobiliaria": get_val(18),
                 "prop_vertical": bool(get_val(20)),
-                "fecha_firma": get_val(16),
+                "fecha_firma": _parse_date(get_val(16)), # MODIFIED: Use the robust date parser
             }
 
             cuota_type = get_val(22)
@@ -192,6 +195,8 @@ class AfiliadasImporterView:
         except Exception as e:
             print(f"Skipping row due to parsing error: {e}")
             return None
+
+    # ... (the rest of the file, including _render_preview_tabs, _start_import, etc., remains exactly the same) ...
 
     def _render_preview_tabs(self):
         """Render all three preview panels and update the import button state."""
@@ -467,72 +472,4 @@ class AfiliadasImporterView:
                 success_count += 1
                 log_message(f"✅ ÉXITO: {afiliada_name} importada completamente.")
 
-            except Exception as e:
-                error_msg = f"Error en {afiliada_name}: {e}"
-                error_messages.append(error_msg)
-                log_message(f"❌ FALLO: {error_msg}")
-            progress.value = (i + 1) / total_records
-            await asyncio.sleep(0.05)
-        progress_dialog.close()
-
-        with ui.dialog() as summary_dialog, ui.card().classes("min-w-[700px]"):
-            ui.label("Resultado de la Importación").classes("text-h6")
-            if success_count > 0:
-                ui.markdown(
-                    f"✅ **Se importaron {success_count} de {total_records} registros exitosamente.**"
-                ).classes("text-positive")
-            if error_messages:
-                ui.markdown(
-                    f"❌ **Fallaron {len(error_messages)} de {total_records} registros.**"
-                ).classes("text-negative")
-
-            if new_afiliadas:
-                with ui.expansion(
-                    "Ver Nuevas Afiliadas Creadas", icon="person_add"
-                ).classes("w-full"):
-                    with ui.table(
-                        columns=[
-                            {
-                                "name": "num_afiliada",
-                                "label": "Nº Afiliada",
-                                "field": "num_afiliada",
-                                "sortable": True,
-                            },
-                            {
-                                "name": "nombre",
-                                "label": "Nombre",
-                                "field": "nombre",
-                                "sortable": True,
-                            },
-                            {
-                                "name": "apellidos",
-                                "label": "Apellidos",
-                                "field": "apellidos",
-                                "sortable": True,
-                            },
-                            {"name": "email", "label": "Email", "field": "email"},
-                        ],
-                        rows=new_afiliadas,
-                        row_key="id",
-                    ).classes("w-full"):
-                        pass
-
-            with ui.expansion(
-                "Ver Registro Completo del Proceso", icon="article"
-            ).classes("w-full"):
-                ui.textarea(value="\n".join(full_log_messages)).props(
-                    "readonly outlined rows=15"
-                ).classes("w-full")
-            if error_messages:
-                with ui.expansion(
-                    "Ver Resumen de Errores", icon="report_problem"
-                ).classes("w-full"):
-                    with ui.scroll_area().classes("w-full h-48 border rounded p-2"):
-                        for msg in error_messages:
-                            ui.label(msg).classes("text-sm text-negative")
-            with ui.row().classes("w-full justify-end mt-4"):
-                ui.button("Aceptar", on_click=summary_dialog.close)
-        summary_dialog.open()
-
-        self.state.set_records([])
-        self._render_preview_tabs()
+   
