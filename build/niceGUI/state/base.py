@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from nicegui import ui
 import unicodedata
 import re
+from datetime import datetime
+
 
 def _normalize_for_sorting(value: Any) -> str:
     """
@@ -75,33 +77,67 @@ class BaseTableState:
 
         # Apply filters
         for column, filter_value in self.filters.items():
-            if filter_value:
-                if column == 'global_search':
-                    search_term = str(filter_value).lower()
+            if not filter_value:
+                continue
+            
+            if column.startswith('date_range_'):
+                actual_column = column.replace('date_range_', '')
+                start_date_str = filter_value.get('start')
+                end_date_str = filter_value.get('end')
+
+                if not start_date_str and not end_date_str:
+                    continue
+                
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
+                
+                temp_filtered = []
+                for r in filtered:
+                    record_date_str = r.get(actual_column)
+                    if not record_date_str:
+                        continue
+                    
+                    try:
+                        # Handle potential timezone info (e.g., from ISO 8601 format)
+                        if 'T' in record_date_str:
+                            record_date = datetime.fromisoformat(record_date_str.replace('Z', '+00:00')).date()
+                        else:
+                            record_date = datetime.strptime(record_date_str, '%Y-%m-%d').date()
+                        
+                        # Check if the record date falls within the range
+                        if start_date and record_date < start_date:
+                            continue
+                        if end_date and record_date > end_date:
+                            continue
+                        temp_filtered.append(r)
+                    except (ValueError, TypeError):
+                        # Ignore records with invalid date formats
+                        continue
+                filtered = temp_filtered
+
+            elif column == 'global_search':
+                search_term = str(filter_value).lower()
+                filtered = [
+                    r for r in filtered
+                    if any(search_term in str(v).lower() for v in r.values())
+                ]
+            elif isinstance(filter_value, list):
+                if filter_value: # Ensure the list is not empty
                     filtered = [
                         r for r in filtered
-                        if any(search_term in str(v).lower() for v in r.values())
+                        if r.get(column) in filter_value
                     ]
-                elif isinstance(filter_value, list):
-                    if filter_value:
-                        filtered = [
-                            r for r in filtered
-                            if r.get(column) in filter_value
-                        ]
-                else:
-                    filtered = [
-                        r for r in filtered
-                        if str(filter_value).lower() in str(r.get(column, '')).lower()
-                    ]
+            else: # General string matching for other filter types
+                filtered = [
+                    r for r in filtered
+                    if str(filter_value).lower() in str(r.get(column, '')).lower()
+                ]
 
         self.filtered_records = filtered
 
         # Apply sorting
         if self.sort_criteria:
             for column, ascending in reversed(self.sort_criteria):
-                # *** THIS IS THE KEY CHANGE ***
-                # We now use the robust _normalize_for_sorting function as the key,
-                # while still handling None values correctly to sort them at the beginning.
                 self.filtered_records.sort(
                     key=lambda x: (x.get(column) is None, _normalize_for_sorting(x.get(column))),
                     reverse=not ascending
