@@ -73,7 +73,7 @@ CREATE TABLE sindicato_inq.afiliadas (
     nombre TEXT,
     apellidos TEXT,
     cif TEXT UNIQUE,
-    fecha_nacimiento DATE,
+    fecha_nac DATE,
     genero TEXT,
     email TEXT,
     telefono TEXT,
@@ -83,7 +83,7 @@ CREATE TABLE sindicato_inq.afiliadas (
     fecha_baja DATE,
     trato_propiedad BOOLEAN,
     nivel_participacion TEXT
-    );
+);
 
 CREATE TABLE sindicato_inq.facturacion (
     id SERIAL PRIMARY KEY,
@@ -92,7 +92,7 @@ CREATE TABLE sindicato_inq.facturacion (
     periodicidad SMALLINT,
     forma_pago TEXT,
     iban TEXT
-    );
+);
 
 CREATE TABLE asesorias (
     id SERIAL PRIMARY KEY,
@@ -185,7 +185,8 @@ CREATE TABLE staging_afiliadas (
     prop_vertical TEXT,
     api TEXT,
     propiedad TEXT,
-    entramado TEXT
+    entramado TEXT,
+    fecha_nac TEXT
 );
 
 CREATE TABLE staging_empresas (
@@ -396,7 +397,7 @@ INSERT INTO
         nombre,
         apellidos,
         cif,
-        fecha_nacimiento,
+        fecha_nac,
         genero,
         email,
         telefono,
@@ -407,28 +408,13 @@ INSERT INTO
         trato_propiedad,
         nivel_participacion
     )
-SELECT
-    p.id,
-    s.num_afiliada,
-    s.nombre,
-    s.apellidos,
-    s.cif,
-    NULL,
-    s.genero,
-    s.email,
-    s.telefono,
-    s.estado,
-    s.regimen,
-    to_date(
-        NULLIF(s.fecha_alta, ''),
-        'DD/MM/YYYY'
-    ),
-    to_date(
-        NULLIF(s.fecha_baja, ''),
-        'DD/MM/YYYY'
-    ),
-    FALSE,
-    s.nivel_participacion
+SELECT p.id, s.num_afiliada, s.nombre, s.apellidos, s.cif, to_date(
+        NULLIF(s.fecha_nac, ''), 'YYYY-MM-DD'
+    ), s.genero, s.email, s.telefono, s.estado, s.regimen, to_date(
+        NULLIF(s.fecha_alta, ''), 'DD/MM/YYYY'
+    ), to_date(
+        NULLIF(s.fecha_baja, ''), 'DD/MM/YYYY'
+    ), FALSE, s.nivel_participacion
 FROM staging_afiliadas s
     JOIN pisos p ON s.direccion = p.direccion -- Se usa JOIN para asegurar la vinculación
 ON CONFLICT (num_afiliada) DO NOTHING;
@@ -517,8 +503,10 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Añade la restricción pero no la valida en los datos existentes
 ALTER TABLE sindicato_inq.facturacion
-ADD CONSTRAINT chk_iban_format
-CHECK (iban IS NULL OR iban ~ '^ES[0-9]{22}$') NOT VALID;
+ADD CONSTRAINT chk_iban_format CHECK (
+    iban IS NULL
+    OR iban ~ '^ES[0-9]{22}$'
+) NOT VALID;
 
 -- 2.4. Limpiar tablas Staging
 DROP TABLE staging_afiliadas;

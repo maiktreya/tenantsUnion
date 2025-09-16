@@ -1,3 +1,5 @@
+# build/niceGUI/config.py
+
 from dataclasses import dataclass
 import os
 
@@ -18,8 +20,13 @@ class Config:
 
 
 # =====================================================================
-#  TABLE & RELATIONSHIP METADATA (REVISED & COMPLETE)
+#  TABLE & RELATIONSHIP METADATA (ENHANCED FOR MULTI-LEVEL EXPLORATION)
 # =====================================================================
+
+# This configuration object is the single source of truth for the application's
+# understanding of the database schema. It drives UI generation, validation,
+# and relationship exploration.
+
 TABLE_INFO = {
     "entramado_empresas": {
         "display_name": "Entramado de Empresas",
@@ -58,7 +65,11 @@ TABLE_INFO = {
             "nodo_id": {"view": "nodos", "display_field": "nombre"},
         },
         "child_relations": [
-            {"table": "pisos", "foreign_key": "bloque_id"},
+            {
+                "table": "pisos",
+                "foreign_key": "bloque_id",
+                "child_relations": [{"table": "afiliadas", "foreign_key": "piso_id"}],
+            },
         ],
     },
     "pisos": {
@@ -79,7 +90,13 @@ TABLE_INFO = {
             "api",
         ],
         "relations": {
-            "bloque_id": {"view": "bloques", "display_field": "direccion"},
+            "bloque_id": {
+                "view": "bloques",
+                "display_field": "direccion",
+                "relations": {
+                    "empresa_id": {"view": "empresas", "display_field": "nombre"}
+                },
+            },
             "empresa_nobloque_id": {"view": "empresas", "display_field": "nombre"},
         },
         "child_relations": [
