@@ -96,7 +96,7 @@ class AfiliadasImporterView:
 
     def _transform_and_validate_row(self, row: pd.Series) -> Optional[Dict[str, Any]]:
         """Transforms a single row, validates it, and adds validation status."""
-        
+
         # --- NEW: HELPER FUNCTION FOR ROBUST DATE PARSING ---
         def _parse_date(date_str: str) -> Optional[str]:
             """Parses a date string from common formats into ISO format (YYYY-MM-DD)."""
@@ -107,7 +107,7 @@ class AfiliadasImporterView:
                     return datetime.strptime(date_str, fmt).date().isoformat()
                 except (ValueError, TypeError):
                     continue
-            return None # Return None if all formats fail
+            return None  # Return None if all formats fail
 
         try:
 
@@ -121,8 +121,10 @@ class AfiliadasImporterView:
             main_address = f"{get_val(9)}, {get_val(10)} {get_val(11)}".strip()
             floor_details = get_val(12).strip()
 
-            full_address = f"{main_address}, {floor_details}" if floor_details else main_address
-            
+            full_address = (
+                f"{main_address}, {floor_details}" if floor_details else main_address
+            )
+
             municipio = get_val(13)
             cp = get_val(14)
             final_address = f"{full_address}, {cp}, {municipio}"
@@ -132,7 +134,7 @@ class AfiliadasImporterView:
                 "nombre": nombre,
                 "apellidos": f"{get_val(2)} {get_val(3)}".strip(),
                 "genero": get_val(4),
-                "fecha_nacimiento": _parse_date(get_val(5)), # Use parser
+                "fecha_nacimiento": _parse_date(get_val(5)),  # Use parser
                 "cif": get_val(6),
                 "telefono": get_val(7),
                 "email": get_val(8),
@@ -150,7 +152,9 @@ class AfiliadasImporterView:
                 "n_personas": int(get_val(15)) if get_val(15).isdigit() else None,
                 "inmobiliaria": get_val(18),
                 "prop_vertical": bool(get_val(20)),
-                "fecha_firma": _parse_date(get_val(16)), # MODIFIED: Use the robust date parser
+                "fecha_firma": _parse_date(
+                    get_val(16)
+                ),  # MODIFIED: Use the robust date parser
             }
 
             cuota_type = get_val(22)
@@ -472,4 +476,72 @@ class AfiliadasImporterView:
                 success_count += 1
                 log_message(f"✅ ÉXITO: {afiliada_name} importada completamente.")
 
-   
+            except Exception as e:
+                error_msg = f"Error en {afiliada_name}: {e}"
+                error_messages.append(error_msg)
+                log_message(f"❌ FALLO: {error_msg}")
+            progress.value = (i + 1) / total_records
+            await asyncio.sleep(0.05)
+        progress_dialog.close()
+
+        with ui.dialog() as summary_dialog, ui.card().classes("min-w-[700px]"):
+            ui.label("Resultado de la Importación").classes("text-h6")
+            if success_count > 0:
+                ui.markdown(
+                    f"✅ **Se importaron {success_count} de {total_records} registros exitosamente.**"
+                ).classes("text-positive")
+            if error_messages:
+                ui.markdown(
+                    f"❌ **Fallaron {len(error_messages)} de {total_records} registros.**"
+                ).classes("text-negative")
+
+            if new_afiliadas:
+                with ui.expansion(
+                    "Ver Nuevas Afiliadas Creadas", icon="person_add"
+                ).classes("w-full"):
+                    with ui.table(
+                        columns=[
+                            {
+                                "name": "num_afiliada",
+                                "label": "Nº Afiliada",
+                                "field": "num_afiliada",
+                                "sortable": True,
+                            },
+                            {
+                                "name": "nombre",
+                                "label": "Nombre",
+                                "field": "nombre",
+                                "sortable": True,
+                            },
+                            {
+                                "name": "apellidos",
+                                "label": "Apellidos",
+                                "field": "apellidos",
+                                "sortable": True,
+                            },
+                            {"name": "email", "label": "Email", "field": "email"},
+                        ],
+                        rows=new_afiliadas,
+                        row_key="id",
+                    ).classes("w-full"):
+                        pass
+
+            with ui.expansion(
+                "Ver Registro Completo del Proceso", icon="article"
+            ).classes("w-full"):
+                ui.textarea(value="\n".join(full_log_messages)).props(
+                    "readonly outlined rows=15"
+                ).classes("w-full")
+            if error_messages:
+                with ui.expansion(
+                    "Ver Resumen de Errores", icon="report_problem"
+                ).classes("w-full"):
+                    with ui.scroll_area().classes("w-full h-48 border rounded p-2"):
+                        for msg in error_messages:
+                            ui.label(msg).classes("text-sm text-negative")
+            with ui.row().classes("w-full justify-end mt-4"):
+                ui.button("Aceptar", on_click=summary_dialog.close)
+        summary_dialog.open()
+
+        self.state.set_records([])
+        self._render_preview_tabs()
