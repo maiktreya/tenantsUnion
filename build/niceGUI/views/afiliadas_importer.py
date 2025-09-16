@@ -1,5 +1,4 @@
 # /build/niceGUI/views/afiliadas_importer.py
-
 import pandas as pd
 import io
 import re
