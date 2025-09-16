@@ -16,7 +16,7 @@ def _clean_dialog_record(record: Dict) -> Dict:
     cleaned = {}
     for key, value in record.items():
         # Convert any empty string to None, otherwise keep the original value
-        cleaned[key] = None if value == '' else value
+        cleaned[key] = None if value == "" else value
     return cleaned
 
 
@@ -222,10 +222,7 @@ class EnhancedRecordDialog:
     async def _save_handler(self):
         """Central save handler that cleans data before sending to the API."""
         try:
-            raw_data = {
-                field: self.inputs[field].value
-                for field in self.inputs
-            }
+            raw_data = {field: self.inputs[field].value for field in self.inputs}
 
             cleaned_data = _clean_dialog_record(raw_data)
             final_data = {
@@ -237,8 +234,7 @@ class EnhancedRecordDialog:
                 if success:
                     self.dialog.close()
                     if self.on_success:
-                        # --- FIX: Removed 'await' ---
-                        self.on_success()
+                        await self.on_success()
                 return
 
             if self.mode == "create":
@@ -256,8 +252,7 @@ class EnhancedRecordDialog:
             if result:
                 self.dialog.close()
                 if self.on_success:
-                    # --- FIX: Removed 'await' ---
-                    self.on_success()
+                    await self.on_success()
 
         except Exception as e:
             ui.notify(f"Error saving record: {str(e)}", type="negative")
