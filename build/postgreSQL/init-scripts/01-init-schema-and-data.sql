@@ -91,8 +91,8 @@ CREATE TABLE sindicato_inq.facturacion (
     cuota DECIMAL(8, 2),
     periodicidad SMALLINT,
     forma_pago TEXT,
-    iban TEXT CONSTRAINT chk_iban_format CHECK (iban IS NULL OR iban ~ '^ES[0-9]{22}$')
- );
+    iban TEXT
+    );
 
 CREATE TABLE asesorias (
     id SERIAL PRIMARY KEY,
@@ -514,6 +514,11 @@ FROM
     ) = s.beneficiaria_nombre
     LEFT JOIN usuarios u ON s.tecnica_alias = u.alias
 ON CONFLICT (id) DO NOTHING;
+
+-- Añade la restricción pero no la valida en los datos existentes
+ALTER TABLE sindicato_inq.facturacion
+ADD CONSTRAINT chk_iban_format
+CHECK (iban IS NULL OR iban ~ '^ES[0-9]{22}$') NOT VALID;
 
 -- 2.4. Limpiar tablas Staging
 DROP TABLE staging_afiliadas;
