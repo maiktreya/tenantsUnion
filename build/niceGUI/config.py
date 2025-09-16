@@ -81,6 +81,8 @@ TABLE_INFO = {
             "empresa_nobloque_id",
             "inmobiliaria",
             "bloque_id",
+            "vpo",
+            "vpo_date",
         ],
         "fields": [
             "direccion",
