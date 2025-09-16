@@ -1,13 +1,17 @@
 # /build/niceGUI/views/conflicts.py
 
 from typing import Optional, List, Dict, Awaitable, Callable
-from nicegui import ui, app
-from api.client import APIClient
-from state.app_state import GenericViewState
-from components.dialogs import EnhancedRecordDialog, ConfirmationDialog
 from datetime import date
-from config import TABLE_INFO
+from nicegui import ui, app
+
+from api.client import APIClient
+
+from state.app_state import GenericViewState
+
 from components.base_view import BaseView
+from components.dialogs import EnhancedRecordDialog, ConfirmationDialog
+
+from config import TABLE_INFO
 
 
 class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
