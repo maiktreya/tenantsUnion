@@ -1,5 +1,4 @@
 # /build/niceGUI/views/admin.py
-
 from typing import Dict, Any
 from nicegui import ui
 
