@@ -453,7 +453,9 @@ class AfiliadasImporterView:
                     raise Exception("No se pudo crear la afiliada.")
 
                 new_afiliadas.append(new_afiliada)
-                log_message(f"➕ Afiliada creada: {afiliada_name} ({new_afiliada.get('num_afiliada')})")
+                log_message(
+                    f"➕ Afiliada creada: {afiliada_name} ({new_afiliada.get('num_afiliada')})"
+                )
 
                 record["facturacion"]["afiliada_id"] = new_afiliada["id"]
                 await self.api.create_record("facturacion", record["facturacion"])
@@ -482,16 +484,33 @@ class AfiliadasImporterView:
                 ).classes("text-negative")
 
             if new_afiliadas:
-                with ui.expansion("Ver Nuevas Afiliadas Creadas", icon="person_add").classes("w-full"):
+                with ui.expansion(
+                    "Ver Nuevas Afiliadas Creadas", icon="person_add"
+                ).classes("w-full"):
                     with ui.table(
                         columns=[
-                            {'name': 'num_afiliada', 'label': 'Nº Afiliada', 'field': 'num_afiliada', 'sortable': True},
-                            {'name': 'nombre', 'label': 'Nombre', 'field': 'nombre', 'sortable': True},
-                            {'name': 'apellidos', 'label': 'Apellidos', 'field': 'apellidos', 'sortable': True},
-                            {'name': 'email', 'label': 'Email', 'field': 'email'},
+                            {
+                                "name": "num_afiliada",
+                                "label": "Nº Afiliada",
+                                "field": "num_afiliada",
+                                "sortable": True,
+                            },
+                            {
+                                "name": "nombre",
+                                "label": "Nombre",
+                                "field": "nombre",
+                                "sortable": True,
+                            },
+                            {
+                                "name": "apellidos",
+                                "label": "Apellidos",
+                                "field": "apellidos",
+                                "sortable": True,
+                            },
+                            {"name": "email", "label": "Email", "field": "email"},
                         ],
                         rows=new_afiliadas,
-                        row_key='id'
+                        row_key="id",
                     ).classes("w-full"):
                         pass
 
