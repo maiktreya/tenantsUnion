@@ -1,5 +1,4 @@
 # /build/niceGUI/views/views_explorer.py
-
 from typing import Dict, Any
 from nicegui import ui, app
 
