@@ -1,19 +1,21 @@
 import pytest
 import respx
-from httpx import Response, AsyncClient
+from httpx import Response
 from unittest.mock import AsyncMock
 
-# Adjust the path to import from the project's source code
 import sys
 from pathlib import Path
 
-# Add the project root to the Python path to allow imports from 'build'
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+# --- ROBUST FIX ---
+# Point sys.path directly to the application's source directory.
+# This makes all imports within the tests and the app itself resolve correctly.
+SRC_DIR = Path(__file__).parent.parent / 'build' / 'niceGUI'
+sys.path.insert(0, str(SRC_DIR))
+# --- END FIX ---
 
-from tests.debug_client import DebugAPIClient  # <-- MODIFIED: Import the debug client
-from build.niceGUI.main import app as nicegui_app
-from build.niceGUI.views import HomeView, AdminView
+from tests.debug_client import DebugAPIClient
+# Imports can now be made directly, as if we were inside the `niceGUI` directory
+from main import app as nicegui_app
 from nicegui import ui
 
 # =====================================================================
@@ -28,14 +30,12 @@ def mock_api_url() -> str:
 
 
 @pytest.fixture
-def api_client(mock_api_url: str) -> DebugAPIClient: # <-- MODIFIED: Updated type hint
+def api_client(mock_api_url: str) -> DebugAPIClient:
     """
     Provides an instance of the DebugAPIClient, configured to use the mock URL.
     This is used for unit-testing components that depend on the API client.
     """
-    # We create a new instance for each test to ensure isolation
-    client = DebugAPIClient(base_url=mock_api_url) # <-- MODIFIED: Instantiate the debug client
-    # Ensure client is reset for each test run
+    client = DebugAPIClient(base_url=mock_api_url)
     client.client = None
     return client
 
