@@ -3,26 +3,21 @@
 from typing import Optional, List, Dict, Awaitable, Callable
 from nicegui import ui, app
 from api.client import APIClient
-
-# --- CHANGE: Import the single, generic state class ---
 from state.app_state import GenericViewState
 from components.dialogs import EnhancedRecordDialog, ConfirmationDialog
 from datetime import date
 from config import TABLE_INFO
+from components.base_view import BaseView
 
 
-class ConflictsView:
+class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
     """Enhanced conflicts management view using the centralized GenericViewState."""
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-        # --- CHANGE: Use the generic state for the main data list ---
         self.state = GenericViewState()
-
-        # --- CHANGE: State specific to this view is now managed here ---
         self.selected_conflict: Optional[Dict] = None
         self.history: List[Dict] = []
-
         self.conflict_select = None
         self.info_container = None
         self.history_container = None
@@ -270,10 +265,8 @@ class ConflictsView:
             return
 
         self.info_container.clear()
-        # --- CHANGE: Use the view's self.selected_conflict property ---
         conflict = self.selected_conflict
 
-        # ... (Rest of the display logic is identical, it correctly uses the 'conflict' variable) ...
         with self.info_container:
             ui.label("Información del Conflicto").classes("text-h6 mb-2")
             with ui.card().classes("w-full mb-2"):
@@ -334,7 +327,6 @@ class ConflictsView:
             return
         self.history_container.clear()
         try:
-            # --- CHANGE: Use self.selected_conflict for the ID ---
             history_records = await self.api.get_records(
                 "v_diario_conflictos_con_afiliada",
                 {"conflicto_id": f'eq.{self.selected_conflict["id"]}'},
@@ -352,9 +344,6 @@ class ConflictsView:
                     )
         except Exception as e:
             ui.notify(f"Error loading history: {str(e)}", type="negative")
-
-    # ... The rest of the file (_create_history_entry, _add_note, _create_conflict, etc.)
-    # can remain as they are, since they correctly reference self.selected_conflict.
 
     def _create_history_entry(self, entry: dict):
         title = f"Nota con fecha {entry.get('created_at', 'Sin fecha').split('T')[0]}"

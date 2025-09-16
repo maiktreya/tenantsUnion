@@ -1,18 +1,15 @@
 from typing import Callable
 from nicegui import ui, app
+from components.base_view import BaseView
 
 
-class HomeView:
+class HomeView(BaseView):  # MODIFIED: Inherit from BaseView
     """Home page view with role-based card visibility"""
 
     def __init__(self, navigate: Callable[[str], None]):
         self.navigate = navigate
 
-    def has_role(self, *roles: str) -> bool:
-        """Check if current user has required roles (same as main app)"""
-        user_roles = {role.lower() for role in app.storage.user.get("roles", [])}
-        required_roles = {role.lower() for role in roles}
-        return not required_roles.isdisjoint(user_roles)
+    # REMOVED: The redundant 'has_role' method has been deleted from this class.
 
     def create(self) -> ui.column:
         """Create the home view UI with role-based card visibility"""

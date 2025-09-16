@@ -7,6 +7,7 @@ from .exporter import export_to_csv, export_to_json
 from .importer import CSVImporterDialog
 from .relationship_explorer import RelationshipExplorer
 from .utils import _clean_record
+from .base_view import BaseView
 
 __all__ = [
     "DataTable",
@@ -18,4 +19,5 @@ __all__ = [
     "CSVImporterDialog",
     "RelationshipExplorer",
     "_clean_record",
+    "BaseView",
 ]

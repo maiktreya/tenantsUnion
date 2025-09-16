@@ -3,33 +3,25 @@
 from typing import Dict, Any
 from nicegui import ui, app
 from api.client import APIClient
-
-# --- CHANGE: Import the new generic state from the central app_state module ---
 from state.app_state import GenericViewState
 from components.data_table import DataTable
 from components.filters import FilterPanel
 from components.exporter import export_to_csv
 from components.relationship_explorer import RelationshipExplorer
 from config import VIEW_INFO
+from components.base_view import BaseView
 
 
-class ViewsExplorerView:
+class ViewsExplorerView(BaseView):  # MODIFIED: Inherit from BaseView
     """Views explorer with enhanced client-side filtering and multi-sorting."""
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-        # --- CHANGE: Instantiate the new GenericViewState ---
         self.state = GenericViewState()
         self.data_table_container = None
         self.filter_panel = None
         self.detail_container = None
         self.relationship_explorer = None
-
-    def has_role(self, *roles: str) -> bool:
-        """Check if current user has required roles (same as main app)"""
-        user_roles = {role.lower() for role in app.storage.user.get("roles", [])}
-        required_roles = {role.lower() for role in roles}
-        return not required_roles.isdisjoint(user_roles)
 
     def create(self) -> ui.column:
         """Create the views explorer UI."""
@@ -39,7 +31,6 @@ class ViewsExplorerView:
             ui.label("Explorador de Vistas").classes("text-h4")
 
             with ui.row().classes("w-full gap-4 items-center"):
-                # --- CHANGE: Bind the select component to the new 'selected_entity_name' property ---
                 ui.select(
                     options=list(VIEW_INFO.keys()),
                     label="Seleccionar Vista",
@@ -77,7 +68,6 @@ class ViewsExplorerView:
 
     async def _on_row_click(self, record: Dict):
         """Handles a row click by invoking the RelationshipExplorer."""
-        # --- CHANGE: Get the view name from the new 'selected_entity_name' property ---
         view_name = self.state.selected_entity_name.value
         await self.relationship_explorer.show_details(
             record, view_name, calling_view="views"
@@ -88,7 +78,6 @@ class ViewsExplorerView:
         if self.detail_container:
             self.detail_container.clear()
 
-        # --- CHANGE: Get the view name from the new 'selected_entity_name' property ---
         view = view_name or self.state.selected_entity_name.value
         if not view:
             return
@@ -150,7 +139,6 @@ class ViewsExplorerView:
         await self._load_view_data()
 
     def _export_data(self):
-        # --- CHANGE: Use the new 'selected_entity_name' property ---
         if self.state.selected_entity_name.value:
             export_to_csv(
                 self.state.filtered_records,
