@@ -105,22 +105,25 @@ class AfiliadasImporterView:
             if not nombre:
                 return None
 
-            # 1. Build the base address (street type, name, number) for matching with 'bloques'
-            base_address = f"{get_val(9)} {get_val(10)}, {get_val(11)}".strip()
+            # 1. Get the core address components
+            main_address = f"{get_val(9)}, {get_val(10)} {get_val(11)}".strip()
+            floor_details = get_val(12).strip()
 
-            # 2. Get the floor/door details
-            floor_details = get_val(12)
+            # 2. Build the first part of the address, adding a comma only if floor details exist
+            if floor_details:
+                # Correct format: "Street Number, Floor Details"
+                full_address = f"{main_address}, {floor_details}"
+            else:
+                # If no floor details, just use the main address
+                full_address = main_address
 
-            # 3. Combine them cleanly into the full address
-            full_address = f"{base_address}, {floor_details}".strip(", ")
-
-            # 4. Add the rest of the components
+            # 3. Add the rest of the components
             municipio = get_val(13)
             cp = get_val(14)
             final_address = f"{full_address}, {cp}, {municipio}"
 
-            # 5. Clean up any extra spaces that might have been introduced
-            final_address = re.sub(r"\s+", " ", final_address).strip(", ")
+            # 4. Final cleanup for any extra spaces or trailing commas
+            final_address = re.sub(r"\s+", " ", final_address).strip().strip(",")
 
             afiliada_data = {
                 "nombre": nombre,
