@@ -152,9 +152,7 @@ class AfiliadasImporterView:
                 "n_personas": int(get_val(15)) if get_val(15).isdigit() else None,
                 "inmobiliaria": get_val(18),
                 "prop_vertical": bool(get_val(20)),
-                "fecha_firma": _parse_date(
-                    get_val(16)
-                ),  # MODIFIED: Use the robust date parser
+                "fecha_firma": _parse_date(get_val(16)),
             }
 
             cuota_type = get_val(22)
