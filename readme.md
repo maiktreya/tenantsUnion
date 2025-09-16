@@ -7,8 +7,6 @@
 
 Este proyecto es una aplicación web de escritorio desarrollada para facilitar la gestión interna de la información del **Sindicato de Inquilinas e Inquilinos de Madrid**. La interfaz, construida con **NiceGUI**, ofrece una experiencia de usuario rápida y reactiva para interactuar con una base de datos PostgreSQL a través de una API RESTful generada automáticamente con **PostgREST**.
 
-**[➡️ Acceder a la Demo en Vivo](https://tu-dominio.duckdns.org)** *(Reemplazar con el enlace real)*
-
 ## 🏛️ Arquitectura
 
 El sistema sigue una arquitectura de tres capas, completamente dockerizada para garantizar la portabilidad y facilidad en el despliegue. Esta elección pragmática está optimizada para la máxima productividad de equipos pequeños.
