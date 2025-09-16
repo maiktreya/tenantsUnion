@@ -1,9 +1,11 @@
 -- =====================================================================
--- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (VERSIÓN CORREGIDA Y AUTÓNOMA)
+-- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (ALINEADO CON ESQUEMA BASE)
 -- =====================================================================
--- Este script crea el esquema completo, define las tablas, crea índices,
--- configura la autenticación, genera las vistas y puebla la base de
--- datos con un conjunto de datos amplio y artificial.
+-- Este script crea el esquema completo, define las tablas (alineadas con
+-- 01-init-schema-and-data), crea índices, configura la autenticación,
+-- genera las vistas y puebla la base de datos con datos artificiales.
+-- Mantiene extensiones "dev-only": nodos y mapping CP→nodo, roles
+-- normalizados, credenciales, triggers y vistas de reporting.
 -- =====================================================================
 
 -- =====================================================================
@@ -15,6 +17,11 @@ SET search_path TO sindicato_inq, public;
 
 -- =====================================================================
 -- PASO 1: DEFINICIÓN DE TABLAS E ÍNDICES (ALINEADO CON PRODUCCIÓN)
+-- Nota: Se incorporan campos presentes en 01-init-schema-and-data:
+--   - empresas.url_notas TEXT
+--   - pisos.prop_vertical TEXT (en lugar de BOOLEAN), vpo, vpo_date
+--   - afiliadas.fecha_nac (en lugar de fecha_nacimiento)
+-- Se preservan campos dev-only que ya usabas (seccion_sindical, comision).
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS entramado_empresas (
@@ -58,7 +65,8 @@ CREATE TABLE IF NOT EXISTS empresas (
     nombre TEXT,
     cif_nif_nie TEXT UNIQUE,
     directivos TEXT,
-    direccion_fiscal TEXT
+    direccion_fiscal TEXT,
+    url_notas TEXT -- añadido para alinear con esquema base
 );
 
 CREATE TABLE IF NOT EXISTS usuario_credenciales (
@@ -86,13 +94,19 @@ CREATE TABLE IF NOT EXISTS pisos (
     municipio TEXT,
     cp INTEGER,
     inmobiliaria TEXT,
-    prop_vertical BOOLEAN,
+    -- prop_vertical ahora TEXT (en el script base es TEXT)
+    prop_vertical TEXT,
     por_habitaciones BOOLEAN,
+    n_personas INTEGER,
     fecha_firma DATE,
-    n_personas INTEGER
+    -- añadidos del script base
+    vpo BOOLEAN,
+    vpo_date DATE
 );
 
--- Tabla 'afiliadas' refactorizada para máxima consistencia
+-- Tabla 'afiliadas' alineada con base:
+-- - fecha_nac en lugar de fecha_nacimiento
+-- - se mantienen seccion_sindical y comision (dev-only) para no romper vistas/dev
 CREATE TABLE IF NOT EXISTS afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
@@ -101,7 +115,7 @@ CREATE TABLE IF NOT EXISTS afiliadas (
     nombre TEXT,
     apellidos TEXT,
     cif TEXT UNIQUE,
-    fecha_nacimiento DATE,
+    fecha_nac DATE,
     genero TEXT,
     email TEXT,
     telefono TEXT,
@@ -111,7 +125,7 @@ CREATE TABLE IF NOT EXISTS afiliadas (
     fecha_alta DATE,
     fecha_baja DATE,
     trato_propiedad BOOLEAN,
-    -- Participación Interna
+    -- Participación Interna (dev-only, no está en esquema base pero se preserva)
     seccion_sindical TEXT,
     nivel_participacion TEXT,
     comision TEXT
@@ -162,7 +176,7 @@ CREATE TABLE IF NOT EXISTS diario_conflictos (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Crear índices
+-- Crear índices (incluye los del base y extras dev)
 CREATE INDEX IF NOT EXISTS idx_nodos_cp_mapping_nodo_id ON nodos_cp_mapping (nodo_id);
 
 CREATE INDEX IF NOT EXISTS idx_empresas_entramado_id ON empresas (entramado_id);
@@ -194,7 +208,7 @@ CREATE INDEX IF NOT EXISTS idx_diario_conflictos_conflicto_id ON diario_conflict
 CREATE INDEX IF NOT EXISTS idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 
 -- =====================================================================
--- PASO 2: FUNCIÓN, PROCEDIMIENTO Y TRIGGER PARA SINCRONIZACIÓN
+-- PASO 2: FUNCIÓN, PROCEDIMIENTO Y TRIGGER PARA SINCRONIZACIÓN (dev)
 -- =====================================================================
 
 CREATE OR REPLACE FUNCTION sync_bloque_nodo()
@@ -240,13 +254,13 @@ END;
 $$;
 
 -- =====================================================================
--- PASO 3: VISTAS PARA PRESENTACIÓN DE DATOS
+-- PASO 3: VISTAS PARA PRESENTACIÓN DE DATOS (dev)
 -- =====================================================================
 CREATE OR REPLACE VIEW v_resumen_bloques AS
 SELECT
-    b.id, -- Primary key for the block
-    b.empresa_id, -- Foreign key to empresas
-    b.nodo_id, -- Foreign key to nodos
+    b.id,
+    b.empresa_id,
+    b.nodo_id,
     b.direccion AS "Dirección",
     e.nombre AS "Empresa Propietaria",
     n.nombre AS "Nodo Territorial",
@@ -552,49 +566,55 @@ VALUES (
         'Empresa local especializada en gestión de patrimonio inmobiliario urbano.'
     );
 
--- Insertar empresas
+-- Insertar empresas (añadimos url_notas como NULL por defecto)
 INSERT INTO
     empresas (
         entramado_id,
         nombre,
         cif_nif_nie,
         directivos,
-        direccion_fiscal
+        direccion_fiscal,
+        url_notas
     )
 VALUES (
         1,
         'Fidere Vivienda Madrid SL',
         'B81234567',
         'Juan Pérez García, Ana García López',
-        'Paseo de la Castellana, 1, Madrid, España'
+        'Paseo de la Castellana, 1, Madrid, España',
+        NULL
     ),
     (
         1,
         'Azora Gestión Inmobiliaria SA',
         'A81234568',
         'Carlos Sánchez Ruiz, María López Torres',
-        'Calle de Serrano, 50, Madrid, España'
+        'Calle de Serrano, 50, Madrid, España',
+        NULL
     ),
     (
         2,
         'Nestar Residencial Madrid SA',
         'A87654321',
         'Laura Martínez Silva, David Fernández Vega',
-        'Calle de Serrano, 10, Madrid, España'
+        'Calle de Serrano, 10, Madrid, España',
+        NULL
     ),
     (
         3,
         'Elix Housing SOCIMI',
         'A12345678',
         'Sofía Gómez Ruiz, David Fernández Castro',
-        'Avenida de América, 5, Madrid, España'
+        'Avenida de América, 5, Madrid, España',
+        NULL
     ),
     (
         4,
         'Inmobiliaria Centro Madrid SL',
         'B98765432',
         'Roberto Díaz Moreno, Elena Jiménez Blanco',
-        'Gran Vía, 25, Madrid, España'
+        'Gran Vía, 25, Madrid, España',
+        NULL
     );
 
 -- Insertar bloques
@@ -620,6 +640,7 @@ VALUES (
     (5, 'Avenida Test, 30, Madrid');
 
 -- Insertar pisos
+-- Ajuste: prop_vertical como TEXT ('Si'/'No'); añadimos vpo y vpo_date como NULL
 INSERT INTO
     pisos (
         bloque_id,
@@ -629,7 +650,10 @@ INSERT INTO
         inmobiliaria,
         prop_vertical,
         por_habitaciones,
-        n_personas
+        n_personas,
+        fecha_firma,
+        vpo,
+        vpo_date
     )
 VALUES (
         1,
@@ -637,9 +661,12 @@ VALUES (
         'Madrid',
         28080,
         'No',
-        true,
+        'Si',
         false,
-        2
+        2,
+        NULL,
+        NULL,
+        NULL
     ),
     (
         1,
@@ -647,9 +674,12 @@ VALUES (
         'Madrid',
         28080,
         'No',
-        true,
+        'Si',
         false,
-        3
+        3,
+        NULL,
+        NULL,
+        NULL
     ),
     (
         1,
@@ -657,9 +687,12 @@ VALUES (
         'Madrid',
         28080,
         'No',
-        true,
+        'Si',
         false,
-        1
+        1,
+        NULL,
+        NULL,
+        NULL
     ),
     (
         2,
@@ -667,9 +700,12 @@ VALUES (
         'Madrid',
         28013,
         'No',
-        false,
+        'No',
         true,
-        4
+        4,
+        NULL,
+        NULL,
+        NULL
     ),
     (
         2,
@@ -677,9 +713,12 @@ VALUES (
         'Madrid',
         28013,
         'No',
+        'No',
         false,
-        false,
-        2
+        2,
+        NULL,
+        NULL,
+        NULL
     ),
     (
         3,
@@ -687,9 +726,12 @@ VALUES (
         'Madrid',
         28081,
         'Sí',
-        true,
+        'Si',
         false,
-        3
+        3,
+        NULL,
+        NULL,
+        NULL
     ),
     (
         3,
@@ -697,9 +739,12 @@ VALUES (
         'Madrid',
         28081,
         'Sí',
-        true,
+        'Si',
         false,
-        2
+        2,
+        NULL,
+        NULL,
+        NULL
     ),
     (
         4,
@@ -707,9 +752,12 @@ VALUES (
         'Madrid',
         28082,
         'No',
-        true,
+        'Si',
         false,
-        1
+        1,
+        NULL,
+        NULL,
+        NULL
     ),
     (
         5,
@@ -717,9 +765,12 @@ VALUES (
         'Madrid',
         28028,
         'Sí',
+        'Si',
         true,
-        true,
-        5
+        5,
+        NULL,
+        NULL,
+        NULL
     ),
     (
         6,
@@ -727,9 +778,12 @@ VALUES (
         'Madrid',
         28025,
         'No',
-        true,
+        'Si',
         false,
-        2
+        2,
+        NULL,
+        NULL,
+        NULL
     );
 
 -- =====================================================================
@@ -834,6 +888,7 @@ VALUES (1, 1),
     (6, 4);
 
 -- Crear afiliadas
+-- Ajuste: usamos fecha_nac (en lugar de fecha_nacimiento) y mantenemos seccion_sindical/comision
 INSERT INTO
     afiliadas (
         piso_id,
@@ -851,7 +906,8 @@ INSERT INTO
         estado,
         fecha_alta,
         trato_propiedad,
-        fecha_nacimiento
+        fecha_nac,
+        fecha_baja
     )
 VALUES (
         1,
@@ -869,7 +925,8 @@ VALUES (
         'Alta',
         '2023-01-15',
         false,
-        '1985-03-15'
+        '1985-03-15',
+        NULL
     ),
     (
         2,
@@ -887,7 +944,8 @@ VALUES (
         'Alta',
         '2023-02-20',
         true,
-        '1978-11-22'
+        '1978-11-22',
+        NULL
     ),
     (
         3,
@@ -905,7 +963,8 @@ VALUES (
         'Baja',
         '2023-03-25',
         false,
-        '1992-07-08'
+        '1992-07-08',
+        NULL
     ),
     (
         4,
@@ -923,7 +982,8 @@ VALUES (
         'Alta',
         '2023-04-10',
         true,
-        '1980-12-03'
+        '1980-12-03',
+        NULL
     ),
     (
         5,
@@ -941,10 +1001,11 @@ VALUES (
         'Alta',
         '2023-05-18',
         false,
-        '1975-09-17'
+        '1975-09-17',
+        NULL
     );
 
--- Insertar facturación
+-- Insertar facturación (valida con constraint de IBAN)
 INSERT INTO
     facturacion (
         afiliada_id,
@@ -1129,4 +1190,10 @@ CALL sync_all_bloques_to_nodos ();
 -- =====================================================================
 -- CONFIRMACIÓN Y ESTADÍSTICAS
 -- =====================================================================
-SELECT 'Base de datos poblada correctamente con datos artificiales' as mensaje;
+SELECT 'Base de datos poblada correctamente con datos artificiales (alineado con esquema base)' as mensaje;
+
+ALTER TABLE sindicato_inq.facturacion
+ADD CONSTRAINT chk_iban_format CHECK (
+    iban IS NULL
+    OR iban ~ '^ES[0-9]{22}$'
+) NOT VALID;

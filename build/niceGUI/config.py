@@ -75,19 +75,20 @@ TABLE_INFO = {
     "pisos": {
         "display_name": "Pisos",
         "id_field": "id",
-        "hidden_fields": ["id"],
+        "hidden_fields": [
+            "id",
+            "por_habitaciones",
+            "empresa_nobloque_id",
+            "inmobiliaria",
+            "bloque_id",
+        ],
         "fields": [
             "direccion",
             "municipio",
             "cp",
-            "inmobiliaria",
             "prop_vertical",
-            "por_habitaciones",
             "n_personas",
             "fecha_firma",
-            "bloque_id",
-            "empresa_nobloque_id",
-            "api",
         ],
         "relations": {
             "bloque_id": {
