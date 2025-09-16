@@ -10,7 +10,9 @@ from nicegui import ui, events
 from api.client import APIClient
 from api.validate import validator
 from state.importer_state import ImporterState
-from config import IMPORTER_HEADER_MAP
+# --- THIS IS THE FIX ---
+from config import IMPORTER_HEADER_MAP, TABLE_INFO # Import TABLE_INFO as well if validator needs it
+# --------------------
 
 
 class AfiliadasImporterView:
