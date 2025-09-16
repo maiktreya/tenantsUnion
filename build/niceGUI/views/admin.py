@@ -2,16 +2,18 @@
 
 from typing import Dict, Any
 from nicegui import ui
+
 from api.client import APIClient
 
-# --- CHANGE: Import the new generic state from the central app_state module ---
 from state.app_state import GenericViewState
+
 from components.data_table import DataTable
 from components.dialogs import EnhancedRecordDialog
 from components.exporter import export_to_csv
 from components.importer import CSVImporterDialog
 from components.filters import FilterPanel
 from components.relationship_explorer import RelationshipExplorer
+
 from config import TABLE_INFO
 
 
