@@ -1,10 +1,23 @@
 # build/niceGUI/components/dialogs.py
 
-from typing import Dict, Optional, Callable, Awaitable
-from nicegui import ui, app
+from typing import Dict, Optional, Callable, Awaitable, Any
+from nicegui import ui
 from api.client import APIClient
 from config import TABLE_INFO
 from datetime import date
+
+
+def _clean_dialog_record(record: Dict) -> Dict:
+    """
+    Cleans a record from a dialog by converting empty strings to None.
+    This helps prevent API errors when inserting data into typed columns
+    like INTEGER or BOOLEAN, which cannot accept empty strings.
+    """
+    cleaned = {}
+    for key, value in record.items():
+        # Convert any empty string to None, otherwise keep the original value
+        cleaned[key] = None if value == '' else value
+    return cleaned
 
 
 class ConfirmationDialog:
@@ -51,7 +64,6 @@ class EnhancedRecordDialog:
         mode: str = "create",
         on_success: Optional[Callable] = None,
         on_save: Optional[Callable[[Dict], Awaitable[bool]]] = None,
-        # --- NEW: ADDED PARAMETER TO ACCEPT PRE-FETCHED OPTIONS ---
         custom_options: Optional[Dict[str, Dict]] = None,
     ):
         self.api = api
@@ -60,7 +72,6 @@ class EnhancedRecordDialog:
         self.mode = mode
         self.on_success = on_success
         self.on_save = on_save
-        # --- NEW: STORE THE CUSTOM OPTIONS ---
         self.custom_options = custom_options or {}
         self.dialog = None
         self.inputs = {}
@@ -123,7 +134,6 @@ class EnhancedRecordDialog:
             label = field.replace("_", " ").title()
             lower_field = field.lower()
 
-            # --- MODIFIED BLOCK: CHECK FOR CUSTOM OPTIONS FIRST ---
             if field in self.custom_options:
                 options = self.custom_options[field]
                 current_value = value
@@ -160,7 +170,6 @@ class EnhancedRecordDialog:
                 if current_value not in options:
                     current_value = None
 
-                # Hide pre-filled fields in create mode for a cleaner UI
                 if field in ["conflicto_id", "usuario_id"] and self.mode == "create":
                     self.inputs[field] = ui.input(value=current_value).style(
                         "display: none"
@@ -211,38 +220,44 @@ class EnhancedRecordDialog:
                 )
 
     async def _save_handler(self):
-        """Central save handler that uses a custom callback if provided."""
+        """Central save handler that cleans data before sending to the API."""
         try:
-            data = {
+            raw_data = {
                 field: self.inputs[field].value
                 for field in self.inputs
-                if self.inputs[field].value is not None
+            }
+
+            cleaned_data = _clean_dialog_record(raw_data)
+            final_data = {
+                key: value for key, value in cleaned_data.items() if value is not None
             }
 
             if self.on_save:
-                success = await self.on_save(data)
+                success = await self.on_save(final_data)
                 if success:
                     self.dialog.close()
                     if self.on_success:
-                        await self.on_success()
+                        # --- FIX: Removed 'await' ---
+                        self.on_success()
                 return
 
             if self.mode == "create":
-                result = await self.api.create_record(self.table, data)
+                result = await self.api.create_record(self.table, final_data)
                 if result:
                     ui.notify("Record created successfully", type="positive")
             else:
                 record_id = self.record.get(
                     TABLE_INFO.get(self.table, {}).get("id_field", "id")
                 )
-                result = await self.api.update_record(self.table, record_id, data)
+                result = await self.api.update_record(self.table, record_id, final_data)
                 if result:
                     ui.notify("Record updated successfully", type="positive")
 
             if result:
                 self.dialog.close()
                 if self.on_success:
-                    await self.on_success()
+                    # --- FIX: Removed 'await' ---
+                    self.on_success()
 
         except Exception as e:
             ui.notify(f"Error saving record: {str(e)}", type="negative")

@@ -6,6 +6,7 @@ from .filters import FilterPanel
 from .exporter import export_to_csv, export_to_json
 from .importer import CSVImporterDialog
 from .relationship_explorer import RelationshipExplorer
+from .utils import _clean_record
 
 __all__ = [
     "DataTable",
@@ -16,4 +17,5 @@ __all__ = [
     "export_to_json",
     "CSVImporterDialog",
     "RelationshipExplorer",
+    "_clean_record",
 ]

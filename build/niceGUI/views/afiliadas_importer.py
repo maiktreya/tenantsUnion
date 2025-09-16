@@ -112,7 +112,7 @@ class AfiliadasImporterView:
                 "cif": get_val(6),
                 "telefono": get_val(7),
                 "email": get_val(8),
-                "fecha_alta": get_val(16),
+                "fecha_alta": date.today().isoformat(),
                 "regimen": get_val(17),
                 "estado": "Alta",
                 "trato_propiedad": bool(get_val(18)),
