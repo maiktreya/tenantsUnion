@@ -82,18 +82,18 @@ CREATE TABLE sindicato_inq.afiliadas (
     fecha_alta DATE,
     fecha_baja DATE,
     trato_propiedad BOOLEAN,
-    nivel_participacion TEXT,
-    comision TEXT
-);
+    nivel_participacion TEXT
+    );
 
-CREATE TABLE facturacion (
+CREATE TABLE sindicato_inq.facturacion (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE CASCADE,
     cuota DECIMAL(8, 2),
     periodicidad SMALLINT,
     forma_pago TEXT,
-    iban TEXT
-);
+    iban TEXT CONSTRAINT chk_iban_format CHECK (iban IS NULL OR iban ~ '^ES[0-9]{22}$'),
+    CONSTRAINT facturacion_pkey PRIMARY KEY (id)
+ );
 
 CREATE TABLE asesorias (
     id SERIAL PRIMARY KEY,
