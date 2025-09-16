@@ -86,7 +86,21 @@ class FilterPanel:
                     
                     is_date_column = any(substr in column.lower() for substr in ["fecha", "date"])
 
-                    if is_date_column:
+                    if column == 'cuota':
+                        sorted_unique_vals = self._get_sorted_unique_values(column)
+                        options = {
+                            '__GT_ZERO__': 'Con Cuota (> 0)',
+                            **{val: str(val) for val in sorted_unique_vals}
+                        }
+                        self.inputs[column] = ui.select(
+                            options=options,
+                            label='Filtrar Cuota',
+                            multiple=True,
+                            clearable=True,
+                            on_change=lambda e, col=column: self.on_filter_change(col, e.value)
+                        ).classes('w-64').props('dense outlined')
+                    
+                    elif is_date_column:
                         with ui.row().classes('gap-2 items-center'):
                             ui.label(f'Rango {column}:').classes('text-sm text-gray-600')
                             self.date_range_filters[column] = {'start': None, 'end': None}
@@ -99,7 +113,6 @@ class FilterPanel:
                                 on_change=lambda e, col=column: self._on_date_change(col, 'end', e.value)
                             ).props('dense outlined clearable').classes('w-32').tooltip(f'Fecha de fin para {column}')
                             
-                            # Store the UI elements to be able to clear them later
                             self.inputs[f'date_start_{column}'] = start_date_input
                             self.inputs[f'date_end_{column}'] = end_date_input
 
@@ -131,5 +144,4 @@ class FilterPanel:
                 else:
                     input_field.value = None
         
-        # Clear the internal state for date ranges
         self.date_range_filters.clear()
