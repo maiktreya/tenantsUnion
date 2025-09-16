@@ -1,5 +1,6 @@
 from typing import Callable
 from nicegui import ui, app
+
 from components.base_view import BaseView
 
 
