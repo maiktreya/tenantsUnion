@@ -3,14 +3,16 @@
 from typing import Dict, Any
 from nicegui import ui
 from api.client import APIClient
-from state.admin_state import AdminState
+
+# --- CHANGE: Import the new generic state from the central app_state module ---
+from state.app_state import GenericViewState
 from components.data_table import DataTable
 from components.dialogs import EnhancedRecordDialog
 from components.exporter import export_to_csv
 from components.importer import CSVImporterDialog
 from components.filters import FilterPanel
 from components.relationship_explorer import RelationshipExplorer
-from config import config, TABLE_INFO
+from config import TABLE_INFO
 
 
 class AdminView:
@@ -18,11 +20,12 @@ class AdminView:
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-        self.state = AdminState()
+        # --- CHANGE: Instantiate the new GenericViewState ---
+        self.state = GenericViewState()
         self.data_table = None
         self.detail_container = None
         self.filter_panel = None
-        self.relationship_explorer = None  # ADD INSTANCE VARIABLE
+        self.relationship_explorer = None
 
     def create(self) -> ui.column:
         """Create the enhanced CRUD view UI."""
@@ -34,13 +37,15 @@ class AdminView:
             )
 
             with ui.row().classes("w-full gap-4 items-center"):
+                # --- CHANGE: Bind the select component to the new 'selected_entity_name' property ---
                 ui.select(
                     options=list(TABLE_INFO.keys()),
                     label="Seleccionar Tabla",
                     on_change=lambda e: ui.timer(
                         0.1, lambda: self._load_table_data(e.value), once=True
                     ),
-                ).classes("w-64").bind_value_to(self.state.selected_table)
+                ).classes("w-64").bind_value_to(self.state.selected_entity_name)
+
                 ui.button(
                     "Refrescar", icon="refresh", on_click=self._refresh_data
                 ).props("color=orange-600")
@@ -72,7 +77,6 @@ class AdminView:
             ui.separator().classes("my-4")
             self.detail_container = ui.column().classes("w-full")
 
-            # INITIALIZE THE COMPONENT
             self.relationship_explorer = RelationshipExplorer(
                 self.api, self.detail_container
             )
@@ -80,16 +84,22 @@ class AdminView:
         return container
 
     async def _on_row_click(self, record: Dict):
-        """Handles a row click by invoking the RelationshipExplorer with admin context."""
-        table_name = self.state.selected_table.value
-        await self.relationship_explorer.show_details(record, table_name, calling_view='admin')
+        """Handles a row click by invoking the RelationshipExplorer."""
+        # --- CHANGE: Get the table name from the new 'selected_entity_name' property ---
+        table_name = self.state.selected_entity_name.value
+        await self.relationship_explorer.show_details(
+            record, table_name, calling_view="admin"
+        )
 
     async def _load_table_data(self, table_name: str = None):
         if self.detail_container:
             self.detail_container.clear()
-        table = table_name or self.state.selected_table.value
+
+        # --- CHANGE: Get the table name from the new 'selected_entity_name' property ---
+        table = table_name or self.state.selected_entity_name.value
         if not table:
             return
+
         spinner = ui.spinner(size="lg", color="orange-600").classes("absolute-center")
         try:
             records = await self.api.get_records(table, limit=5000)
@@ -130,32 +140,35 @@ class AdminView:
         await self._load_table_data()
 
     def _open_import_dialog(self):
-        if not self.state.selected_table.value:
+        # --- CHANGE: Use the new 'selected_entity_name' property ---
+        if not self.state.selected_entity_name.value:
             ui.notify("Por favor, seleccione una tabla primero", type="warning")
             return
         dialog = CSVImporterDialog(
             api=self.api,
-            table_name=self.state.selected_table.value,
+            table_name=self.state.selected_entity_name.value,
             on_success=self._refresh_data,
         )
         dialog.open()
 
     async def _create_record(self):
-        if not self.state.selected_table.value:
+        # --- CHANGE: Use the new 'selected_entity_name' property ---
+        if not self.state.selected_entity_name.value:
             ui.notify("Por favor, seleccione una tabla primero", type="warning")
             return
         dialog = EnhancedRecordDialog(
             api=self.api,
-            table=self.state.selected_table.value,
+            table=self.state.selected_entity_name.value,
             mode="create",
             on_success=lambda: ui.timer(0.1, self._refresh_data, once=True),
         )
         await dialog.open()
 
     async def _edit_record(self, record: Dict):
+        # --- CHANGE: Use the new 'selected_entity_name' property ---
         dialog = EnhancedRecordDialog(
             api=self.api,
-            table=self.state.selected_table.value,
+            table=self.state.selected_entity_name.value,
             record=record,
             mode="edit",
             on_success=lambda: ui.timer(0.1, self._refresh_data, once=True),
@@ -173,8 +186,9 @@ class AdminView:
                 ui.button("Cancelar", on_click=dialog.close).props("flat")
 
                 async def confirm():
+                    # --- CHANGE: Use the new 'selected_entity_name' property ---
                     success = await self.api.delete_record(
-                        self.state.selected_table.value, record_id
+                        self.state.selected_entity_name.value, record_id
                     )
                     if success:
                         ui.notify("Registro eliminado con éxito", type="positive")
@@ -185,6 +199,8 @@ class AdminView:
         dialog.open()
 
     def _export_data(self):
+        # --- CHANGE: Use the new 'selected_entity_name' property ---
         export_to_csv(
-            self.state.filtered_records, f"{self.state.selected_table.value}_export.csv"
+            self.state.filtered_records,
+            f"{self.state.selected_entity_name.value}_export.csv",
         )

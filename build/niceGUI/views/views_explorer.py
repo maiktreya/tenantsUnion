@@ -1,14 +1,16 @@
-# maiktreya/tenantsunion/maiktreya-tenantsUnion-414fb7381de7159f8d5e19480086689987d993ee/build/niceGUI/views/views_explorer.py
+# /build/niceGUI/views/views_explorer.py
 
 from typing import Dict, Any
 from nicegui import ui, app
 from api.client import APIClient
-from state.views_state import ViewsState
+
+# --- CHANGE: Import the new generic state from the central app_state module ---
+from state.app_state import GenericViewState
 from components.data_table import DataTable
 from components.filters import FilterPanel
 from components.exporter import export_to_csv
 from components.relationship_explorer import RelationshipExplorer
-from config import VIEW_INFO, TABLE_INFO
+from config import VIEW_INFO
 
 
 class ViewsExplorerView:
@@ -16,7 +18,8 @@ class ViewsExplorerView:
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-        self.state = ViewsState()
+        # --- CHANGE: Instantiate the new GenericViewState ---
+        self.state = GenericViewState()
         self.data_table_container = None
         self.filter_panel = None
         self.detail_container = None
@@ -36,13 +39,14 @@ class ViewsExplorerView:
             ui.label("Explorador de Vistas").classes("text-h4")
 
             with ui.row().classes("w-full gap-4 items-center"):
+                # --- CHANGE: Bind the select component to the new 'selected_entity_name' property ---
                 ui.select(
                     options=list(VIEW_INFO.keys()),
                     label="Seleccionar Vista",
                     on_change=lambda e: ui.timer(
                         0.1, lambda: self._load_view_data(e.value), once=True
                     ),
-                ).classes("w-64").bind_value_to(self.state.selected_view)
+                ).classes("w-64").bind_value_to(self.state.selected_entity_name)
 
                 ui.button(
                     "Refrescar", icon="refresh", on_click=self._refresh_data
@@ -60,7 +64,6 @@ class ViewsExplorerView:
 
             self.state.filter_container = ui.column().classes("w-full")
 
-            # Create a container that will hold the dynamically created data table
             self.data_table_container = ui.column().classes("w-full")
 
             ui.separator().classes("my-4")
@@ -73,16 +76,20 @@ class ViewsExplorerView:
         return container
 
     async def _on_row_click(self, record: Dict):
-        """Handles a row click by invoking the RelationshipExplorer with views context."""
-        view_name = self.state.selected_view.value
-        await self.relationship_explorer.show_details(record, view_name, calling_view='views')
+        """Handles a row click by invoking the RelationshipExplorer."""
+        # --- CHANGE: Get the view name from the new 'selected_entity_name' property ---
+        view_name = self.state.selected_entity_name.value
+        await self.relationship_explorer.show_details(
+            record, view_name, calling_view="views"
+        )
 
     async def _load_view_data(self, view_name: str = None):
         """Loads data for the selected view and dynamically creates the data table."""
         if self.detail_container:
             self.detail_container.clear()
 
-        view = view_name or self.state.selected_view.value
+        # --- CHANGE: Get the view name from the new 'selected_entity_name' property ---
+        view = view_name or self.state.selected_entity_name.value
         if not view:
             return
 
@@ -95,7 +102,6 @@ class ViewsExplorerView:
             self.state.set_records(records)
             self._setup_filters()
 
-            # Dynamically create the DataTable with the correct hidden columns
             with self.data_table_container:
                 view_config = VIEW_INFO.get(view, {})
                 hidden_fields = view_config.get("hidden_fields", [])
@@ -132,7 +138,6 @@ class ViewsExplorerView:
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
         # The table will auto-refresh due to its subscription to the state.
-        # No need for a direct self.data_table.refresh() call.
 
     def _clear_filters(self):
         self.state.filters.clear()
@@ -145,8 +150,9 @@ class ViewsExplorerView:
         await self._load_view_data()
 
     def _export_data(self):
-        if self.state.selected_view.value:
+        # --- CHANGE: Use the new 'selected_entity_name' property ---
+        if self.state.selected_entity_name.value:
             export_to_csv(
                 self.state.filtered_records,
-                f"{self.state.selected_view.value}_export.csv",
+                f"{self.state.selected_entity_name.value}_export.csv",
             )

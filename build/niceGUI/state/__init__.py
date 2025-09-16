@@ -1,16 +1,14 @@
 # /build/niceGUI/state/__init__.py
 
 from .base import BaseTableState, ReactiveValue
-from .admin_state import AdminState
-from .views_state import ViewsState
+from .app_state import GenericViewState
 from .conflicts_state import ConflictsState
-from .importer_state import ImporterState  # <-- ADD THIS LINE
+from .importer_state import ImporterState
 
 __all__ = [
     "BaseTableState",
     "ReactiveValue",
-    "AdminState",
-    "ViewsState",
     "ConflictsState",
-    "ImporterState",  # <-- AND ADD THIS LINE
+    "ImporterState",
+    "GenericViewState",
 ]
