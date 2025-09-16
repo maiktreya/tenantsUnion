@@ -80,7 +80,7 @@ docker compose run --rm --entrypoint "certbot certificates" certbot
 **Manual renewal:**
 
 ```bash
-./renew-certificates.sh
+bash utils/renew-certificates.sh
 ```
 
 ### 7. **Directory Structure**
