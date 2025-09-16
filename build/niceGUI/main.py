@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 import os
 from pathlib import Path
+from nicegui import ui, app
 
 from logging_config import setup_logging
-
 setup_logging()
 
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from nicegui import ui, app
-from config import config
 from api.client import APIClient
+
 from views.home import HomeView
 from views.admin import AdminView
 from views.views_explorer import ViewsExplorerView
 from views.conflicts import ConflictsView
-
-# --- NEW: IMPORT THE NEW VIEW ---
 from views.afiliadas_importer import AfiliadasImporterView
+
 from auth.login import create_login_page
 from auth.user_management import UserManagementView
 from auth.user_profile import UserProfileView
+
+from config import config
 
 # ---------------------------------------------------------------------
 # 1. AUTHENTICATION MIDDLEWARE
