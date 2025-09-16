@@ -1,3 +1,4 @@
+# /build/niceGUI/views/home.py
 from typing import Callable
 from nicegui import ui, app
 
