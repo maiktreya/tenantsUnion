@@ -2,14 +2,18 @@
 
 from typing import Dict, Any
 from nicegui import ui, app
+
 from api.client import APIClient
+
 from state.app_state import GenericViewState
+
 from components.data_table import DataTable
 from components.filters import FilterPanel
 from components.exporter import export_to_csv
 from components.relationship_explorer import RelationshipExplorer
-from config import VIEW_INFO
 from components.base_view import BaseView
+
+from config import VIEW_INFO
 
 
 class ViewsExplorerView(BaseView):  # MODIFIED: Inherit from BaseView
