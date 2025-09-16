@@ -65,6 +65,11 @@ class TableValidator:
     def _validate_field_types(self, table: str, data: Dict[str, Any]) -> List[str]:
         """Validate field types based on naming conventions."""
         errors = []
+        # --- THIS IS THE FIX ---
+        # Get the config for the current table to correctly check for existing patterns.
+        config = self.table_info.get(table, {})
+        # ---------------------
+
         for field, value in data.items():
             if value is None or str(value).strip() == "":
                 continue
