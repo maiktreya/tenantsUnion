@@ -18,11 +18,11 @@ Your Docker Compose now exposes only nginx externally (ports 80/443), while keep
 
 ```bash
 # Make scripts executable
-chmod +x init-letsencrypt-duckdns.sh
-chmod +x renew-certificates.sh
+chmod +x utils/init-letsencrypt-duckdns.sh
+chmod +x utils/renew-certificates.sh
 
 # Run initial SSL setup
-./init-letsencrypt-duckdns.sh
+bash utils/init-letsencrypt-duckdns.sh
 ```
 
 **What the script does:**
@@ -91,8 +91,8 @@ Your project should have:
 project/
 ├── docker-compose.yaml
 ├── .env
-├── init-letsencrypt-duckdns.sh
-├── renew-certificates.sh
+├── utils/init-letsencrypt-duckdns.sh
+├── utils/renew-certificates.sh
 └── build/
     └── nginx/
         ├── nginx.conf.template
