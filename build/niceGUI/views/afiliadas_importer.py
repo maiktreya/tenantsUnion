@@ -10,6 +10,7 @@ from nicegui import ui, events
 from api.client import APIClient
 from api.validate import validator
 from state.importer_state import ImporterState
+from config import IMPORTER_HEADER_MAP
 
 
 class AfiliadasImporterView:
@@ -71,9 +72,11 @@ class AfiliadasImporterView:
                 io.StringIO(decoded_content), header=None, quotechar='"', sep=","
             )
 
+            data_dataframe = raw_dataframe.iloc[1:]
+
             records = [
                 record
-                for _, row in raw_dataframe.iterrows()
+                for _, row in data_dataframe.iterrows()
                 if (record := self._transform_and_validate_row(row)) is not None
             ]
             self.state.set_records(records)
@@ -102,7 +105,23 @@ class AfiliadasImporterView:
             if not nombre:
                 return None
 
-            # Afiliada data is now cleaner
+            # 1. Build the base address (street type, name, number) for matching with 'bloques'
+            base_address = f"{get_val(9)} {get_val(10)}, {get_val(11)}".strip()
+
+            # 2. Get the floor/door details
+            floor_details = get_val(12)
+
+            # 3. Combine them cleanly into the full address
+            full_address = f"{base_address}, {floor_details}".strip(", ")
+
+            # 4. Add the rest of the components
+            municipio = get_val(13)
+            cp = get_val(14)
+            final_address = f"{full_address}, {cp}, {municipio}"
+
+            # 5. Clean up any extra spaces that might have been introduced
+            final_address = re.sub(r"\s+", " ", final_address).strip(", ")
+
             afiliada_data = {
                 "num_afiliada": get_val(29),
                 "nombre": nombre,
@@ -119,20 +138,14 @@ class AfiliadasImporterView:
                 "piso_id": None,
             }
 
-            # Piso data now includes fields previously in afiliada
             piso_data = {
-                "direccion": re.sub(
-                    r"\s+",
-                    " ",
-                    f"{get_val(9)} {get_val(10)}, {get_val(11)} {get_val(12)}, {get_val(14)}, {get_val(13)}".strip(
-                        ", "
-                    ),
-                ).strip(),
-                "municipio": get_val(13),
-                "cp": int(get_val(14)) if get_val(14).isdigit() else None,
+                "direccion": final_address,  # Use the corrected address
+                "municipio": municipio,
+                "cp": int(cp) if cp.isdigit() else None,
                 "n_personas": int(get_val(15)) if get_val(15).isdigit() else None,
                 "inmobiliaria": get_val(18),
-                "prop_vertical": get_val(20) == "Si",
+                "prop_vertical": bool(get_val(20)),
+                "fecha_firma": get_val(16),
             }
 
             cuota_type = get_val(22)
@@ -180,7 +193,6 @@ class AfiliadasImporterView:
 
     def _render_preview_tabs(self):
         """Render all three preview panels and update the import button state."""
-        # Revised fields for afiliadas panel
         self._render_panel(
             "afiliada",
             self.afiliadas_panel,
@@ -196,7 +208,6 @@ class AfiliadasImporterView:
                 "fecha_alta",
             ],
         )
-        # Revised fields for pisos panel
         self._render_panel(
             "piso",
             self.pisos_panel,
@@ -207,6 +218,7 @@ class AfiliadasImporterView:
                 "n_personas",
                 "inmobiliaria",
                 "prop_vertical",
+                "fecha_firma",
             ],
         )
         self._render_panel(
@@ -222,34 +234,10 @@ class AfiliadasImporterView:
             return
         panel.clear()
 
-        header_map = {
-            "num_afiliada": "Nº Afiliada",
-            "nombre": "Nombre",
-            "apellidos": "Apellidos",
-            "cif": "CIF/NIE",
-            "email": "Email",
-            "telefono": "Teléfono",
-            "direccion": "Dirección",
-            "municipio": "Municipio",
-            "cp": "CP",
-            "fecha_nacimiento": "Fecha Nacimiento",
-            "trato_propiedad": "Trato Directo",
-            "propiedad": "Propiedad",
-            "prop_vertical": "Prop. Vertical",
-            "fecha_alta": "Fecha Alta",
-            "n_personas": "Nº Personas",
-            "inmobiliaria": "Inmobiliaria",
-            "cuota": "Cuota (€)",
-            "periodicidad": "Periodicidad (m)",
-            "forma_pago": "Forma Pago",
-            "iban": "IBAN",
-        }
-
         with panel, ui.scroll_area().classes("w-full h-[32rem]"):
             with ui.row().classes(
                 "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md items-center no-wrap sticky top-0 z-10"
             ):
-                # --- MODIFIED: "Acciones" column is now first ---
                 ui.label("Acciones").classes("w-16 min-w-[4rem]")
                 with ui.row().classes(
                     "w-24 min-w-[6rem] items-center cursor-pointer"
@@ -274,7 +262,7 @@ class AfiliadasImporterView:
                     with ui.row().classes(
                         f"{width_class} items-center cursor-pointer"
                     ).on("click", lambda f=field: self._sort_by_column(f)):
-                        ui.label(header_map.get(field, field.title()))
+                        ui.label(IMPORTER_HEADER_MAP.get(field, field.title()))
                         sort_info = next(
                             (c for c in self.state.sort_criteria if c[0] == field), None
                         )
@@ -304,7 +292,6 @@ class AfiliadasImporterView:
 
                     record["ui_updaters"][data_key] = update_row_style
 
-                    # --- MODIFIED: Drop button is now first in the row ---
                     with ui.column().classes(
                         "w-16 min-w-[4rem] flex items-center justify-center"
                     ):
@@ -448,7 +435,6 @@ class AfiliadasImporterView:
                 )
                 if existing_pisos:
                     piso_id = existing_pisos[0]["id"]
-                    # Update existing piso with new info from CSV
                     await self.api.update_record("pisos", piso_id, record["piso"])
                     log_message(
                         f"ℹ️ Piso encontrado y actualizado: {record['piso']['direccion']}"

@@ -319,4 +319,30 @@ VIEW_INFO = {
     "comprobar_link_pisos_bloques": {"display_name": "Comprobar Vínculo Pisos-Bloques"},
 }
 
+# =====================================================================
+#  UI METADATA (HEADER MAPPINGS)
+# =====================================================================
+IMPORTER_HEADER_MAP = {
+    "num_afiliada": "Nº Afiliada",
+    "nombre": "Nombre",
+    "apellidos": "Apellidos",
+    "cif": "CIF/NIE",
+    "email": "Email",
+    "telefono": "Teléfono",
+    "direccion": "Dirección",
+    "municipio": "Municipio",
+    "cp": "CP",
+    "fecha_nacimiento": "Fecha Nacimiento",
+    "trato_propiedad": "Trato Directo",
+    "propiedad": "Propiedad",
+    "prop_vertical": "Prop. Vertical",
+    "fecha_alta": "Fecha Alta",
+    "n_personas": "Nº Personas",
+    "inmobiliaria": "Inmobiliaria",
+    "cuota": "Cuota (€)",
+    "periodicidad": "Periodicidad (m)",
+    "forma_pago": "Forma Pago",
+    "iban": "IBAN",
+}
+
 config = Config()

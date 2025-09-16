@@ -28,7 +28,8 @@ CREATE TABLE empresas (
     nombre TEXT,
     cif_nif_nie TEXT UNIQUE,
     directivos TEXT,
-    direccion_fiscal TEXT
+    direccion_fiscal TEXT,
+    url_notas TEXT
 );
 
 CREATE TABLE bloques (
@@ -47,7 +48,9 @@ CREATE TABLE pisos (
     prop_vertical BOOLEAN, -- Propiedad Vertical (atributo del piso)
     por_habitaciones BOOLEAN,
     n_personas INTEGER,
-    fecha_firma DATE
+    fecha_firma DATE,
+    vpo BOOLEAN,
+    vpo_date DATE
 );
 
 CREATE TABLE usuarios (
