@@ -113,6 +113,7 @@ class AfiliadasImporterView:
             return None
 
         try:
+
             def get_val(index):
                 return "" if pd.isna(row.get(index)) else str(row.get(index)).strip()
 
@@ -402,7 +403,6 @@ class AfiliadasImporterView:
 
         self._render_preview_tabs()
 
-
     def _revalidate_record(self, record: Dict):
         """Re-validates a single record and updates its UI in ALL tabs."""
         is_valid_afiliada, errors_afiliada = validator.validate_record(
@@ -481,4 +481,97 @@ class AfiliadasImporterView:
                     )
                 else:
                     new_piso = await self.api.create_record("pisos", record["piso"])
-       
+                    if new_piso:
+                        piso_id = new_piso["id"]
+                        log_message(f"➕ Piso creado: {record['piso']['direccion']}")
+                if not piso_id:
+                    raise Exception("No se pudo crear o encontrar el piso.")
+                record["afiliada"]["piso_id"] = piso_id
+
+                new_afiliada = await self.api.create_record(
+                    "afiliadas", record["afiliada"]
+                )
+                if not new_afiliada:
+                    raise Exception("No se pudo crear la afiliada.")
+
+                new_afiliadas.append(new_afiliada)
+                log_message(
+                    f"➕ Afiliada creada: {afiliada_name} ({new_afiliada.get('num_afiliada')})"
+                )
+
+                record["facturacion"]["afiliada_id"] = new_afiliada["id"]
+                await self.api.create_record("facturacion", record["facturacion"])
+                log_message(f"➕ Facturación añadida para {afiliada_name}")
+
+                success_count += 1
+                log_message(f"✅ ÉXITO: {afiliada_name} importada completamente.")
+
+            except Exception as e:
+                error_msg = f"Error en {afiliada_name}: {e}"
+                error_messages.append(error_msg)
+                log_message(f"❌ FALLO: {error_msg}")
+            progress.value = (i + 1) / total_records
+            await asyncio.sleep(0.05)
+        progress_dialog.close()
+
+        with ui.dialog() as summary_dialog, ui.card().classes("min-w-[700px]"):
+            ui.label("Resultado de la Importación").classes("text-h6")
+            if success_count > 0:
+                ui.markdown(
+                    f"✅ **Se importaron {success_count} de {total_records} registros exitosamente.**"
+                ).classes("text-positive")
+            if error_messages:
+                ui.markdown(
+                    f"❌ **Fallaron {len(error_messages)} de {total_records} registros.**"
+                ).classes("text-negative")
+
+            if new_afiliadas:
+                with ui.expansion(
+                    "Ver Nuevas Afiliadas Creadas", icon="person_add"
+                ).classes("w-full"):
+                    with ui.table(
+                        columns=[
+                            {
+                                "name": "num_afiliada",
+                                "label": "Nº Afiliada",
+                                "field": "num_afiliada",
+                                "sortable": True,
+                            },
+                            {
+                                "name": "nombre",
+                                "label": "Nombre",
+                                "field": "nombre",
+                                "sortable": True,
+                            },
+                            {
+                                "name": "apellidos",
+                                "label": "Apellidos",
+                                "field": "apellidos",
+                                "sortable": True,
+                            },
+                            {"name": "email", "label": "Email", "field": "email"},
+                        ],
+                        rows=new_afiliadas,
+                        row_key="id",
+                    ).classes("w-full"):
+                        pass
+
+            with ui.expansion(
+                "Ver Registro Completo del Proceso", icon="article"
+            ).classes("w-full"):
+                ui.textarea(value="\n".join(full_log_messages)).props(
+                    "readonly outlined rows=15"
+                ).classes("w-full")
+            if error_messages:
+                with ui.expansion(
+                    "Ver Resumen de Errores", icon="report_problem"
+                ).classes("w-full"):
+                    with ui.scroll_area().classes("w-full h-48 border rounded p-2"):
+                        for msg in error_messages:
+                            ui.label(msg).classes("text-sm text-negative")
+            with ui.row().classes("w-full justify-end mt-4"):
+                ui.button("Aceptar", on_click=summary_dialog.close)
+        summary_dialog.open()
+
+        self.state.set_records([])
+        self._render_preview_tabs()
