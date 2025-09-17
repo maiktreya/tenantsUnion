@@ -8,31 +8,21 @@ def _is_numeric_string(value: str) -> bool:
     """Check if a string represents a number (integer or float)."""
     if not value:
         return False
-    value = value.strip()
-    # Pattern to match integers, floats, and negative numbers
-    numeric_pattern = r"^-?(?:\d+\.?\d*|\.\d+)$"
-    return bool(re.match(numeric_pattern, value))
+    return bool(re.match(r"^-?(?:\d+\.?\d*|\.\d+)$", value.strip()))
 
 
 def _normalize_for_sorting(value) -> str:
-    """Normalize a value for proper sorting, handling accents, case, and numeric strings."""
+    """Normalize a value for proper sorting."""
     if value is None:
         return ""
-
     str_value = str(value).strip()
-
     if _is_numeric_string(str_value):
         try:
-            numeric_value = float(str_value)
-            # Pad with zeros to ensure correct numeric sorting as strings
-            return f"{numeric_value:015.3f}"
+            return f"{float(str_value):015.3f}"
         except ValueError:
-            pass  # Fallback to text sorting
-
-    # For text values: normalize unicode characters (remove accents) and convert to lowercase
+            pass
     normalized = unicodedata.normalize("NFD", str_value.lower())
-    without_accents = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
-    return without_accents
+    return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
 
 
 class FilterPanel:
@@ -50,7 +40,7 @@ class FilterPanel:
         self.date_range_filters: Dict[str, Dict[str, str | None]] = {}
 
     def create(self) -> ui.column:
-        """Create the filter panel UI based on the data provided."""
+        """Create the filter panel UI."""
         self.container = ui.column().classes("w-full")
         self.refresh()
         return self.container
@@ -63,7 +53,6 @@ class FilterPanel:
         try:
             return sorted(unique_values, key=_normalize_for_sorting)
         except Exception:
-            # Fallback to simple string sorting if normalization fails
             return sorted(unique_values, key=lambda x: str(x).lower())
 
     def refresh(self):
@@ -95,7 +84,6 @@ class FilterPanel:
                         r.get(column) for r in self.records if r.get(column) is not None
                     ]
                     unique_count = len(set(unique_values))
-
                     is_date_column = any(
                         substr in column.lower() for substr in ["fecha", "date"]
                     )
@@ -121,17 +109,16 @@ class FilterPanel:
                         )
 
                     elif is_date_column:
-                        with ui.element("div").classes("flex flex-col"):
+                        # --- START OF FIX FOR LABEL PADDING ---
+                        with ui.element("div").classes("flex flex-col gap-1"):
                             ui.label(f"Rango {column}").classes(
-                                "text-xs text-gray-500 -mb-2 ml-1"
+                                "text-xs text-gray-500 ml-1"
                             )
                             with ui.row().classes("gap-2 items-center no-wrap"):
                                 self.date_range_filters[column] = {
                                     "start": None,
                                     "end": None,
                                 }
-
-                                # Start Date Input with Popup Calendar
                                 with ui.input(label="Desde").props(
                                     "dense outlined"
                                 ).classes("w-32") as start_input:
@@ -147,8 +134,6 @@ class FilterPanel:
                                         ).classes("cursor-pointer")
                                     with ui.menu() as start_menu:
                                         ui.date().bind_value(start_input)
-
-                                # End Date Input with Popup Calendar
                                 with ui.input(label="Hasta").props(
                                     "dense outlined"
                                 ).classes("w-32") as end_input:
@@ -164,9 +149,9 @@ class FilterPanel:
                                         ).classes("cursor-pointer")
                                     with ui.menu() as end_menu:
                                         ui.date().bind_value(end_input)
-
                                 self.inputs[f"date_start_{column}"] = start_input
                                 self.inputs[f"date_end_{column}"] = end_input
+                        # --- END OF FIX ---
 
                     elif (
                         1 < unique_count <= 16
@@ -191,7 +176,20 @@ class FilterPanel:
     def _on_date_change(self, column: str, part: str, value: str):
         """Updates the internal date range state and calls the main filter callback."""
         if column in self.date_range_filters:
-            # An empty value from the input will be an empty string, convert to None
             self.date_range_filters[column][part] = value if value else None
-            filter_key = f"date_range_{column}"
-            self
+            self.on_filter_change(
+                f"date_range_{column}", self.date_range_filters[column]
+            )
+
+    def clear(self):
+        """Clears all filter inputs."""
+        for key, element in self.inputs.items():
+            if key.startswith("date_"):
+                element.value = None  # Clear date inputs
+            else:
+                element.value = (
+                    []
+                    if isinstance(element, ui.select) and element.props.get("multiple")
+                    else ""
+                )
+        self.date_range_filters.clear()

@@ -12,28 +12,26 @@ def _normalize_for_sorting(value: Any) -> str:
     case sensitivity, and accents.
     """
     if value is None:
-        return ''  # Return an empty string for None values
+        return ""
 
     str_value = str(value).strip()
 
-    # Check if it is a numeric string
-    if re.match(r'^-?(?:\d+\.?\d*|\.\d+)$', str_value):
+    if re.match(r"^-?(?:\d+\.?\d*|\.\d+)$", str_value):
         try:
             numeric_value = float(str_value)
-            # Format as a zero-padded string to ensure correct numeric sorting
             return f"{numeric_value:020.6f}"
         except (ValueError, TypeError):
-            pass  # Fallback to text sorting if conversion fails
+            pass
 
-    # For text values, normalize to remove accents and convert to lowercase
-    normalized = unicodedata.normalize('NFD', str_value.lower())
-    without_accents = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    normalized = unicodedata.normalize("NFD", str_value.lower())
+    without_accents = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
     return without_accents
 
 
 @dataclass
 class ReactiveValue:
     """Wrapper for reactive values"""
+
     value: Any = None
     _observers: List[Callable] = field(default_factory=list)
 
@@ -48,6 +46,7 @@ class ReactiveValue:
     def unsubscribe(self, callback: Callable):
         if callback in self._observers:
             self._observers.remove(callback)
+
 
 class BaseTableState:
     """Base state for table-based views with client-side filtering and sorting."""
@@ -75,72 +74,96 @@ class BaseTableState:
         """
         filtered = self.records.copy()
 
-        # Apply filters
         for column, filter_value in self.filters.items():
             if not filter_value:
                 continue
-            
-            if column.startswith('date_range_'):
-                actual_column = column.replace('date_range_', '')
-                start_date_str = filter_value.get('start')
-                end_date_str = filter_value.get('end')
 
+            # --- START OF FIX FOR "CUOTA" FILTER ---
+            if column == "cuota" and isinstance(filter_value, list):
+                # Separate the special filter from the numeric values
+                has_gt_zero_filter = "__GT_ZERO__" in filter_value
+                numeric_values = [v for v in filter_value if v != "__GT_ZERO__"]
+
+                filtered = [
+                    r
+                    for r in filtered
+                    if (
+                        # Condition 1: Check for explicit numeric matches
+                        (numeric_values and r.get(column) in numeric_values)
+                        or
+                        # Condition 2: Check for the "> 0" custom filter
+                        (
+                            has_gt_zero_filter
+                            and r.get(column) is not None
+                            and float(r.get(column, 0)) > 0
+                        )
+                    )
+                ]
+            # --- END OF FIX ---
+
+            elif column.startswith("date_range_"):
+                # (Date range logic remains the same)
+                actual_column = column.replace("date_range_", "")
+                start_date_str = filter_value.get("start")
+                end_date_str = filter_value.get("end")
                 if not start_date_str and not end_date_str:
                     continue
-                
-                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
-                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
-                
+                start_date = (
+                    datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                    if start_date_str
+                    else None
+                )
+                end_date = (
+                    datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                    if end_date_str
+                    else None
+                )
                 temp_filtered = []
                 for r in filtered:
                     record_date_str = r.get(actual_column)
                     if not record_date_str:
                         continue
-                    
                     try:
-                        # Handle potential timezone info (e.g., from ISO 8601 format)
-                        if 'T' in record_date_str:
-                            record_date = datetime.fromisoformat(record_date_str.replace('Z', '+00:00')).date()
-                        else:
-                            record_date = datetime.strptime(record_date_str, '%Y-%m-%d').date()
-                        
-                        # Check if the record date falls within the range
+                        record_date = datetime.fromisoformat(
+                            record_date_str.replace("Z", "+00:00")
+                        ).date()
                         if start_date and record_date < start_date:
                             continue
                         if end_date and record_date > end_date:
                             continue
                         temp_filtered.append(r)
                     except (ValueError, TypeError):
-                        # Ignore records with invalid date formats
                         continue
                 filtered = temp_filtered
 
-            elif column == 'global_search':
+            elif column == "global_search":
                 search_term = str(filter_value).lower()
                 filtered = [
-                    r for r in filtered
+                    r
+                    for r in filtered
                     if any(search_term in str(v).lower() for v in r.values())
                 ]
+
             elif isinstance(filter_value, list):
-                if filter_value: # Ensure the list is not empty
-                    filtered = [
-                        r for r in filtered
-                        if r.get(column) in filter_value
-                    ]
-            else: # General string matching for other filter types
+                if filter_value:
+                    filtered = [r for r in filtered if r.get(column) in filter_value]
+            else:
                 filtered = [
-                    r for r in filtered
-                    if str(filter_value).lower() in str(r.get(column, '')).lower()
+                    r
+                    for r in filtered
+                    if str(filter_value).lower() in str(r.get(column, "")).lower()
                 ]
 
         self.filtered_records = filtered
 
-        # Apply sorting
         if self.sort_criteria:
             for column, ascending in reversed(self.sort_criteria):
                 self.filtered_records.sort(
-                    key=lambda x: (x.get(column) is None, _normalize_for_sorting(x.get(column))),
-                    reverse=not ascending
+                    key=lambda x: (
+                        x.get(column) is None,
+                        _normalize_for_sorting(x.get(column)),
+                    ),
+                    reverse=not ascending,
                 )
 
         self.current_page.set(1)
