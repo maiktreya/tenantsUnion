@@ -29,11 +29,13 @@ The result: faster delivery, fewer moving parts, and stronger guarantees.
 * Add a view → instant read-only endpoint.
 * Devs focus on real business value, not plumbing.
 
-### 3. Simplicity + Speed ⚙️
+### 3. Simplicity as Robustness ⚙️
 
 * Fewer layers = less code, less overhead, less debugging.
-* Runtime is lean: Postgres + a stateless PostgREST server.
-
+* Runtime is lean Postgres + a stateless PostgREST server.
+* Config-driven validation with minimalistic schema mapping.
+* Minimal full CRUD  API client with flexible generics.
+* Singletons for a centralized async API & a reactive state managements + 
 ---
 
 ## Escape Hatch Pragmatism 🛠️
