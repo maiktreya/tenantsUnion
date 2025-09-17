@@ -59,7 +59,6 @@ CREATE TABLE usuarios (
     nombre TEXT,
     apellidos TEXT,
     email TEXT,
-    roles TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -254,8 +253,7 @@ CREATE TABLE staging_usuarios (
     correo_electronico TEXT,
     telefono TEXT,
     grupo_por_defecto TEXT,
-    grupos TEXT,
-    roles TEXT
+    grupos TEXT
 );
 
 -- =====================================================================
@@ -429,15 +427,9 @@ INSERT INTO
         alias,
         nombre,
         apellidos,
-        email,
-        roles
+        email
     )
-SELECT
-    codigo,
-    nombre,
-    apellidos,
-    NULLIF(correo_electronico, ''),
-    roles
+SELECT codigo, nombre, apellidos, NULLIF(correo_electronico, ''),
 FROM staging_usuarios
 ON CONFLICT (alias) DO NOTHING;
 

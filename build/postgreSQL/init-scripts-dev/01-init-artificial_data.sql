@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS usuarios (
     nombre TEXT,
     apellidos TEXT,
     email TEXT,
-    roles TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -797,7 +796,6 @@ INSERT INTO
         nombre,
         apellidos,
         email,
-        roles,
         is_active
     )
 VALUES (
