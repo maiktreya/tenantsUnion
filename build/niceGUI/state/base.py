@@ -1,3 +1,5 @@
+# build/niceGUI/state/base.py
+
 from typing import Any, Dict, List, Callable, Tuple
 from dataclasses import dataclass, field
 import unicodedata
@@ -58,9 +60,10 @@ class BaseTableState:
         self.sort_criteria: List[Tuple[str, bool]] = []
         self.current_page = ReactiveValue(1)
         self.page_size = ReactiveValue(5)
-        self.filter_container = None
-        self.table_container = None
-        self.pagination_container = None
+        # --- FIX: Removed UI containers from the data state ---
+        # self.filter_container = None
+        # self.table_container = None
+        # self.pagination_container = None
 
     def set_records(self, records: List[Dict]):
         """Set the base records and initialize the filtered view."""

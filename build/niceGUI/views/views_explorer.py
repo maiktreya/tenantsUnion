@@ -17,10 +17,13 @@ class ViewsExplorerView(BaseView):
     def __init__(self, api_client: APIClient, state: AppState):
         self.api = api_client
         self.state = state.views_explorer
+        self.select_view = None
         self.data_table_container = None
-        self.filter_panel = None
         self.detail_container = None
+        self.filter_panel = None
         self.relationship_explorer = None
+        # The view, not the state, will own the filter container.
+        self.filter_container = None
 
     def create(self) -> ui.column:
         """Create the views explorer UI."""
@@ -28,14 +31,15 @@ class ViewsExplorerView(BaseView):
         with container:
             ui.label("Explorador de Vistas").classes("text-h6 font-italic")
             with ui.row().classes("w-full gap-4 items-center"):
-                ui.select(
+                self.select_view = ui.select(
                     options=list(VIEW_INFO.keys()),
                     label="Seleccionar Vista",
                     on_change=lambda e: ui.timer(
                         0.1, lambda: self._load_view_data(e.value), once=True
                     ),
-                ).classes("w-64").bind_value(self.state.selected_entity_name, "value")
+                ).classes("w-64")
 
+                # This button now calls the corrected local clear method.
                 ui.button(
                     "Limpiar Selección", icon="clear_all", on_click=self._clear_view
                 ).props("color=grey-6")
@@ -48,13 +52,13 @@ class ViewsExplorerView(BaseView):
                     on_click=self._clear_filters,
                 ).props("color=orange-600")
 
-                # --- ORIGINAL FUNCTIONALITY RESTORED ---
                 if self.has_role("admin", "sistemas"):
                     ui.button(
                         "Exportar CSV", icon="download", on_click=self._export_data
                     ).props("color=orange-600")
 
-            self.state.filter_container = ui.column().classes("w-full")
+            # Assign the UI element to the view's attribute, not the state's.
+            self.filter_container = ui.column().classes("w-full")
             self.data_table_container = ui.column().classes("w-full")
             ui.separator().classes("my-4")
             self.detail_container = ui.column().classes("w-full")
@@ -64,17 +68,25 @@ class ViewsExplorerView(BaseView):
         return container
 
     def _clear_view(self):
-        """Clears the UI containers and calls the central state clearing method."""
+        """
+        Clears the UI containers and the data state for this specific view.
+        This method is now self-contained and safe.
+        """
         self.state.clear_selection()
-        self.data_table_container.clear()
-        self.state.filter_container.clear()
+        if self.select_view:
+            self.select_view.value = None
+        if self.data_table_container:
+            self.data_table_container.clear()
+        if self.filter_container:
+            self.filter_container.clear()
         if self.detail_container:
             self.detail_container.clear()
 
     async def _load_view_data(self, view_name: str = None):
         """Loads data for the selected view and dynamically creates the data table."""
+        # Clear previous content safely.
         self.data_table_container.clear()
-        self.state.filter_container.clear()
+        self.filter_container.clear()
         if self.detail_container:
             self.detail_container.clear()
 
@@ -109,7 +121,9 @@ class ViewsExplorerView(BaseView):
                     f"Error al cargar datos de la vista: {str(e)}", type="negative"
                 )
             finally:
-                spinner.delete()
+                # Safely delete the spinner only if its client still exists.
+                if not spinner.client.is_deleted:
+                    spinner.delete()
 
     async def _on_row_click(self, record: Dict):
         """Handles a row click by invoking the RelationshipExplorer."""
@@ -119,8 +133,8 @@ class ViewsExplorerView(BaseView):
 
     def _setup_filters(self):
         """Initializes the filter panel based on the loaded data."""
-        self.state.filter_container.clear()
-        with self.state.filter_container:
+        self.filter_container.clear()
+        with self.filter_container:
             self.filter_panel = FilterPanel(
                 records=self.state.records, on_filter_change=self._update_filter
             )
@@ -140,7 +154,8 @@ class ViewsExplorerView(BaseView):
 
     async def _refresh_data(self):
         """Reloads data for the currently selected view."""
-        await self._load_view_data(self.state.selected_entity_name.value)
+        if self.state.selected_entity_name.value:
+            await self._load_view_data(self.state.selected_entity_name.value)
 
     def _export_data(self):
         """Exports the currently filtered data to a CSV file."""
