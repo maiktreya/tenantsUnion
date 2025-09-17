@@ -1,6 +1,7 @@
 from typing import Optional, List, Dict, Awaitable, Callable
 from datetime import date
 from nicegui import ui, app
+from collections import Counter
 
 from api.client import APIClient
 from state.app_state import AppState
@@ -182,23 +183,28 @@ class ConflictsView(BaseView):
         ui.timer(0.1, self._apply_filters, once=True)
 
     def _display_statistics(self):
+        """Calculates and displays statistics for the filtered conflicts."""
         if not self.stats_card:
             return
         self.stats_card.clear()
         with self.stats_card:
             ui.label("Estadísticas").classes("text-h6 mb-2")
-            status_counts = {
-                conflict.get("estado", "Sin estado"): 0
+
+            # --- FIX: Ensure all keys are strings to prevent sorting errors ---
+            # Use collections.Counter for a more efficient and safer count.
+            all_estados = [
+                str(conflict.get("estado", "Sin estado"))
                 for conflict in self.state.filtered_records
-            }
-            for conflict in self.state.filtered_records:
-                status_counts[conflict.get("estado", "Sin estado")] += 1
+            ]
+            status_counts = Counter(all_estados)
+
             with ui.row().classes("w-full gap-4 flex-wrap"):
                 ui.chip(
                     f"Total: {len(self.state.filtered_records)}",
                     color="blue",
                     icon="inventory",
                 )
+                # Now that all keys are strings, sorting is safe.
                 for estado, count in sorted(status_counts.items()):
                     color = {
                         "Abierto": "red",
@@ -409,13 +415,20 @@ class ConflictsView(BaseView):
                 return False
             data["conflicto_id"] = self.selected_conflict["id"]
             data["usuario_id"] = user_id
-            result = (
-                await self.api.update_record("diario_conflictos", record["id"], data)
-                if record
-                else await self.api.create_record("diario_conflictos", data)
-            )
-            if not result:
+
+            # Use the create_record which returns a tuple
+            if record:
+                result = await self.api.update_record(
+                    "diario_conflictos", record["id"], data
+                )
+                success = result is not None
+            else:
+                result, error = await self.api.create_record("diario_conflictos", data)
+                success = result is not None
+
+            if not success:
                 return False
+
             conflict_update = {}
             if data.get("tarea_actual"):
                 conflict_update["tarea_actual"] = data.get("tarea_actual")
