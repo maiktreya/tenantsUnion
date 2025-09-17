@@ -1,15 +1,15 @@
 import httpx
-import logging  # <-- CHANGE: Import the logging module
+import logging
 from typing import Dict, List, Optional, Any, Tuple
 from nicegui import ui
 from api.validate import validator
 
-log = logging.getLogger(__name__)  # <-- CHANGE: Get a logger for this module
+log = logging.getLogger(__name__)
 
 
 class APIClient:
     """
-    Enhanced PostgREST API client with config-driven validation.
+    Enhanced PostgREST API client with config-driven validation and detailed error reporting.
     Uses TABLE_INFO from config.py as the single source of truth.
     """
 
@@ -24,7 +24,7 @@ class APIClient:
         return self.client
 
     # =====================================================================
-    #  CORE CRUD OPERATIONS WITH CONFIG-DRIVEN VALIDATION
+    #  CORE CRUD OPERATIONS WITH ENHANCED ERROR HANDLING
     # =====================================================================
 
     async def get_records(
@@ -68,7 +68,6 @@ class APIClient:
 
             return records
         except httpx.HTTPStatusError as e:
-            # <-- CHANGE: Added detailed logging -->
             log.error(
                 f"HTTP Error getting records from '{table}': Status {e.response.status_code}",
                 exc_info=True,
@@ -79,7 +78,6 @@ class APIClient:
             )
             return []
         except Exception as e:
-            # <-- CHANGE: Added detailed logging -->
             log.error(f"Unexpected error getting records from '{table}'", exc_info=True)
             ui.notify(f"Error al obtener registros: {str(e)}", type="negative")
             return []
@@ -89,17 +87,14 @@ class APIClient:
         table: str,
         data: Dict,
         validate: bool = True,
-        show_validation_errors: bool = True,
-    ) -> Optional[Dict]:
-        """Create a new record from a dictionary with optional validation."""
+    ) -> Tuple[Optional[Dict], Optional[str]]:
+        """
+        Create a new record, returning the record and a detailed error message on failure.
+        """
         if validate:
             is_valid, errors = validator.validate_record(table, data, "create")
             if not is_valid:
-                if show_validation_errors:
-                    ui.notify(
-                        f'Validation errors: {"; ".join(errors)}', type="negative"
-                    )
-                return None
+                return None, f'Validation failed: {"; ".join(errors)}'
 
         client = self._ensure_client()
         url = f"{self.base_url}/{table}"
@@ -110,25 +105,43 @@ class APIClient:
             response.raise_for_status()
             result = response.json()
             created_record = result[0] if isinstance(result, list) else result
+            return created_record, None
 
-            if validate:
-                is_valid, errors = validator.validate_record(
-                    table, created_record, "read"
-                )
-                if not is_valid and show_validation_errors:
-                    ui.notify(
-                        f'Warning - Created record has validation issues: {"; ".join(errors)}',
-                        type="warning",
+        except httpx.HTTPStatusError as e:
+            try:
+                error_details = e.response.json()
+                message = error_details.get("message", "No details provided.")
+                code = error_details.get("code", "")
+
+                if code == "23505":  # PostgreSQL unique_violation code
+                    if "cif" in message:
+                        return (
+                            None,
+                            "Error de Duplicado: Ya existe una afiliada con este CIF.",
+                        )
+                    if "num_afiliada" in message:
+                        return (
+                            None,
+                            "Error de Duplicado: Ya existe una afiliada con este número.",
+                        )
+                    if "direccion" in message and table == "pisos":
+                        return (
+                            None,
+                            "Error de Duplicado: Ya existe un piso con esta dirección.",
+                        )
+                    return (
+                        None,
+                        f"Error de Duplicado: El registro ya existe. ({message})",
                     )
 
-            return created_record
+                return None, f"Error de Base de Datos: {message}"
+
+            except Exception:
+                return None, f"Error HTTP {e.response.status_code}: {e.response.text}"
+
         except Exception as e:
-            # <-- CHANGE: Added detailed logging -->
-            log.error(
-                f"Error creating record in '{table}' with data: {data}", exc_info=True
-            )
-            ui.notify(f"Error al crear registro: {str(e)}", type="negative")
-            return None
+            log.error(f"Error creating record in '{table}'", exc_info=True)
+            return None, f"Error Inesperado: {str(e)}"
 
     async def update_record(
         self,
@@ -162,9 +175,11 @@ class APIClient:
             response = await client.patch(url, json=data, headers=headers)
             response.raise_for_status()
             result = response.json()
-            updated_record = result[0] if isinstance(result, list) else result
+            updated_record = (
+                result[0] if isinstance(result, list) and result else result
+            )
 
-            if validate:
+            if validate and updated_record:
                 is_valid, errors = validator.validate_record(
                     table, updated_record, "read"
                 )
@@ -173,13 +188,10 @@ class APIClient:
                         f'Warning - Updated record has validation issues: {"; ".join(errors)}',
                         type="warning",
                     )
-
             return updated_record
         except Exception as e:
-            # <-- CHANGE: Added detailed logging -->
             log.error(
-                f"Error updating record ID '{record_id}' in '{table}' with data: {data}",
-                exc_info=True,
+                f"Error updating record ID '{record_id}' in '{table}'", exc_info=True
             )
             ui.notify(f"Error al actualizar registro: {str(e)}", type="negative")
             return None
@@ -194,7 +206,6 @@ class APIClient:
             response.raise_for_status()
             return True
         except Exception as e:
-            # <-- CHANGE: Added detailed logging -->
             log.error(
                 f"Error deleting record ID '{record_id}' from '{table}'", exc_info=True
             )
@@ -202,7 +213,7 @@ class APIClient:
             return False
 
     # =====================================================================
-    #  ENHANCED UTILITY METHODS (No changes needed here)
+    #  ENHANCED UTILITY METHODS
     # =====================================================================
 
     async def get_record_by_id(
@@ -220,24 +231,21 @@ class APIClient:
         records: List[Dict],
         validate: bool = True,
         stop_on_error: bool = False,
-    ) -> Tuple[List[Dict], List[str]]:
-        """Create multiple records with optional validation and error handling."""
+    ) -> Tuple[List[Dict], List[Tuple[Dict, str]]]:
+        """Create multiple records, returning successes and detailed failures."""
         created = []
         errors = []
 
-        for i, record in enumerate(records):
-            result = await self.create_record(
-                table, record, validate=validate, show_validation_errors=False
+        for record in records:
+            result, error_msg = await self.create_record(
+                table, record, validate=validate
             )
-
             if result:
                 created.append(result)
             else:
-                error_msg = f"Failed to create record {i+1}"
-                errors.append(error_msg)
+                errors.append((record, error_msg or "Unknown error"))
                 if stop_on_error:
                     break
-
         return created, errors
 
     async def validate_record_data(
@@ -256,15 +264,6 @@ class APIClient:
         """Get validation constraints for a specific field."""
         return validator.get_field_constraints(table, field)
 
-    def get_table_display_fields(self, table: str, record: Dict) -> Dict[str, Any]:
-        """Get only the fields that should be displayed in the UI."""
-        schema = self.get_table_schema(table)
-        if not schema:
-            return record
-
-        hidden_fields = set(schema.get("hidden_fields", []))
-        return {k: v for k, v in record.items() if k not in hidden_fields}
-
     async def search_records(
         self, table: str, search_term: str, search_fields: Optional[List[str]] = None
     ) -> List[Dict]:
@@ -274,7 +273,9 @@ class APIClient:
             return []
 
         if not search_fields:
-            all_fields = schema.get("fields", [])
+            all_fields = list(
+                self.get_table_schema(table).get("relations", {}).keys()
+            ) + list(self.get_table_schema(table).get("fields", []))
             hidden_fields = set(schema.get("hidden_fields", []))
             search_fields = [
                 f
@@ -290,7 +291,7 @@ class APIClient:
         return await self.get_records(table, filters=filters)
 
     # =====================================================================
-    #  RELATIONSHIP HELPERS (No changes needed here)
+    #  RELATIONSHIP HELPERS
     # =====================================================================
 
     async def get_related_records(

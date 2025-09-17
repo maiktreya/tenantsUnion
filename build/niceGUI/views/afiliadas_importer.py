@@ -3,26 +3,22 @@ import pandas as pd
 import io
 import re
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import date, datetime
 from nicegui import ui, events
 
 from api.client import APIClient
 from api.validate import validator
-
-# --- REFACTOR STEP 1: Import the generic state manager ---
 from state.app_state import GenericViewState
-
 from config import IMPORTER_HEADER_MAP
 
 
 class AfiliadasImporterView:
     """A view to import 'afiliadas' with live validation, sorting, and an editable preview."""
 
-    def __init__(self, api_client: APIClient):
+    def __init__(self, api_client: APIClient, state: GenericViewState):
         self.api = api_client
-        # --- REFACTOR STEP 2: Use GenericViewState instead of ImporterState ---
-        self.state = GenericViewState()
+        self.state = state
         self.afiliadas_panel: Optional[ui.column] = None
         self.pisos_panel: Optional[ui.column] = None
         self.facturacion_panel: Optional[ui.column] = None
@@ -102,7 +98,6 @@ class AfiliadasImporterView:
         """Transforms a single row, validates it, and adds validation status."""
 
         def _parse_date(date_str: str) -> Optional[str]:
-            """Parses a date string from common formats into ISO format (YYYY-MM-DD)."""
             if not date_str or pd.isna(date_str):
                 return None
             for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
@@ -123,11 +118,9 @@ class AfiliadasImporterView:
 
             main_address = f"{get_val(9)}, {get_val(10)} {get_val(11)}".strip()
             floor_details = get_val(12).strip()
-
             full_address = (
                 f"{main_address}, {floor_details}" if floor_details else main_address
             )
-
             municipio = get_val(13)
             cp = get_val(14)
             final_address = f"{full_address}, {cp}, {municipio}"
@@ -166,6 +159,7 @@ class AfiliadasImporterView:
             )
             cuota_match = re.search(r"(\d+)\s*€\s*(mes|año)", cuota_str)
             iban_raw = get_val(26).replace(" ", "")
+
             facturacion_data = {
                 "cuota": float(cuota_match.group(1)) if cuota_match else 0.0,
                 "periodicidad": (
@@ -238,29 +232,18 @@ class AfiliadasImporterView:
         self._update_import_button_state()
 
     def _render_panel(self, data_key: str, panel: ui.column, fields: List[str]):
-        """Generic function to render a preview panel with sorting and reactive rows."""
+        """Generic function to render a preview panel."""
         if not panel:
             return
         panel.clear()
 
         with panel, ui.scroll_area().classes("w-full h-[32rem]"):
+            # Header Row
             with ui.row().classes(
                 "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md items-center no-wrap sticky top-0 z-10"
             ):
                 ui.label("Acciones").classes("w-16 min-w-[4rem]")
-                with ui.row().classes(
-                    "w-24 min-w-[6rem] items-center cursor-pointer"
-                ).on("click", lambda: self._sort_by_column("is_valid")):
-                    ui.label("Estado")
-                    sort_info = next(
-                        (c for c in self.state.sort_criteria if c[0] == "is_valid"),
-                        None,
-                    )
-                    if sort_info:
-                        ui.icon(
-                            "arrow_upward" if sort_info[1] else "arrow_downward",
-                            size="sm",
-                        )
+                ui.label("Estado").classes("w-24 min-w-[6rem]")
                 ui.label("Afiliada").classes("w-48 min-w-[12rem]")
                 for field in fields:
                     width_class = (
@@ -268,22 +251,15 @@ class AfiliadasImporterView:
                         if field in ["email", "direccion", "iban"]
                         else "w-32 min-w-[8rem]"
                     )
-                    with ui.row().classes(
-                        f"{width_class} items-center cursor-pointer"
-                    ).on("click", lambda f=field: self._sort_by_column(f)):
-                        ui.label(IMPORTER_HEADER_MAP.get(field, field.title()))
-                        sort_info = next(
-                            (c for c in self.state.sort_criteria if c[0] == field), None
-                        )
-                        if sort_info:
-                            ui.icon(
-                                "arrow_upward" if sort_info[1] else "arrow_downward",
-                                size="sm",
-                            )
+                    ui.label(IMPORTER_HEADER_MAP.get(field, field.title())).classes(
+                        width_class
+                    )
 
+            # Data Rows
             for record in self.state.records:
                 if "ui_updaters" not in record:
                     record["ui_updaters"] = {}
+
                 with ui.row().classes(
                     "w-full items-center gap-2 p-2 border-t no-wrap"
                 ) as row:
@@ -308,7 +284,7 @@ class AfiliadasImporterView:
                             icon="delete",
                             on_click=lambda r=record: self._drop_record(r),
                         ).props("size=sm flat dense color=negative").tooltip(
-                            "Eliminar esta fila de la importación"
+                            "Eliminar esta fila"
                         )
 
                     with ui.column().classes(
@@ -328,10 +304,12 @@ class AfiliadasImporterView:
                             f"status_icon_{data_key}"
                         ] = update_status_icon
                         update_status_icon()
+
                     afiliada_label = f"{record['afiliada']['nombre']} {record['afiliada']['apellidos']}"
                     ui.label(afiliada_label).classes(
                         "w-48 min-w-[12rem] text-sm text-gray-600"
                     )
+
                     for field in fields:
                         value = record[data_key].get(field)
                         input_element = (
@@ -354,6 +332,7 @@ class AfiliadasImporterView:
                         input_element.on(
                             "change", lambda r=record: self._revalidate_record(r)
                         )
+
                 update_row_style()
 
     def _drop_record(self, record_to_drop: Dict):
@@ -362,49 +341,8 @@ class AfiliadasImporterView:
         self._render_preview_tabs()
         ui.notify("Fila eliminada de la importación.", type="info")
 
-    def _normalize_for_sorting(self, value: Any) -> str:
-        """
-        Helper function to normalize values for consistent sorting.
-        Handles None, numbers, strings, and accents.
-        """
-        if value is None:
-            return ""
-        return str(value).lower()
-
-    def _sort_by_column(self, column: str):
-        """Handles sorting when a column header is clicked, with self-contained logic."""
-        existing_criterion = next(
-            (c for c in self.state.sort_criteria if c[0] == column), None
-        )
-        new_direction = not existing_criterion[1] if existing_criterion else True
-        self.state.sort_criteria = [(column, new_direction)]
-
-        # --- REFACTORED LOGIC ---
-        sort_key = None
-        if column == "is_valid":
-            sort_key = lambda r: r["validation"].get("is_valid", True)
-        else:
-            # Access nested data for other columns
-            if column in self.state.records[0].get("afiliada", {}):
-                sort_key = lambda r: self._normalize_for_sorting(
-                    r.get("afiliada", {}).get(column)
-                )
-            elif column in self.state.records[0].get("piso", {}):
-                sort_key = lambda r: self._normalize_for_sorting(
-                    r.get("piso", {}).get(column)
-                )
-            elif column in self.state.records[0].get("facturacion", {}):
-                sort_key = lambda r: self._normalize_for_sorting(
-                    r.get("facturacion", {}).get(column)
-                )
-
-        if sort_key:
-            self.state.records.sort(key=sort_key, reverse=not new_direction)
-
-        self._render_preview_tabs()
-
     def _revalidate_record(self, record: Dict):
-        """Re-validates a single record and updates its UI in ALL tabs."""
+        """Re-validates a single record and updates its UI."""
         is_valid_afiliada, errors_afiliada = validator.validate_record(
             "afiliadas", record["afiliada"], "create"
         )
@@ -414,25 +352,28 @@ class AfiliadasImporterView:
         is_valid_facturacion, errors_facturacion = validator.validate_record(
             "facturacion", record["facturacion"], "create"
         )
+
         record["validation"]["is_valid"] = (
             is_valid_afiliada and is_valid_piso and is_valid_facturacion
         )
         record["validation"]["errors"] = (
             errors_afiliada + errors_piso + errors_facturacion
         )
+
         if "ui_updaters" in record:
             for updater in record["ui_updaters"].values():
                 updater()
+
         self._update_import_button_state()
 
     def _update_import_button_state(self):
-        """Enable or disable the import button based on validation status."""
+        """Enables or disables the import button based on validation status."""
         if self.import_button:
             all_valid = all(r["validation"]["is_valid"] for r in self.state.records)
             self.import_button.set_enabled(all_valid and bool(self.state.records))
 
     async def _start_import(self):
-        """Starts the import process, using the records from the state."""
+        """Starts the import process, capturing and displaying detailed, record-specific errors."""
         valid_records = [
             r
             for r in self.state.records
@@ -443,7 +384,8 @@ class AfiliadasImporterView:
             return
 
         total_records, success_count = len(valid_records), 0
-        error_messages, full_log_messages, new_afiliadas = [], [], []
+        failed_records: List[Tuple[str, str]] = []
+        full_log_messages, new_afiliadas = [], []
 
         with ui.dialog() as progress_dialog, ui.card().classes("min-w-[600px]"):
             ui.label("Iniciando Importación...").classes("text-h6")
@@ -468,6 +410,7 @@ class AfiliadasImporterView:
                 live_log.push(msg),
                 full_log_messages.append(msg),
             )
+
             try:
                 piso_id = None
                 existing_pisos = await self.api.get_records(
@@ -475,24 +418,22 @@ class AfiliadasImporterView:
                 )
                 if existing_pisos:
                     piso_id = existing_pisos[0]["id"]
-                    await self.api.update_record("pisos", piso_id, record["piso"])
-                    log_message(
-                        f"ℹ️ Piso encontrado y actualizado: {record['piso']['direccion']}"
-                    )
+                    log_message(f"ℹ️ Piso encontrado: {record['piso']['direccion']}")
                 else:
-                    new_piso = await self.api.create_record("pisos", record["piso"])
-                    if new_piso:
-                        piso_id = new_piso["id"]
-                        log_message(f"➕ Piso creado: {record['piso']['direccion']}")
-                if not piso_id:
-                    raise Exception("No se pudo crear o encontrar el piso.")
-                record["afiliada"]["piso_id"] = piso_id
+                    new_piso, piso_error = await self.api.create_record(
+                        "pisos", record["piso"]
+                    )
+                    if piso_error:
+                        raise Exception(f"Creación de piso fallida: {piso_error}")
+                    piso_id = new_piso["id"]
+                    log_message(f"➕ Piso creado: {record['piso']['direccion']}")
 
-                new_afiliada = await self.api.create_record(
+                record["afiliada"]["piso_id"] = piso_id
+                new_afiliada, afiliada_error = await self.api.create_record(
                     "afiliadas", record["afiliada"]
                 )
-                if not new_afiliada:
-                    raise Exception("No se pudo crear la afiliada.")
+                if afiliada_error:
+                    raise Exception(f"Creación de afiliada fallida: {afiliada_error}")
 
                 new_afiliadas.append(new_afiliada)
                 log_message(
@@ -500,18 +441,27 @@ class AfiliadasImporterView:
                 )
 
                 record["facturacion"]["afiliada_id"] = new_afiliada["id"]
-                await self.api.create_record("facturacion", record["facturacion"])
-                log_message(f"➕ Facturación añadida para {afiliada_name}")
+                _, facturacion_error = await self.api.create_record(
+                    "facturacion", record["facturacion"]
+                )
+                if facturacion_error:
+                    log_message(
+                        f"⚠️ AVISO: No se pudo crear la facturación para {afiliada_name}: {facturacion_error}"
+                    )
+                else:
+                    log_message(f"➕ Facturación añadida para {afiliada_name}")
 
                 success_count += 1
                 log_message(f"✅ ÉXITO: {afiliada_name} importada completamente.")
 
             except Exception as e:
-                error_msg = f"Error en {afiliada_name}: {e}"
-                error_messages.append(error_msg)
-                log_message(f"❌ FALLO: {error_msg}")
+                error_msg = str(e)
+                failed_records.append((afiliada_name, error_msg))
+                log_message(f"❌ FALLO: {afiliada_name} - {error_msg}")
+
             progress.value = (i + 1) / total_records
             await asyncio.sleep(0.05)
+
         progress_dialog.close()
 
         with ui.dialog() as summary_dialog, ui.card().classes("min-w-[700px]"):
@@ -520,41 +470,10 @@ class AfiliadasImporterView:
                 ui.markdown(
                     f"✅ **Se importaron {success_count} de {total_records} registros exitosamente.**"
                 ).classes("text-positive")
-            if error_messages:
+            if failed_records:
                 ui.markdown(
-                    f"❌ **Fallaron {len(error_messages)} de {total_records} registros.**"
+                    f"❌ **Fallaron {len(failed_records)} de {total_records} registros.**"
                 ).classes("text-negative")
-
-            if new_afiliadas:
-                with ui.expansion(
-                    "Ver Nuevas Afiliadas Creadas", icon="person_add"
-                ).classes("w-full"):
-                    with ui.table(
-                        columns=[
-                            {
-                                "name": "num_afiliada",
-                                "label": "Nº Afiliada",
-                                "field": "num_afiliada",
-                                "sortable": True,
-                            },
-                            {
-                                "name": "nombre",
-                                "label": "Nombre",
-                                "field": "nombre",
-                                "sortable": True,
-                            },
-                            {
-                                "name": "apellidos",
-                                "label": "Apellidos",
-                                "field": "apellidos",
-                                "sortable": True,
-                            },
-                            {"name": "email", "label": "Email", "field": "email"},
-                        ],
-                        rows=new_afiliadas,
-                        row_key="id",
-                    ).classes("w-full"):
-                        pass
 
             with ui.expansion(
                 "Ver Registro Completo del Proceso", icon="article"
@@ -562,13 +481,34 @@ class AfiliadasImporterView:
                 ui.textarea(value="\n".join(full_log_messages)).props(
                     "readonly outlined rows=15"
                 ).classes("w-full")
-            if error_messages:
+
+            if failed_records:
                 with ui.expansion(
-                    "Ver Resumen de Errores", icon="report_problem"
+                    "Ver Resumen de Errores", icon="report_problem", value=True
                 ).classes("w-full"):
-                    with ui.scroll_area().classes("w-full h-48 border rounded p-2"):
-                        for msg in error_messages:
-                            ui.label(msg).classes("text-sm text-negative")
+                    with ui.table(
+                        columns=[
+                            {
+                                "name": "afiliada",
+                                "label": "Afiliada",
+                                "field": "afiliada",
+                                "align": "left",
+                            },
+                            {
+                                "name": "error",
+                                "label": "Razón del Fallo",
+                                "field": "error",
+                                "align": "left",
+                            },
+                        ],
+                        rows=[
+                            {"afiliada": name, "error": reason}
+                            for name, reason in failed_records
+                        ],
+                        row_key="afiliada",
+                    ).classes("w-full"):
+                        pass
+
             with ui.row().classes("w-full justify-end mt-4"):
                 ui.button("Aceptar", on_click=summary_dialog.close)
         summary_dialog.open()
