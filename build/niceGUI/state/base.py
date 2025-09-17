@@ -1,6 +1,5 @@
-from typing import Any, Dict, List, Optional, Callable, Tuple
+from typing import Any, Dict, List, Callable, Tuple
 from dataclasses import dataclass, field
-from nicegui import ui
 import unicodedata
 import re
 from datetime import datetime

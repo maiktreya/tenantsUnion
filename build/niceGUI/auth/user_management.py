@@ -1,5 +1,5 @@
-from typing import Dict, List, Optional
-from nicegui import ui, app
+from typing import Dict, List
+from nicegui import ui
 from api.client import APIClient
 from passlib.context import CryptContext
 from components.base_view import BaseView

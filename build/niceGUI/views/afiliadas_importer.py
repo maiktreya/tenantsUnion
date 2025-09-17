@@ -2,9 +2,8 @@ import pandas as pd
 import io
 import re
 import asyncio
-import csv
 import unicodedata
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from datetime import date, datetime
 from nicegui import ui, events
 

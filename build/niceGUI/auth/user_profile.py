@@ -1,4 +1,3 @@
-from typing import Optional
 from nicegui import ui, app
 from api.client import APIClient
 from passlib.context import CryptContext
