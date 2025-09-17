@@ -803,7 +803,6 @@ VALUES (
         'Sumate',
         '(sistemas)',
         'sumate@inquilinato.org',
-        'admin',
         TRUE
     ),
     (
@@ -811,7 +810,6 @@ VALUES (
         'Administrador',
         'Sistema',
         'admin@inquilinato.org',
-        'admin',
         TRUE
     ),
     (
@@ -819,7 +817,6 @@ VALUES (
         'Laura',
         'Gómez',
         'laura.gomez@inquilinato.org',
-        'gestor',
         TRUE
     ),
     (
@@ -827,7 +824,6 @@ VALUES (
         'Miguel',
         'López',
         'miguel.lopez@inquilinato.org',
-        'técnico',
         TRUE
     ),
     (
@@ -835,7 +831,6 @@ VALUES (
         'Ana',
         'Martínez',
         'ana.martinez@inquilinato.org',
-        'usuario',
         TRUE
     ),
     (
@@ -843,7 +838,6 @@ VALUES (
         'Carlos',
         'Sánchez',
         'carlos.sanchez@inquilinato.org',
-        'usuario',
         TRUE
     );
 
