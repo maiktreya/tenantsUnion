@@ -31,11 +31,11 @@ The result: faster delivery, fewer moving parts, and stronger guarantees.
 
 ### 3. Simplicity as Robustness ⚙️
 
-* Fewer layers = less code, less overhead, less debugging.
-* Runtime is lean Postgres + a stateless PostgREST server.
-* Config-driven validation with minimalistic schema mapping.
-* Minimal full CRUD API client with flexible generics & integrated validation logic.
-* Singletons: the async API & reactive UI state fully centralized. 
+* **Fewer layers** = less code, less overhead, less debugging.
+* Database as backend: just a **stateless PostgREST** server.
+* **Config-driven** validation through metadata **schema mapping** = forget object-relational impedance!
+* Minimal **full CRUD API** client with flexible generics & **integrated validation logic**.
+* **Singletons** everywhere: **async API** & **reactive UI** state fully centralized.
 ---
 
 ## Escape Hatch Pragmatism 🛠️
