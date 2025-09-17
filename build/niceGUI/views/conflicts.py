@@ -1,31 +1,26 @@
-# /build/niceGUI/views/conflicts.py
 from typing import Optional, List, Dict, Awaitable, Callable
 from datetime import date
 from nicegui import ui, app
 
 from api.client import APIClient
-
-from state.app_state import GenericViewState
-
+from state.app_state import AppState
 from components.base_view import BaseView
 from components.dialogs import EnhancedRecordDialog, ConfirmationDialog
-
 from config import TABLE_INFO
 
 
-class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
-    """Enhanced conflicts management view using the centralized GenericViewState."""
+class ConflictsView(BaseView):
+    """Enhanced conflicts management view using the centralized AppState."""
 
-    def __init__(self, api_client: APIClient):
+    def __init__(self, api_client: APIClient, state: AppState):
         self.api = api_client
-        self.state = GenericViewState()
+        self.state = state.conflicts
+        self.global_state = state
         self.selected_conflict: Optional[Dict] = None
         self.history: List[Dict] = []
         self.conflict_select = None
         self.info_container = None
         self.history_container = None
-        self.nodos_list = []
-        self.all_afiliadas_options = {}
         self.filter_nodo = None
         self.filter_estado = None
         self.filter_causa = None
@@ -36,8 +31,14 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
         container = ui.column().classes("w-full p-4 gap-4")
 
         with container:
-            ui.label("Toma de Actas - Gestión de Conflictos").classes("text-h4")
+            ui.label("Toma de Actas - Gestión de Conflictos").classes(
+                "text-h6 font-italic"
+            )
 
+            nodo_options = {
+                "": "Todos los nodos",
+                **{nodo["id"]: nodo["nombre"] for nodo in self.global_state.all_nodos},
+            }
             conflict_options = TABLE_INFO.get("conflictos", {}).get("field_options", {})
             estado_opts_list = conflict_options.get("estado", [])
             causa_opts_list = conflict_options.get("causa", [])
@@ -55,7 +56,7 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
             ).props("default-opened"):
                 with ui.row().classes("w-full gap-4 flex-wrap items-center"):
                     self.filter_nodo = ui.select(
-                        options={},
+                        options=nodo_options,
                         label="Filtrar por Nodo",
                         on_change=self._apply_filters,
                         clearable=True,
@@ -114,41 +115,8 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
                 with ui.column().classes("flex-grow"):
                     self.history_container = ui.column().classes("w-full gap-4")
 
-        ui.timer(0.5, self._initialize_data, once=True)
+        ui.timer(0.5, self._load_conflicts, once=True)
         return container
-
-    async def _initialize_data(self):
-        await self._load_nodos()
-        await self._load_afiliadas_for_dialog()
-        await self._load_conflicts()
-
-    async def _load_afiliadas_for_dialog(self):
-        try:
-            records = await self.api.get_records("v_afiliadas_detalle", limit=5000)
-            options = {
-                r[
-                    "id"
-                ]: f'{r.get("Nombre", "")} {r.get("Apellidos", "")} (ID: {r.get("id")})'
-                for r in records
-            }
-            self.all_afiliadas_options = options
-        except Exception as e:
-            ui.notify(
-                f"Error cargando la lista de afiliadas: {str(e)}", type="negative"
-            )
-
-    async def _load_nodos(self):
-        try:
-            nodos = await self.api.get_records("nodos", order="nombre.asc")
-            self.nodos_list = nodos
-            nodo_options = {
-                "": "Todos los nodos",
-                **{nodo["id"]: nodo["nombre"] for nodo in nodos},
-            }
-            if self.filter_nodo:
-                self.filter_nodo.set_options(nodo_options)
-        except Exception as e:
-            ui.notify(f"Error loading nodes: {str(e)}", type="negative")
 
     async def _load_conflicts(self):
         try:
@@ -168,7 +136,7 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
 
     async def _apply_filters(self, _=None):
         """Updates the generic state's filters and refreshes the UI."""
-        self.state.filters = {
+        filters = {
             "nodo_id": (
                 self.filter_nodo.value
                 if self.filter_nodo and self.filter_nodo.value
@@ -190,9 +158,7 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
                 else None
             ),
         }
-        self.state.filters = {
-            k: v for k, v in self.state.filters.items() if v is not None
-        }
+        self.state.filters = {k: v for k, v in filters.items() if v is not None}
         self.state.apply_filters_and_sort()
 
         options = self._get_conflict_options(self.state.filtered_records)
@@ -206,7 +172,6 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
                 self.state.selected_item.set(None)
                 self.conflict_select.value = None
                 self._clear_displays()
-
         self._display_statistics()
 
     def _clear_filters(self):
@@ -222,11 +187,12 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
         self.stats_card.clear()
         with self.stats_card:
             ui.label("Estadísticas").classes("text-h6 mb-2")
-            status_counts = {}
+            status_counts = {
+                conflict.get("estado", "Sin estado"): 0
+                for conflict in self.state.filtered_records
+            }
             for conflict in self.state.filtered_records:
-                estado = conflict.get("estado") or "Sin estado"
-                status_counts[estado] = status_counts.get(estado, 0) + 1
-
+                status_counts[conflict.get("estado", "Sin estado")] += 1
             with ui.row().classes("w-full gap-4 flex-wrap"):
                 ui.chip(
                     f"Total: {len(self.state.filtered_records)}",
@@ -249,27 +215,20 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
             self.state.selected_item.set(None)
             self._clear_displays()
             return
-
-        # Find the full conflict record from the state's master list
         conflict = next(
             (c for c in self.state.records if c.get("id") == conflict_id), None
         )
-
         if conflict:
             self.selected_conflict = conflict
-            self.state.selected_item.set(
-                conflict
-            )  # Also update the generic state's selected item
+            self.state.selected_item.set(conflict)
             await self._display_conflict_info()
             await self._load_conflict_history()
 
     async def _display_conflict_info(self):
         if not self.info_container or not self.selected_conflict:
             return
-
         self.info_container.clear()
         conflict = self.selected_conflict
-
         with self.info_container:
             ui.label("Información del Conflicto").classes("text-h6 mb-2")
             with ui.card().classes("w-full mb-2"):
@@ -402,8 +361,9 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
 
     async def _add_note(self):
         if not self.selected_conflict:
-            ui.notify("Por favor, seleccione un conflicto primero.", type="warning")
-            return
+            return ui.notify(
+                "Por favor, seleccione un conflicto primero.", type="warning"
+            )
         initial_record = {
             "conflicto_id": self.selected_conflict["id"],
             "usuario_id": app.storage.user.get("user_id"),
@@ -424,7 +384,7 @@ class ConflictsView(BaseView):  # MODIFIED: Inherit from BaseView
             table="conflictos",
             mode="create",
             on_success=self._load_conflicts,
-            custom_options={"afiliada_id": self.all_afiliadas_options},
+            custom_options={"afiliada_id": self.global_state.all_afiliadas_options},
         )
         await dialog.open()
 

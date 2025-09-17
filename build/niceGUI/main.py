@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 import os
+import logging
 from pathlib import Path
+from typing import Optional
 from nicegui import ui, app
 
 from logging_config import setup_logging
@@ -12,6 +13,8 @@ from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.client import APIClient
+from config import config
+from state.app_state import AppState
 
 from views.home import HomeView
 from views.admin import AdminView
@@ -23,193 +26,103 @@ from auth.login import create_login_page
 from auth.user_management import UserManagementView
 from auth.user_profile import UserProfileView
 
-from config import config
-
-# ---------------------------------------------------------------------
-# 1. AUTHENTICATION MIDDLEWARE
-# ---------------------------------------------------------------------
-
+log = logging.getLogger(__name__)
 unrestricted_page_routes = {"/login"}
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """This middleware efficiently checks authentication for every request."""
-
     async def dispatch(self, request: Request, call_next):
         if (
             request.url.path.startswith("/_nicegui")
             or request.url.path in unrestricted_page_routes
         ):
             return await call_next(request)
-
         if not app.storage.user.get("authenticated", False):
             return RedirectResponse(f"/login?redirect_to={request.url.path}")
-
         return await call_next(request)
 
 
 app.add_middleware(AuthMiddleware)
 
-# ---------------------------------------------------------------------
-# 2. FINAL, REFINED APPLICATION CLASS
-# ---------------------------------------------------------------------
-
 
 class Application:
-    """Main application class with streamlined and corrected role-based access control."""
-
-    def __init__(self, api_client: APIClient):
+    def __init__(self, api_client: APIClient, state: AppState):
         self.api_client = api_client
+        self.state = state
         self.current_view = "home"
         self.view_containers = {}
         self.views = {}
         self.setup_static_files()
 
     def setup_static_files(self):
-        """Setup static file directories for assets."""
-        base_dir = Path(__file__).parent
-        assets_dir = base_dir / "assets"
-        (assets_dir / "images").mkdir(exist_ok=True)
+        assets_dir = Path(__file__).parent / "assets"
         app.add_static_files("/assets", str(assets_dir))
 
     def has_role(self, *roles: str) -> bool:
-        """Checks if the current user has any of the specified roles (case-insensitive)."""
         user_roles = {role.lower() for role in app.storage.user.get("roles", [])}
-        required_roles = {role.lower() for role in roles}
-        return not required_roles.isdisjoint(user_roles)
+        return not {role.lower() for role in roles}.isdisjoint(user_roles)
 
     def show_view(self, view_name: str):
-        """Controls which view is displayed."""
         if view_name not in self.views:
             ui.notify("Acceso no autorizado.", type="negative")
             return
-
         self.current_view = view_name
         for name, container in self.view_containers.items():
-            # Using .visible property for directness and clarity
             container.visible = name == view_name
 
     def create_header(self):
-        """Creates the header with role-based navigation and adds hide-on-scroll logic."""
-
-        with ui.header().classes("bg-white shadow-lg").props("id=main-header"):
+        with ui.header().classes("bg-white shadow-lg"):
             with ui.row().classes("w-full items-center p-2 gap-4"):
-                with ui.element("div").classes(
-                    "w-1/5 min-w-[200px] max-w-[280px] cursor-pointer"
-                ).on("click", lambda: self.show_view("home")):
-                    ui.image("/assets/images/logo.png")
-
-                ui.element("div").classes("h-10 w-px bg-gray-300")
-                ui.label("Sistema de Gestión").classes(
-                    "text-xl font-italic text-gray-400"
+                ui.image("/assets/images/logo.png").classes("w-48 cursor-pointer").on(
+                    "click", lambda: self.show_view("home")
                 )
                 ui.space()
-
-                with ui.row().classes("gap-2"):
-                    if self.has_role("admin", "sistemas"):
-                        ui.button(
-                            "admin BBDD", on_click=lambda: self.show_view("admin")
-                        ).props("flat color=red-600")
-                        ui.button(
-                            "admin Usuarios",
-                            on_click=lambda: self.show_view("user_management"),
-                        ).props("flat color=red-600")
-
-                    if self.has_role("admin", "gestor"):
-                        ui.button(
-                            "Vistas", on_click=lambda: self.show_view("views")
-                        ).props("flat color=red-600")
-                        # --- NEW: ADD THE BUTTON FOR THE IMPORTER VIEW ---
-                        ui.button(
-                            "Importar Afiliadas",
-                            on_click=lambda: self.show_view("afiliadas_importer"),
-                        ).props("flat color=red-600")
-
-                    if self.has_role("admin", "gestor", "actas"):
-                        ui.button(
-                            "Conflictos", on_click=lambda: self.show_view("conflicts")
-                        ).props("flat color=red-600")
-
-                ui.space()
-
-                with ui.row().classes("items-center"):
-                    username = app.storage.user.get("username", "...")
-                    roles = ", ".join(app.storage.user.get("roles", []))
-
-                    with ui.element().classes(
-                        "cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-                    ).on("click", lambda: self.show_view("user_profile")):
-                        ui.label(f"User: {username} ({roles})").classes(
-                            "mr-2 text-gray-600 text-xs"
-                        )
-                        ui.icon("person", size="sm").classes("text-gray-500").tooltip(
-                            "Ver mi perfil"
-                        )
-
-                    def logout():
-                        ui.run_javascript("window.location.href = '/login';")
-                        app.storage.user.clear()
-
-                    ui.button(on_click=logout, icon="logout").props(
-                        "flat dense round color=red-600"
-                    ).tooltip("Cerrar sesión")
-
-        # --- HEADER HIDE-ON-SCROLL CSS ---
-        ui.add_head_html(
-            """
-        <style>
-        #main-header {
-            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
-            z-index: 100;
-            position: sticky;
-            top: 0;
-        }
-        .hide-on-scroll {
-            transform: translateY(-100%);
-        }
-        </style>
-        """
-        )
-
-        # --- HEADER HIDE-ON-SCROLL JAVASCRIPT ---
-        ui.run_javascript(
-            """
-        let lastScroll = 0;
-        const header = document.getElementById('main-header');
-        window.addEventListener('scroll', function() {
-            const currScroll = window.scrollY;
-            if (currScroll > lastScroll && currScroll > 50) {
-                // Scrolling down
-                header.classList.add('hide-on-scroll');
-            } else {
-                // Scrolling up
-                header.classList.remove('hide-on-scroll');
-            }
-            lastScroll = currScroll;
-        });
-        """
-        )
+                if self.has_role("admin", "sistemas"):
+                    ui.button(
+                        "Admin BBDD", on_click=lambda: self.show_view("admin")
+                    ).props("flat color=orange-600")
+                    ui.button(
+                        "Admin Usuarios",
+                        on_click=lambda: self.show_view("user_management"),
+                    ).props("flat color=orange-600")
+                if self.has_role("admin", "gestor"):
+                    ui.button("Vistas", on_click=lambda: self.show_view("views")).props(
+                        "flat color=orange-600"
+                    )
+                    ui.button(
+                        "Importar Afiliadas",
+                        on_click=lambda: self.show_view("afiliadas_importer"),
+                    ).props("flat color=orange-600")
+                if self.has_role("admin", "gestor", "actas"):
+                    ui.button(
+                        "Conflictos", on_click=lambda: self.show_view("conflicts")
+                    ).props("flat color=orange-600")
+                ui.button(
+                    "Mi Perfil", on_click=lambda: self.show_view("user_profile")
+                ).props("flat")
+                ui.button(
+                    "Logout",
+                    on_click=lambda: app.storage.user.clear()
+                    or ui.navigate.to("/login"),
+                    icon="logout",
+                ).props("flat dense color=negative")
 
     def create_views(self):
-        """Creates only the application views authorized for the current user's role."""
         try:
             self.views["home"] = HomeView(self.show_view)
-            self.views["views"] = ViewsExplorerView(self.api_client)
             self.views["user_profile"] = UserProfileView(self.api_client)
-
             if self.has_role("admin", "sistemas"):
-                self.views["admin"] = AdminView(self.api_client)
+                self.views["admin"] = AdminView(self.api_client, self.state)
                 self.views["user_management"] = UserManagementView(self.api_client)
-
             if self.has_role("admin", "gestor"):
-                # --- NEW: INITIALIZE THE IMPORTER VIEW ---
+                self.views["views"] = ViewsExplorerView(self.api_client, self.state)
+                # --- THIS IS THE FIX ---
+                # The importer view is now correctly created with its state slice
                 self.views["afiliadas_importer"] = AfiliadasImporterView(
-                    self.api_client
+                    self.api_client, self.state.afiliadas_importer
                 )
-
             if self.has_role("admin", "gestor", "actas"):
-                self.views["conflicts"] = ConflictsView(self.api_client)
-
+                self.views["conflicts"] = ConflictsView(self.api_client, self.state)
             with ui.column().classes("w-full min-h-screen bg-gray-50"):
                 for name, view in self.views.items():
                     self.view_containers[name] = container = ui.column().classes(
@@ -218,30 +131,26 @@ class Application:
                     container.visible = False
                     with container:
                         view.create()
-
             self.show_view("home")
         except Exception as e:
             ui.notify(f"Error fatal al crear las vistas: {e}", type="negative")
+            log.exception("Failed to create views")
 
     async def cleanup(self):
-        """Closes the API client on shutdown."""
         if self.api_client:
             await self.api_client.close()
 
 
-# ---------------------------------------------------------------------
-# 3. APPLICATION LIFECYCLE
-# ---------------------------------------------------------------------
-
-app_instance: Application | None = None
 api_singleton = APIClient(config.API_BASE_URL)
+app_state_singleton = AppState(api_singleton)
+app_instance: Optional[Application] = None
 
 
 @ui.page("/")
 def main_page_entry():
-    """Main entry point for authenticated users."""
     global app_instance
-    app_instance = Application(api_client=api_singleton)
+    app_instance = Application(api_client=api_singleton, state=app_state_singleton)
+    ui.timer(0.2, app_state_singleton.initialize_global_data, once=True)
     app_instance.create_header()
     app_instance.create_views()
 
@@ -251,20 +160,14 @@ create_login_page(api_client=api_singleton)
 
 @app.on_shutdown
 async def shutdown_handler():
-    """Handle application shutdown gracefully."""
     if app_instance:
         await app_instance.cleanup()
-    elif api_singleton and api_singleton.client:
-        await api_singleton.close()
 
-
-# ---------------------------------------------------------------------
-# 4. MAIN ENTRY POINT
-# ---------------------------------------------------------------------
 
 if __name__ in {"__main__", "__mp_main__"}:
-    storage_secret = os.environ.get("NICEGUI_STORAGE_SECRET", "QTEGUR912430I10U")
-
+    storage_secret = os.environ.get(
+        "NICEGUI_STORAGE_SECRET", "a-secure-secret-key-here"
+    )
     ui.run(
         host=config.APP_HOST,
         port=config.APP_PORT,

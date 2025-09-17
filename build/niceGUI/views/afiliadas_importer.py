@@ -15,30 +15,34 @@ from config import IMPORTER_HEADER_MAP
 
 
 class AfiliadasImporterView:
-    """A view to import 'afiliadas' with live validation, sorting, and an editable preview."""
+    """A view to import 'afiliadas' using a shared state slice."""
 
-    def __init__(self, api_client: APIClient):
+    # --- THIS IS THE FIX ---
+    # The __init__ method now correctly accepts the state object.
+    def __init__(self, api_client: APIClient, state: GenericViewState):
         self.api = api_client
-        self.state = GenericViewState()
+        self.state = state  # Use the passed-in state slice
         self.afiliadas_panel: Optional[ui.column] = None
         self.pisos_panel: Optional[ui.column] = None
         self.facturacion_panel: Optional[ui.column] = None
         self.import_button: Optional[ui.button] = None
 
+    # ... (The rest of the file remains the same as the last feature-complete version) ...
     def create(self) -> ui.column:
         """Create the UI for the CSV importer view."""
         container = ui.column().classes("w-full p-4 gap-4")
         with container:
-            ui.label("Importar Nuevas Afiliadas desde CSV").classes("text-h4")
+            ui.label("Importar Nuevas Afiliadas desde CSV").classes(
+                "text-h6 font-italic"
+            )
             ui.markdown(
-                "Sube un archivo CSV. Los datos se validarán y se mostrarán en pestañas. "
-                "Las filas con errores se marcarán en rojo. Corrige los datos antes de importar."
+                "Sube un archivo CSV. Los datos se validarán y se mostrarán en pestañas."
             )
             with ui.row().classes("w-full gap-4 items-center"):
                 ui.upload(
                     on_upload=self._handle_upload,
                     auto_upload=True,
-                    label="Subir archivo afiliacion.csv",
+                    label="Subir archivo",
                 ).props('accept=".csv"')
                 self.import_button = ui.button(
                     "Iniciar Importación", icon="upload", on_click=self._start_import
@@ -78,21 +82,13 @@ class AfiliadasImporterView:
             ]
             self.state.set_records(records)
             self._render_preview_tabs()
-            ui.notify(
-                "Archivo procesado. Revisa y corrige los datos antes de importar.",
-                type="positive",
-            )
+            ui.notify("Archivo procesado.", type="positive")
         except Exception as ex:
-            ui.notify(
-                f"Error al procesar el archivo: {type(ex).__name__}: {ex}",
-                type="negative",
-            )
+            ui.notify(f"Error al procesar el archivo: {ex}", type="negative")
             self.state.set_records([])
             self._render_preview_tabs()
 
     def _transform_and_validate_row(self, row: pd.Series) -> Optional[Dict[str, Any]]:
-        """Transforms a single row, validates it, and adds validation status."""
-
         def _parse_date(date_str: str) -> Optional[str]:
             if not date_str:
                 return None
@@ -108,7 +104,6 @@ class AfiliadasImporterView:
             nombre = get_val(0).strip('<>"')
             if not nombre:
                 return None
-
             full_address = ", ".join(
                 filter(
                     None,
@@ -123,7 +118,6 @@ class AfiliadasImporterView:
                 )
             )
             final_address = re.sub(r"\s*,\s*", ", ", full_address).strip(" ,")
-
             afiliada_data = {
                 "nombre": nombre,
                 "apellidos": f"{get_val(2)} {get_val(3)}".strip(),
@@ -147,11 +141,9 @@ class AfiliadasImporterView:
                 "prop_vertical": get_val(20),
                 "fecha_firma": _parse_date(get_val(16)),
             }
-
             cuota_str = get_val(23) or get_val(24) or get_val(25)
             cuota_match = re.search(r"(\d+[\.,]?\d*)\s*€\s*(mes|año)", cuota_str)
             iban_raw = get_val(26).replace(" ", "")
-
             facturacion_data = {
                 "cuota": (
                     float(cuota_match.group(1).replace(",", "."))
@@ -165,7 +157,6 @@ class AfiliadasImporterView:
                 "iban": iban_raw.upper() if iban_raw else None,
                 "afiliada_id": None,
             }
-
             is_valid_afiliada, errors_afiliada = validator.validate_record(
                 "afiliadas", afiliada_data, "create"
             )
@@ -175,7 +166,6 @@ class AfiliadasImporterView:
             is_valid_facturacion, errors_facturacion = validator.validate_record(
                 "facturacion", facturacion_data, "create"
             )
-
             return {
                 "piso": piso_data,
                 "afiliada": afiliada_data,
@@ -191,7 +181,6 @@ class AfiliadasImporterView:
             return None
 
     def _render_preview_tabs(self):
-        """Render all preview panels."""
         self._render_panel(
             "afiliada",
             self.afiliadas_panel,
@@ -225,7 +214,6 @@ class AfiliadasImporterView:
         self._update_import_button_state()
 
     def _render_panel(self, data_key: str, panel: ui.column, fields: List[str]):
-        """Renders a single preview panel with sorting."""
         if not panel:
             return
         panel.clear()
@@ -273,13 +261,16 @@ class AfiliadasImporterView:
                 ) as row:
 
                     def update_row_style(r=row, rec=record):
-                        is_valid = rec["validation"]["is_valid"]
                         r.classes(
                             remove="bg-red-100 bg-green-50",
-                            add="bg-green-50" if is_valid else "bg-red-100",
+                            add=(
+                                "bg-green-50"
+                                if rec["validation"]["is_valid"]
+                                else "bg-red-100"
+                            ),
                         ).tooltip(
                             "\n".join(rec["validation"]["errors"])
-                            if not is_valid
+                            if not rec["validation"]["is_valid"]
                             else "Válido"
                         )
 
@@ -294,7 +285,8 @@ class AfiliadasImporterView:
 
                         def update_status_icon(rec=record, ic=status_icon):
                             is_valid = rec["validation"]["is_valid"]
-                            ic.name, ic.classes(
+                            ic.name = "check_circle" if is_valid else "cancel"
+                            ic.classes(
                                 remove="text-green-500 text-red-500",
                                 add="text-green-500" if is_valid else "text-red-500",
                             )
@@ -399,10 +391,13 @@ class AfiliadasImporterView:
         ]
         if not valid_records:
             return ui.notify("No hay datos válidos para importar.", "warning")
-
-        total, success_count = len(valid_records), 0
-        failed, full_log, new_afiliadas = [], [], []
-
+        total, success_count, failed, full_log, new_afiliadas = (
+            len(valid_records),
+            0,
+            [],
+            [],
+            [],
+        )
         with ui.dialog() as progress_dialog, ui.card().classes("min-w-[600px]"):
             ui.label("Iniciando Importación...").classes("text-h6")
             status = ui.label(f"Preparando {total} registros.")
@@ -411,7 +406,6 @@ class AfiliadasImporterView:
                 "w-full h-48 bg-gray-100 p-2 rounded"
             )
         progress_dialog.open()
-
         for i, record in enumerate(valid_records):
             name = f"{record['afiliada'].get('nombre')} {record['afiliada'].get('apellidos')}".strip()
             status.set_text(f"Procesando {i + 1}/{total}: {name}...")
@@ -424,7 +418,6 @@ class AfiliadasImporterView:
                     or [None]
                 )[0]
                 piso_id = piso["id"] if piso else None
-                # --- RESTORED: Detailed success logging ---
                 if piso_id:
                     log(f"ℹ️ Piso encontrado: {piso['direccion']}")
                 else:
@@ -435,7 +428,6 @@ class AfiliadasImporterView:
                         raise Exception(f"Piso: {p_err}")
                     piso_id = new_piso["id"]
                     log(f"➕ Piso creado: {new_piso['direccion']}")
-
                 record["afiliada"]["piso_id"] = piso_id
                 new_afiliada, a_err = await self.api.create_record(
                     "afiliadas", record["afiliada"], show_validation_errors=False
@@ -446,7 +438,6 @@ class AfiliadasImporterView:
                 log(
                     f"➕ Afiliada creada: {name} (Nº: {new_afiliada.get('num_afiliada')})"
                 )
-
                 record["facturacion"]["afiliada_id"] = new_afiliada["id"]
                 _, f_err = await self.api.create_record(
                     "facturacion", record["facturacion"], show_validation_errors=False
@@ -455,16 +446,13 @@ class AfiliadasImporterView:
                     log(f"⚠️ AVISO (Facturación): {name}: {f_err}")
                 else:
                     log(f"➕ Facturación añadida para {name}")
-
                 success_count += 1
             except Exception as e:
                 failed.append((name, str(e)))
                 log(f"❌ FALLO: {name} - {str(e)}")
             progress.value = (i + 1) / total
             await asyncio.sleep(0.01)
-
         progress_dialog.close()
-
         with ui.dialog() as summary_dialog, ui.card().classes(
             "min-w-[800px] max-w-[90vw]"
         ):
@@ -473,7 +461,6 @@ class AfiliadasImporterView:
                 ui.markdown(
                     f"✅ **Se importaron {success_count} de {total} registros exitosamente.**"
                 ).classes("text-positive")
-            # --- RESTORED: Detailed success table ---
             if new_afiliadas:
                 with ui.expansion("Ver Afiliadas Creadas", icon="person_add").classes(
                     "w-full"
@@ -534,6 +521,5 @@ class AfiliadasImporterView:
                 ).classes("w-full")
             ui.button("Aceptar", on_click=summary_dialog.close).classes("mt-4 self-end")
         summary_dialog.open()
-
         self.state.set_records([])
         self._render_preview_tabs()

@@ -1,29 +1,24 @@
-# /build/niceGUI/views/admin.py
 from typing import Dict, Any
 from nicegui import ui
 
 from api.client import APIClient
-
-from state.app_state import GenericViewState
-
+from state.app_state import AppState  # Updated import
 from components.data_table import DataTable
-from components.dialogs import EnhancedRecordDialog
+from components.dialogs import EnhancedRecordDialog, ConfirmationDialog
 from components.exporter import export_to_csv
 from components.importer import CSVImporterDialog
 from components.filters import FilterPanel
 from components.relationship_explorer import RelationshipExplorer
-
 from config import TABLE_INFO
 
 
 class AdminView:
     """Enhanced admin view for table management with client-side UX."""
 
-    def __init__(self, api_client: APIClient):
+    def __init__(self, api_client: APIClient, state: AppState):
         self.api = api_client
-        # --- CHANGE: Instantiate the new GenericViewState ---
-        self.state = GenericViewState()
-        self.data_table = None
+        self.state = state.admin  # Use the 'admin' slice from the central state
+        self.data_table_container = None
         self.detail_container = None
         self.filter_panel = None
         self.relationship_explorer = None
@@ -31,22 +26,24 @@ class AdminView:
     def create(self) -> ui.column:
         """Create the enhanced CRUD view UI."""
         container = ui.column().classes("w-full p-4 gap-4")
-
         with container:
             ui.label("Administración de Tablas y Registros BBDD").classes(
                 "text-h6 font-italic"
             )
-
             with ui.row().classes("w-full gap-4 items-center"):
-                # --- CHANGE: Bind the select component to the new 'selected_entity_name' property ---
                 ui.select(
                     options=list(TABLE_INFO.keys()),
                     label="Seleccionar Tabla",
                     on_change=lambda e: ui.timer(
                         0.1, lambda: self._load_table_data(e.value), once=True
                     ),
-                ).classes("w-64").bind_value_to(self.state.selected_entity_name)
+                ).classes("w-64").bind_value(self.state.selected_entity_name, "value")
 
+                ui.button(
+                    "Limpiar Selección", icon="clear_all", on_click=self._clear_view
+                ).props("color=grey-6")
+
+                # --- ALL ORIGINAL BUTTONS PRESERVED ---
                 ui.button(
                     "Refrescar", icon="refresh", on_click=self._refresh_data
                 ).props("color=orange-600")
@@ -66,58 +63,61 @@ class AdminView:
                 ).props("color=orange-600")
 
             self.state.filter_container = ui.column().classes("w-full")
-
-            self.data_table = DataTable(
-                state=self.state,
-                on_edit=self._edit_record,
-                on_delete=self._delete_record,
-                on_row_click=self._on_row_click,
-            )
-            self.data_table.create()
-
+            self.data_table_container = ui.column().classes("w-full")
             ui.separator().classes("my-4")
             self.detail_container = ui.column().classes("w-full")
-
             self.relationship_explorer = RelationshipExplorer(
                 self.api, self.detail_container
             )
-
         return container
 
-    async def _on_row_click(self, record: Dict):
-        """Handles a row click by invoking the RelationshipExplorer."""
-        # --- CHANGE: Get the table name from the new 'selected_entity_name' property ---
-        table_name = self.state.selected_entity_name.value
-        await self.relationship_explorer.show_details(
-            record, table_name, calling_view="admin"
-        )
-
-    async def _load_table_data(self, table_name: str = None):
+    def _clear_view(self):
+        """Clears the UI containers and calls the central state clearing method."""
+        self.state.clear_selection()
+        self.data_table_container.clear()
+        self.state.filter_container.clear()
         if self.detail_container:
             self.detail_container.clear()
 
-        # --- CHANGE: Get the table name from the new 'selected_entity_name' property ---
+    async def _load_table_data(self, table_name: str = None):
+        """Loads data and dynamically creates the data table."""
+        self.data_table_container.clear()
+        self.state.filter_container.clear()
+        if self.detail_container:
+            self.detail_container.clear()
+
         table = table_name or self.state.selected_entity_name.value
         if not table:
+            self.state.set_records([])
             return
 
-        spinner = ui.spinner(size="lg", color="orange-600").classes("absolute-center")
-        try:
-            records = await self.api.get_records(table, limit=5000)
-            self.state.set_records(records)
-            self._setup_filters()
-            self.data_table.refresh()
-            ui.notify(f"Se cargaron {len(records)} registros", type="positive")
-        except Exception as e:
-            ui.notify(f"Error al cargar datos: {str(e)}", type="negative")
-        finally:
-            spinner.delete()
+        with self.data_table_container:
+            spinner = ui.spinner(size="lg", color="orange-600").classes(
+                "absolute-center"
+            )
+            try:
+                records = await self.api.get_records(table, limit=5000)
+                self.state.set_records(records)
+                self._setup_filters()
+                DataTable(
+                    state=self.state,
+                    on_edit=self._edit_record,
+                    on_delete=self._delete_record,
+                    on_row_click=self._on_row_click,
+                ).create()
+            except Exception as e:
+                ui.notify(f"Error al cargar datos: {str(e)}", type="negative")
+            finally:
+                spinner.delete()
+
+    async def _on_row_click(self, record: Dict):
+        """Handles a row click by invoking the RelationshipExplorer."""
+        await self.relationship_explorer.show_details(
+            record, self.state.selected_entity_name.value, "admin"
+        )
 
     def _setup_filters(self):
-        if not self.state.filter_container or not self.state.records:
-            if self.state.filter_container:
-                self.state.filter_container.clear()
-            return
+        """Initializes the filter panel based on the loaded data."""
         self.state.filter_container.clear()
         with self.state.filter_container:
             self.filter_panel = FilterPanel(
@@ -126,25 +126,25 @@ class AdminView:
             self.filter_panel.create()
 
     def _update_filter(self, column: str, value: Any):
+        """Callback to update the state when a filter changes."""
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
-        self.data_table.refresh()
 
     def _clear_filters(self):
+        """Clears all active filters and refreshes the view."""
         self.state.filters.clear()
         if self.filter_panel:
             self.filter_panel.clear()
         self.state.apply_filters_and_sort()
-        self.data_table.refresh()
 
     async def _refresh_data(self):
-        await self._load_table_data()
+        """Reloads data for the currently selected table."""
+        await self._load_table_data(self.state.selected_entity_name.value)
 
     def _open_import_dialog(self):
-        # --- CHANGE: Use the new 'selected_entity_name' property ---
+        """Opens the CSV import dialog."""
         if not self.state.selected_entity_name.value:
-            ui.notify("Por favor, seleccione una tabla primero", type="warning")
-            return
+            return ui.notify("Por favor, seleccione una tabla primero", type="warning")
         dialog = CSVImporterDialog(
             api=self.api,
             table_name=self.state.selected_entity_name.value,
@@ -153,10 +153,9 @@ class AdminView:
         dialog.open()
 
     async def _create_record(self):
-        # --- CHANGE: Use the new 'selected_entity_name' property ---
+        """Opens a dialog to create a new record."""
         if not self.state.selected_entity_name.value:
-            ui.notify("Por favor, seleccione una tabla primero", type="warning")
-            return
+            return ui.notify("Por favor, seleccione una tabla primero", type="warning")
         dialog = EnhancedRecordDialog(
             api=self.api,
             table=self.state.selected_entity_name.value,
@@ -166,7 +165,7 @@ class AdminView:
         await dialog.open()
 
     async def _edit_record(self, record: Dict):
-        # --- CHANGE: Use the new 'selected_entity_name' property ---
+        """Opens a dialog to edit an existing record."""
         dialog = EnhancedRecordDialog(
             api=self.api,
             table=self.state.selected_entity_name.value,
@@ -177,31 +176,28 @@ class AdminView:
         await dialog.open()
 
     async def _delete_record(self, record: Dict):
+        """Shows a confirmation dialog before deleting a record."""
         record_id = record.get("id")
-        with ui.dialog() as dialog, ui.card():
-            ui.label(f"¿Eliminar registro #{record_id}?").classes("text-h6")
-            ui.label("Esta acción no se puede deshacer.").classes(
-                "text-body2 text-gray-600"
-            )
-            with ui.row().classes("w-full justify-end gap-2"):
-                ui.button("Cancelar", on_click=dialog.close).props("flat")
+        ConfirmationDialog(
+            title=f"¿Eliminar registro #{record_id}?",
+            message="Esta acción no se puede deshacer.",
+            on_confirm=lambda: self._confirm_delete(record_id),
+            confirm_button_text="Eliminar",
+            confirm_button_color="negative",
+        )
 
-                async def confirm():
-                    # --- CHANGE: Use the new 'selected_entity_name' property ---
-                    success = await self.api.delete_record(
-                        self.state.selected_entity_name.value, record_id
-                    )
-                    if success:
-                        ui.notify("Registro eliminado con éxito", type="positive")
-                        dialog.close()
-                        await self._refresh_data()
-
-                ui.button("Eliminar", on_click=confirm).props("color=negative")
-        dialog.open()
+    async def _confirm_delete(self, record_id: int):
+        """Performs the actual deletion after confirmation."""
+        if await self.api.delete_record(
+            self.state.selected_entity_name.value, record_id
+        ):
+            ui.notify("Registro eliminado con éxito", type="positive")
+            await self._refresh_data()
 
     def _export_data(self):
-        # --- CHANGE: Use the new 'selected_entity_name' property ---
-        export_to_csv(
-            self.state.filtered_records,
-            f"{self.state.selected_entity_name.value}_export.csv",
-        )
+        """Exports the currently filtered data to a CSV file."""
+        if self.state.selected_entity_name.value:
+            export_to_csv(
+                self.state.filtered_records,
+                f"{self.state.selected_entity_name.value}_export.csv",
+            )
