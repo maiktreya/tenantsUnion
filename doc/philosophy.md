@@ -97,7 +97,7 @@ At the host level, it is trivial to secure the system with a firewall and automa
 ```
 
 
-## Conclusion
+## Summarizing
 
 The database-centric architecture represents a conscious choice to prioritize pragmatism over architectural purity. It challenges the notion that more layers and more code equate to a better system.
 
@@ -106,3 +106,19 @@ The database-centric architecture represents a conscious choice to prioritize pr
 For the right project, this approach offers an unparalleled combination of development speed, runtime performance, data integrity, and the flexibility to handle any future requirement.
 
 It's time we stopped asking "Which ORM should we use?" and started asking, "How much of this can our database do for us, and what's the simplest way to handle the rest?"
+
+## 🎯 Is this my Crewd?
+
+This manifesto is not for every project. It’s perfect for:
+
+* CRUD-heavy apps (internal tools, data management, admin dashboards, membership/union systems).
+
+* Small/medium teams that want to deliver value fast without drowning in boilerplate.
+
+Teams already comfortable with SQL and PostgreSQL.
+
+It will feel risky to:
+
+* Large enterprises with strict separation-of-concerns dogma.
+
+* Teams where most devs are frontend-first and don’t want to touch SQL.
