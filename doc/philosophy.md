@@ -34,8 +34,8 @@ The result: faster delivery, fewer moving parts, and stronger guarantees.
 * Fewer layers = less code, less overhead, less debugging.
 * Runtime is lean Postgres + a stateless PostgREST server.
 * Config-driven validation with minimalistic schema mapping.
-* Minimal full CRUD  API client with flexible generics.
-* Singletons for a centralized async API & a reactive state managements + 
+* Minimal full CRUD API client with flexible generics & integrated validation logic.
+* Singletons: the async API & reactive UI state fully centralized. 
 ---
 
 ## Escape Hatch Pragmatism 🛠️
