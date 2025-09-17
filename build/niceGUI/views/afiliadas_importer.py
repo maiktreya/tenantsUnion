@@ -1,4 +1,3 @@
-# /build/niceGUI/views/afiliadas_importer.py
 import pandas as pd
 import io
 import re
@@ -16,9 +15,9 @@ from config import IMPORTER_HEADER_MAP
 class AfiliadasImporterView:
     """A view to import 'afiliadas' with live validation, sorting, and an editable preview."""
 
-    def __init__(self, api_client: APIClient, state: GenericViewState):
+    def __init__(self, api_client: APIClient):
         self.api = api_client
-        self.state = state
+        self.state = GenericViewState()
         self.afiliadas_panel: Optional[ui.column] = None
         self.pisos_panel: Optional[ui.column] = None
         self.facturacion_panel: Optional[ui.column] = None
@@ -112,19 +111,24 @@ class AfiliadasImporterView:
             def get_val(index):
                 return "" if pd.isna(row.get(index)) else str(row.get(index)).strip()
 
-            nombre = get_val(0).strip("<").strip('"')
+            nombre = get_val(0).strip('<>"')
             if not nombre:
                 return None
 
-            main_address = f"{get_val(9)}, {get_val(10)} {get_val(11)}".strip()
-            floor_details = get_val(12).strip()
-            full_address = (
-                f"{main_address}, {floor_details}" if floor_details else main_address
+            full_address = ", ".join(
+                filter(
+                    None,
+                    [
+                        get_val(9),
+                        get_val(10),
+                        get_val(11),
+                        get_val(12),
+                        get_val(14),
+                        get_val(13),
+                    ],
+                )
             )
-            municipio = get_val(13)
-            cp = get_val(14)
-            final_address = f"{full_address}, {cp}, {municipio}"
-            final_address = re.sub(r"\s+", " ", final_address).strip().strip(",")
+            final_address = re.sub(r"\s*,\s*", ", ", full_address).strip(" ,")
 
             afiliada_data = {
                 "nombre": nombre,
@@ -137,31 +141,32 @@ class AfiliadasImporterView:
                 "fecha_alta": date.today().isoformat(),
                 "regimen": get_val(17),
                 "estado": "Alta",
-                "trato_propiedad": bool(get_val(18)),
+                "trato_propiedad": (
+                    True if get_val(18).lower() in ["true", "si", "1"] else False
+                ),
                 "piso_id": None,
             }
 
             piso_data = {
                 "direccion": final_address,
-                "municipio": municipio,
-                "cp": int(cp) if cp.isdigit() else None,
+                "municipio": get_val(13),
+                "cp": int(get_val(14)) if get_val(14).isdigit() else None,
                 "n_personas": int(get_val(15)) if get_val(15).isdigit() else None,
                 "inmobiliaria": get_val(18),
-                "prop_vertical": bool(get_val(20)),
+                "prop_vertical": get_val(20),
                 "fecha_firma": _parse_date(get_val(16)),
             }
 
-            cuota_type = get_val(22)
-            cuota_str = (
-                get_val(23)
-                if cuota_type == "Cuota de Apoyo"
-                else get_val(24) if cuota_type == "Cuota Sindical" else get_val(25)
-            )
-            cuota_match = re.search(r"(\d+)\s*€\s*(mes|año)", cuota_str)
+            cuota_str = get_val(23) or get_val(24) or get_val(25)
+            cuota_match = re.search(r"(\d+[\.,]?\d*)\s*€\s*(mes|año)", cuota_str)
             iban_raw = get_val(26).replace(" ", "")
 
             facturacion_data = {
-                "cuota": float(cuota_match.group(1)) if cuota_match else 0.0,
+                "cuota": (
+                    float(cuota_match.group(1).replace(",", "."))
+                    if cuota_match
+                    else 0.0
+                ),
                 "periodicidad": (
                     12 if cuota_match and cuota_match.group(2) == "año" else 1
                 ),
@@ -192,7 +197,6 @@ class AfiliadasImporterView:
                 },
             }
         except Exception as e:
-            print(f"Skipping row due to parsing error: {e}")
             return None
 
     def _render_preview_tabs(self):
@@ -208,7 +212,6 @@ class AfiliadasImporterView:
                 "telefono",
                 "fecha_nac",
                 "trato_propiedad",
-                "fecha_alta",
             ],
         )
         self._render_panel(
@@ -221,7 +224,6 @@ class AfiliadasImporterView:
                 "n_personas",
                 "inmobiliaria",
                 "prop_vertical",
-                "fecha_firma",
             ],
         )
         self._render_panel(
@@ -232,72 +234,64 @@ class AfiliadasImporterView:
         self._update_import_button_state()
 
     def _render_panel(self, data_key: str, panel: ui.column, fields: List[str]):
-        """Generic function to render a preview panel."""
         if not panel:
             return
         panel.clear()
-
         with panel, ui.scroll_area().classes("w-full h-[32rem]"):
-            # Header Row
             with ui.row().classes(
-                "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 rounded-t-md items-center no-wrap sticky top-0 z-10"
+                "w-full font-bold text-gray-600 gap-2 p-2 bg-gray-50 items-center no-wrap sticky top-0 z-10"
             ):
                 ui.label("Acciones").classes("w-16 min-w-[4rem]")
                 ui.label("Estado").classes("w-24 min-w-[6rem]")
                 ui.label("Afiliada").classes("w-48 min-w-[12rem]")
                 for field in fields:
-                    width_class = (
+                    width = (
                         "flex-grow min-w-[15rem]"
                         if field in ["email", "direccion", "iban"]
                         else "w-32 min-w-[8rem]"
                     )
                     ui.label(IMPORTER_HEADER_MAP.get(field, field.title())).classes(
-                        width_class
+                        width
                     )
 
-            # Data Rows
             for record in self.state.records:
-                if "ui_updaters" not in record:
-                    record["ui_updaters"] = {}
-
+                record.setdefault("ui_updaters", {})
                 with ui.row().classes(
                     "w-full items-center gap-2 p-2 border-t no-wrap"
                 ) as row:
 
                     def update_row_style(r=row, rec=record):
                         is_valid = rec["validation"]["is_valid"]
-                        errors = rec["validation"]["errors"]
                         r.classes(
                             remove="bg-red-100 bg-green-50",
                             add="bg-green-50" if is_valid else "bg-red-100",
                         )
                         r.tooltip(
-                            "\n".join(errors) if not is_valid else "Registro válido"
+                            "\n".join(rec["validation"]["errors"])
+                            if not is_valid
+                            else "Registro válido"
                         )
 
                     record["ui_updaters"][data_key] = update_row_style
 
-                    with ui.column().classes(
-                        "w-16 min-w-[4rem] flex items-center justify-center"
-                    ):
+                    with ui.column().classes("w-16 min-w-[4rem] items-center"):
                         ui.button(
                             icon="delete",
                             on_click=lambda r=record: self._drop_record(r),
-                        ).props("size=sm flat dense color=negative").tooltip(
-                            "Eliminar esta fila"
-                        )
+                        ).props("size=sm flat dense color=negative")
 
-                    with ui.column().classes(
-                        "w-24 min-w-[6rem] flex items-center justify-center"
-                    ):
+                    with ui.column().classes("w-24 min-w-[6rem] items-center"):
                         status_icon = ui.icon("placeholder")
 
                         def update_status_icon(rec=record, ic=status_icon):
                             is_valid = rec["validation"]["is_valid"]
-                            ic.name = "check_circle" if is_valid else "cancel"
+                            ic.name, ic_color = (
+                                ("check_circle", "text-green-500")
+                                if is_valid
+                                else ("cancel", "text-red-500")
+                            )
                             ic.classes(
-                                remove="text-green-500 text-red-500",
-                                add="text-green-500" if is_valid else "text-red-500",
+                                remove="text-green-500 text-red-500", add=ic_color
                             )
 
                         record["ui_updaters"][
@@ -305,44 +299,28 @@ class AfiliadasImporterView:
                         ] = update_status_icon
                         update_status_icon()
 
-                    afiliada_label = f"{record['afiliada']['nombre']} {record['afiliada']['apellidos']}"
-                    ui.label(afiliada_label).classes(
-                        "w-48 min-w-[12rem] text-sm text-gray-600"
-                    )
-
+                    ui.label(
+                        f"{record['afiliada']['nombre']} {record['afiliada']['apellidos']}"
+                    ).classes("w-48 min-w-[12rem] text-sm")
                     for field in fields:
-                        value = record[data_key].get(field)
-                        input_element = (
-                            ui.number(label=None, format="%.0f")
-                            if field in ["cp", "n_personas"]
-                            else (
-                                ui.checkbox()
-                                if isinstance(value, bool)
-                                else ui.input(label=None)
-                            )
-                        )
-                        width_class = (
+                        width = (
                             "flex-grow min-w-[15rem]"
                             if field in ["email", "direccion", "iban"]
                             else "w-32 min-w-[8rem]"
                         )
-                        input_element.bind_value(record[data_key], field).classes(
-                            width_class
-                        )
-                        input_element.on(
+                        ui.input(value=record[data_key].get(field)).classes(
+                            width
+                        ).bind_value(record[data_key], field).on(
                             "change", lambda r=record: self._revalidate_record(r)
                         )
-
                 update_row_style()
 
     def _drop_record(self, record_to_drop: Dict):
-        """Removes a record from the state and refreshes the UI."""
         self.state.records.remove(record_to_drop)
         self._render_preview_tabs()
         ui.notify("Fila eliminada de la importación.", type="info")
 
     def _revalidate_record(self, record: Dict):
-        """Re-validates a single record and updates its UI."""
         is_valid_afiliada, errors_afiliada = validator.validate_record(
             "afiliadas", record["afiliada"], "create"
         )
@@ -352,36 +330,31 @@ class AfiliadasImporterView:
         is_valid_facturacion, errors_facturacion = validator.validate_record(
             "facturacion", record["facturacion"], "create"
         )
-
-        record["validation"]["is_valid"] = (
-            is_valid_afiliada and is_valid_piso and is_valid_facturacion
+        record["validation"].update(
+            {
+                "is_valid": is_valid_afiliada
+                and is_valid_piso
+                and is_valid_facturacion,
+                "errors": errors_afiliada + errors_piso + errors_facturacion,
+            }
         )
-        record["validation"]["errors"] = (
-            errors_afiliada + errors_piso + errors_facturacion
-        )
-
-        if "ui_updaters" in record:
-            for updater in record["ui_updaters"].values():
-                updater()
-
+        for updater in record["ui_updaters"].values():
+            updater()
         self._update_import_button_state()
 
     def _update_import_button_state(self):
-        """Enables or disables the import button based on validation status."""
         if self.import_button:
             all_valid = all(r["validation"]["is_valid"] for r in self.state.records)
             self.import_button.set_enabled(all_valid and bool(self.state.records))
 
     async def _start_import(self):
-        """Starts the import process, capturing and displaying detailed, record-specific errors."""
         valid_records = [
             r
             for r in self.state.records
             if r.get("validation", {}).get("is_valid", False)
         ]
         if not valid_records:
-            ui.notify("No hay datos válidos para importar.", "warning")
-            return
+            return ui.notify("No hay datos válidos para importar.", "warning")
 
         total_records, success_count = len(valid_records), 0
         failed_records: List[Tuple[str, str]] = []
@@ -389,9 +362,7 @@ class AfiliadasImporterView:
 
         with ui.dialog() as progress_dialog, ui.card().classes("min-w-[600px]"):
             ui.label("Iniciando Importación...").classes("text-h6")
-            status_label = ui.label(
-                f"Preparando para importar {total_records} registros válidos."
-            )
+            status_label = ui.label(f"Preparando {total_records} registros.")
             progress = ui.linear_progress(0).classes("w-full my-2")
             live_log = ui.log(max_lines=10).classes(
                 "w-full h-48 bg-gray-100 p-2 rounded"
@@ -399,10 +370,7 @@ class AfiliadasImporterView:
         progress_dialog.open()
 
         for i, record in enumerate(valid_records):
-            afiliada_name = (
-                f"{record['afiliada'].get('nombre', '')} {record['afiliada'].get('apellidos', '')}".strip()
-                or f"Registro #{i+1}"
-            )
+            afiliada_name = f"{record['afiliada'].get('nombre')} {record['afiliada'].get('apellidos')}".strip()
             status_label.set_text(
                 f"Procesando {i + 1}/{total_records}: {afiliada_name}..."
             )
@@ -412,55 +380,49 @@ class AfiliadasImporterView:
             )
 
             try:
-                piso_id = None
                 existing_pisos = await self.api.get_records(
                     "pisos", {"direccion": f'eq.{record["piso"]["direccion"]}'}
                 )
-                if existing_pisos:
-                    piso_id = existing_pisos[0]["id"]
-                    log_message(f"ℹ️ Piso encontrado: {record['piso']['direccion']}")
-                else:
+                piso_id = existing_pisos[0]["id"] if existing_pisos else None
+
+                if not piso_id:
                     new_piso, piso_error = await self.api.create_record(
-                        "pisos", record["piso"]
+                        "pisos", record["piso"], show_validation_errors=False
                     )
                     if piso_error:
-                        raise Exception(f"Creación de piso fallida: {piso_error}")
+                        raise Exception(f"Piso: {piso_error}")
                     piso_id = new_piso["id"]
                     log_message(f"➕ Piso creado: {record['piso']['direccion']}")
+                else:
+                    log_message(f"ℹ️ Piso encontrado: {record['piso']['direccion']}")
 
                 record["afiliada"]["piso_id"] = piso_id
                 new_afiliada, afiliada_error = await self.api.create_record(
-                    "afiliadas", record["afiliada"]
+                    "afiliadas", record["afiliada"], show_validation_errors=False
                 )
                 if afiliada_error:
-                    raise Exception(f"Creación de afiliada fallida: {afiliada_error}")
-
+                    raise Exception(f"Afiliada: {afiliada_error}")
                 new_afiliadas.append(new_afiliada)
-                log_message(
-                    f"➕ Afiliada creada: {afiliada_name} ({new_afiliada.get('num_afiliada')})"
-                )
+                log_message(f"➕ Afiliada creada: {afiliada_name}")
 
                 record["facturacion"]["afiliada_id"] = new_afiliada["id"]
                 _, facturacion_error = await self.api.create_record(
-                    "facturacion", record["facturacion"]
+                    "facturacion", record["facturacion"], show_validation_errors=False
                 )
                 if facturacion_error:
-                    log_message(
-                        f"⚠️ AVISO: No se pudo crear la facturación para {afiliada_name}: {facturacion_error}"
-                    )
+                    log_message(f"⚠️ AVISO: {afiliada_name}: {facturacion_error}")
                 else:
                     log_message(f"➕ Facturación añadida para {afiliada_name}")
 
                 success_count += 1
-                log_message(f"✅ ÉXITO: {afiliada_name} importada completamente.")
-
+                log_message(f"✅ ÉXITO: {afiliada_name} importada.")
             except Exception as e:
                 error_msg = str(e)
                 failed_records.append((afiliada_name, error_msg))
                 log_message(f"❌ FALLO: {afiliada_name} - {error_msg}")
 
             progress.value = (i + 1) / total_records
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.01)
 
         progress_dialog.close()
 
@@ -474,19 +436,10 @@ class AfiliadasImporterView:
                 ui.markdown(
                     f"❌ **Fallaron {len(failed_records)} de {total_records} registros.**"
                 ).classes("text-negative")
-
-            with ui.expansion(
-                "Ver Registro Completo del Proceso", icon="article"
-            ).classes("w-full"):
-                ui.textarea(value="\n".join(full_log_messages)).props(
-                    "readonly outlined rows=15"
-                ).classes("w-full")
-
-            if failed_records:
                 with ui.expansion(
                     "Ver Resumen de Errores", icon="report_problem", value=True
                 ).classes("w-full"):
-                    with ui.table(
+                    ui.table(
                         columns=[
                             {
                                 "name": "afiliada",
@@ -499,6 +452,7 @@ class AfiliadasImporterView:
                                 "label": "Razón del Fallo",
                                 "field": "error",
                                 "align": "left",
+                                "style": "white-space: normal;",
                             },
                         ],
                         rows=[
@@ -506,11 +460,16 @@ class AfiliadasImporterView:
                             for name, reason in failed_records
                         ],
                         row_key="afiliada",
-                    ).classes("w-full"):
-                        pass
+                    ).classes("w-full")
 
-            with ui.row().classes("w-full justify-end mt-4"):
-                ui.button("Aceptar", on_click=summary_dialog.close)
+            with ui.expansion(
+                "Ver Registro Completo del Proceso", icon="article"
+            ).classes("w-full"):
+                ui.textarea(value="\n".join(full_log_messages)).props(
+                    "readonly outlined rows=10"
+                ).classes("w-full")
+
+            ui.button("Aceptar", on_click=summary_dialog.close).classes("mt-4 self-end")
         summary_dialog.open()
 
         self.state.set_records([])

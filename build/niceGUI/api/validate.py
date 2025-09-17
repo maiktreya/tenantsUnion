@@ -1,9 +1,9 @@
 # /build/niceGUI/api/validate.py
 
 from typing import Dict, Any, List, Tuple
-from config import TABLE_INFO
 import re
 from datetime import datetime
+from config import TABLE_INFO
 
 
 class TableValidator:

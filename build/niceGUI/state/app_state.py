@@ -3,12 +3,14 @@
 from typing import List, Dict
 from .base import BaseTableState, ReactiveValue
 
+
 class GenericViewState(BaseTableState):
     """
     A centralized, generic state manager for views that display lists of records.
     This replaces the need for separate AdminState and ViewsState classes,
     promoting code reuse and a single source of truth for table logic.
     """
+
     def __init__(self):
         super().__init__()
         # A reactive value to hold the name of the currently selected entity (e.g., table or view name)

@@ -27,6 +27,22 @@ class APIClient:
     #  CORE CRUD OPERATIONS WITH ENHANCED ERROR HANDLING
     # =====================================================================
 
+
+class APIClient:
+    """
+    Enhanced PostgREST API client with config-driven validation.
+    """
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+        self.client: Optional[httpx.AsyncClient] = None
+
+    def _ensure_client(self) -> httpx.AsyncClient:
+        """Ensure the HTTP client is initialized."""
+        if self.client is None:
+            self.client = httpx.AsyncClient(timeout=30.0)
+        return self.client
+
     async def get_records(
         self,
         table: str,
@@ -68,10 +84,7 @@ class APIClient:
 
             return records
         except httpx.HTTPStatusError as e:
-            log.error(
-                f"HTTP Error getting records from '{table}': Status {e.response.status_code}",
-                exc_info=True,
-            )
+            log.error(f"HTTP Error getting records from '{table}'", exc_info=True)
             ui.notify(
                 f"Error HTTP {e.response.status_code}: {e.response.text}",
                 type="negative",
@@ -87,13 +100,21 @@ class APIClient:
         table: str,
         data: Dict,
         validate: bool = True,
+        show_validation_errors: bool = True,
     ) -> Tuple[Optional[Dict], Optional[str]]:
         """
-        Create a new record, returning the record and a detailed error message on failure.
+        Create a new record.
+        Returns a tuple: (record_data, error_message).
+        On success, error_message is None.
+        On failure, record_data is None.
         """
         if validate:
             is_valid, errors = validator.validate_record(table, data, "create")
             if not is_valid:
+                if show_validation_errors:
+                    ui.notify(
+                        f'Validation errors: {"; ".join(errors)}', type="negative"
+                    )
                 return None, f'Validation failed: {"; ".join(errors)}'
 
         client = self._ensure_client()
@@ -104,7 +125,9 @@ class APIClient:
             response = await client.post(url, json=data, headers=headers)
             response.raise_for_status()
             result = response.json()
-            created_record = result[0] if isinstance(result, list) else result
+            created_record = (
+                result[0] if isinstance(result, list) and result else result
+            )
             return created_record, None
 
         except httpx.HTTPStatusError as e:
@@ -129,18 +152,17 @@ class APIClient:
                             None,
                             "Error de Duplicado: Ya existe un piso con esta dirección.",
                         )
-                    return (
-                        None,
-                        f"Error de Duplicado: El registro ya existe. ({message})",
-                    )
+                    return None, f"Error de Duplicado: El registro ya existe."
 
                 return None, f"Error de Base de Datos: {message}"
-
             except Exception:
                 return None, f"Error HTTP {e.response.status_code}: {e.response.text}"
-
         except Exception as e:
-            log.error(f"Error creating record in '{table}'", exc_info=True)
+            log.error(
+                f"Error creating record in '{table}' with data: {data}", exc_info=True
+            )
+            if show_validation_errors:
+                ui.notify(f"Error al crear registro: {str(e)}", type="negative")
             return None, f"Error Inesperado: {str(e)}"
 
     async def update_record(
@@ -175,17 +197,15 @@ class APIClient:
             response = await client.patch(url, json=data, headers=headers)
             response.raise_for_status()
             result = response.json()
-            updated_record = (
-                result[0] if isinstance(result, list) and result else result
-            )
+            updated_record = result[0] if isinstance(result, list) else result
 
-            if validate and updated_record:
+            if validate:
                 is_valid, errors = validator.validate_record(
                     table, updated_record, "read"
                 )
                 if not is_valid and show_validation_errors:
                     ui.notify(
-                        f'Warning - Updated record has validation issues: {"; ".join(errors)}',
+                        f'Warning - Updated record has issues: {"; ".join(errors)}',
                         type="warning",
                     )
             return updated_record
@@ -211,6 +231,12 @@ class APIClient:
             )
             ui.notify(f"Error al eliminar registro: {str(e)}", type="negative")
             return False
+
+    async def close(self):
+        """Close the HTTP client."""
+        if self.client:
+            await self.client.aclose()
+            self.client = None
 
     # =====================================================================
     #  ENHANCED UTILITY METHODS
