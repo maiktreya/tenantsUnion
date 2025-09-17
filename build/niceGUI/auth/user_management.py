@@ -1,7 +1,8 @@
 from typing import Dict, List
 from nicegui import ui
-from api.client import APIClient
 from passlib.context import CryptContext
+
+from api.client import APIClient
 from components.base_view import BaseView
 
 # Use the same password context as your login system
