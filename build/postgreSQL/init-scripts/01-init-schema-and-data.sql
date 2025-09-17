@@ -253,7 +253,8 @@ CREATE TABLE staging_usuarios (
     correo_electronico TEXT,
     telefono TEXT,
     grupo_por_defecto TEXT,
-    grupos TEXT
+    grupos TEXT,
+    roles TEXT
 );
 
 -- =====================================================================
@@ -429,7 +430,7 @@ INSERT INTO
         apellidos,
         email
     )
-SELECT codigo, nombre, apellidos, NULLIF(correo_electronico, ''),
+SELECT codigo, nombre, apellidos, NULLIF(correo_electronico, '')
 FROM staging_usuarios
 ON CONFLICT (alias) DO NOTHING;
 
