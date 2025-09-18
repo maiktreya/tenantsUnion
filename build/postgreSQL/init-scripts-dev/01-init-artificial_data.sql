@@ -497,12 +497,8 @@ VALUES (
         'Gestor de conflictos y afiliadas'
     ),
     (
-        'técnico',
+        'actas',
         'Técnico para asesorías'
-    ),
-    (
-        'usuario',
-        'Usuario básico del sistema'
     )
 ON CONFLICT (nombre) DO NOTHING;
 
@@ -806,38 +802,17 @@ VALUES (
         TRUE
     ),
     (
-        'admin',
-        'Administrador',
-        'Sistema',
-        'admin@inquilinato.org',
+        'gestor',
+        'test',
+        'test',
+        'test@inquilinato.org',
         TRUE
     ),
     (
-        'gestor1',
-        'Laura',
-        'Gómez',
-        'laura.gomez@inquilinato.org',
-        TRUE
-    ),
-    (
-        'tecnico1',
-        'Miguel',
-        'López',
-        'miguel.lopez@inquilinato.org',
-        TRUE
-    ),
-    (
-        'usuario1',
-        'Ana',
-        'Martínez',
-        'ana.martinez@inquilinato.org',
-        TRUE
-    ),
-    (
-        'usuario2',
-        'Carlos',
-        'Sánchez',
-        'carlos.sanchez@inquilinato.org',
+        'actas',
+        'test',
+        'test',
+        'actas@inquilinato.org',
         TRUE
     );
 
@@ -850,34 +825,19 @@ VALUES (
     ),
     (
         2,
-        '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
+        '$2 b$12$J23QHdoGZ434MQIZH7FwEew.VMDftluCBEugd8LKLIE3B8NCuGKy6'
     ),
     (
         3,
-        '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-    ),
-    (
-        4,
-        '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-    ),
-    (
-        5,
-        '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
-    ),
-    (
-        6,
-        '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
+        '$2b$12$.2k0jdsNjg6J/lcZL1WBkej85pFdSTq2NWdFBjPgfZ7EXjAbjoSei'
     );
 
 -- Asignar roles a usuarios
 INSERT INTO
     usuario_roles (usuario_id, role_id)
 VALUES (1, 1),
-    (2, 1),
-    (3, 2),
-    (4, 3),
-    (5, 4),
-    (6, 4);
+    (2, 2),
+    (3, 3);
 
 -- Crear afiliadas
 -- Ajuste: usamos fecha_nac (en lugar de fecha_nacimiento) y mantenemos seccion_sindical/comision
@@ -1048,7 +1008,7 @@ INSERT INTO
     )
 VALUES (
         1,
-        4,
+        2,
         'Completada',
         '2024-11-15',
         'Inquilina',
@@ -1057,7 +1017,7 @@ VALUES (
     ),
     (
         2,
-        4,
+        2,
         'En proceso',
         '2024-12-01',
         'Inquilina',
@@ -1066,7 +1026,7 @@ VALUES (
     ),
     (
         4,
-        4,
+        3,
         'Completada',
         '2024-10-20',
         'Inquilina',

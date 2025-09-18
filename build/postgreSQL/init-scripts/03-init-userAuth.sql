@@ -34,7 +34,7 @@ INSERT INTO
 SELECT id
 FROM sindicato_inq.usuarios
 WHERE
-    id NOT IN(
+    id NOT IN (
         SELECT usuario_id
         FROM sindicato_inq.usuario_credenciales
     );
@@ -45,23 +45,46 @@ INSERT INTO
 VALUES (
         'admin',
         'Administrador con todos los permisos'
-    );
-
-INSERT INTO
-    sindicato_inq.roles (nombre, descripcion)
-VALUES (
+    ),
+    (
         'gestor',
         'Gestor de conflictos y afiliadas'
-    );
-
-INSERT INTO
-    sindicato_inq.roles (nombre, descripcion)
-VALUES (
+    ),
+    (
         'actas',
         'Perfil básico para gestionar actas y documentos'
     );
 
--- Assign the 'admin' role to the first user (assumed to be the superuser)
+INSERT INTO
+    usuarios (
+        alias,
+        nombre,
+        apellidos,
+        email,
+        is_active
+    )
+VALUES (
+        'gestor',
+        'test',
+        'test',
+        'gestor@inquilinato.org',
+        TRUE
+    ),
+    (
+        'actas',
+        'test',
+        'test',
+        'actas@inquilinato.org',
+        TRUE
+    );
+
+INSERT INTO
+    sindicato_inq.usuario_roles (usuario_id, role_id)
+VALUES (1, 1),
+    (14, 2),
+    (15, 3);
+
+-- Assign the 'admin' role to the first user (assumed to be the superuser) & the two additional roles created
 -- and reset their password to "12345678" (hashed).
 
 UPDATE sindicato_inq.usuario_credenciales
@@ -70,6 +93,14 @@ SET
 WHERE
     usuario_id = 1;
 
-INSERT INTO
-    sindicato_inq.usuario_roles (usuario_id, role_id)
-VALUES (1, 1);
+UPDATE sindicato_inq.usuario_credenciales
+SET
+    password_hash = '$2 b$12$J23QHdoGZ434MQIZH7FwEew.VMDftluCBEugd8LKLIE3B8NCuGKy6'
+WHERE
+    usuario_id = 15;
+
+UPDATE sindicato_inq.usuario_credenciales
+SET
+    password_hash = '$2b$12$.2k0jdsNjg6J/lcZL1WBkej85pFdSTq2NWdFBjPgfZ7EXjAbjoSei'
+WHERE
+    usuario_id = 14;
