@@ -341,7 +341,10 @@ VIEW_INFO = {
         "base_table": "conflictos",
         "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
-    "comprobar_link_pisos_bloques": {"display_name": "Comprobar Vínculo Pisos-Bloques"},
+    "comprobar_link_pisos_bloques": {
+        "display_name": "Comprobar Vínculo Pisos-Bloques",
+        "base_table": "pisos",
+    },
 }
 
 # =====================================================================

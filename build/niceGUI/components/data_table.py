@@ -1,3 +1,5 @@
+# build/niceGUI/components/data_table.py (Corrected)
+
 from typing import List, Optional, Callable
 from nicegui import ui, events
 from state.base import BaseTableState
@@ -13,24 +15,21 @@ class DataTable:
         on_delete: Optional[Callable] = None,
         on_row_click: Optional[Callable] = None,
         show_actions: bool = True,
-        hidden_columns: Optional[List[str]] = None,  # <-- ADDED
+        hidden_columns: Optional[List[str]] = None,
     ):
         self.state = state
         self.on_edit = on_edit
         self.on_delete = on_delete
         self.on_row_click = on_row_click
         self.show_actions = show_actions
-        self.hidden_columns = hidden_columns or []  # <-- ADDED
+        self.hidden_columns = hidden_columns or []
+        self.container = None  # Initialize container attribute
 
     def create(self) -> ui.column:
-        """Create the table UI."""
+        """Create the table UI's container and initial render."""
         self.container = ui.column().classes("w-full")
         self.refresh()
-
-        # Subscribe to state changes to automatically refresh the table
-        self.state.current_page.subscribe(lambda _: self.refresh())
-        self.state.page_size.subscribe(lambda _: self.refresh())
-
+        # REFACTOR: Subscriptions are removed. The parent view will call refresh() explicitly.
         return self.container
 
     def refresh(self):
@@ -41,6 +40,7 @@ class DataTable:
         self.container.clear()
 
         with self.container:
+            # This logic is now guaranteed to run whenever refresh() is called.
             records = self.state.get_paginated_records()
 
             if not self.state.records:
@@ -55,17 +55,14 @@ class DataTable:
                 ui.label("Ningún registro coincide con los filtros actuales.").classes(
                     "text-gray-500"
                 )
+                self._create_pagination()  # Show pagination even if no results
                 return
 
             if records:
-                # --- MODIFICATION START ---
-                # Filter columns to be displayed by removing hidden ones
                 all_columns = list(records[0].keys())
                 columns = [col for col in all_columns if col not in self.hidden_columns]
-                # --- MODIFICATION END ---
 
                 with ui.card().classes("w-full"):
-                    # Table Header
                     with ui.row().classes("w-full bg-gray-100 p-2 items-center"):
                         for column in columns:
                             with ui.row().classes(
@@ -101,7 +98,6 @@ class DataTable:
                         if self.show_actions:
                             ui.label("Acciones").classes("font-bold w-32 text-center")
 
-                    # Table Rows
                     for record in records:
                         row_classes = (
                             "w-full border-b p-2 hover:bg-gray-50 items-center"
@@ -110,7 +106,7 @@ class DataTable:
                             row_classes += " cursor-pointer"
 
                         with ui.row().classes(row_classes) as row:
-                            for column in columns:  # Use the filtered columns list
+                            for column in columns:
                                 value = record.get(column, "")
                                 display_value = (
                                     value if value is not None and value != "" else "-"
@@ -140,7 +136,6 @@ class DataTable:
                         if self.on_row_click:
                             row.on("click", lambda r=record: self.on_row_click(r))
 
-            # Pagination Controls
             if self.state.get_total_pages() > 1:
                 self._create_pagination()
 
@@ -152,11 +147,9 @@ class DataTable:
         )
 
         if not is_shift_key:
-            # If shift is not pressed, this becomes the only sort criterion
             new_direction = not existing_criterion[1] if existing_criterion else True
             self.state.sort_criteria = [(column, new_direction)]
         else:
-            # If shift is pressed, add to or modify the existing sort criteria
             if existing_criterion:
                 idx = self.state.sort_criteria.index(existing_criterion)
                 self.state.sort_criteria[idx] = (column, not existing_criterion[1])
@@ -212,3 +205,4 @@ class DataTable:
         total_pages = self.state.get_total_pages()
         if page_num and 1 <= page_num <= total_pages:
             self.state.current_page.set(page_num)
+        self.refresh()

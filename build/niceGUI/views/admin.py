@@ -1,4 +1,4 @@
-# build/niceGUI/views/admin.py
+# build/niceGUI/views/admin.py (Minimal Fix)
 
 from typing import Dict, Any
 from nicegui import ui
@@ -26,7 +26,6 @@ class AdminView(BaseView):
         self.detail_container = None
         self.filter_panel = None
         self.relationship_explorer = None
-        # --- FIX: The view, not the state, will own the filter container ---
         self.filter_container = None
 
     def create(self) -> ui.column:
@@ -69,7 +68,6 @@ class AdminView(BaseView):
                     "Importar CSV", icon="upload", on_click=self._open_import_dialog
                 ).props("color=orange-600")
 
-            # --- FIX: Assign the UI element to the view's attribute ---
             self.filter_container = ui.column().classes("w-full")
             self.data_table_container = ui.column().classes("w-full")
             ui.separator().classes("my-4")
@@ -83,7 +81,6 @@ class AdminView(BaseView):
         """Loads data and dynamically creates the data table."""
         self.state.selected_entity_name.set(table_name)
 
-        # --- FIX: Reference the view's container attribute ---
         self.data_table_container.clear()
         self.filter_container.clear()
         if self.detail_container:
@@ -111,18 +108,15 @@ class AdminView(BaseView):
             except Exception as e:
                 ui.notify(f"Error al cargar datos: {str(e)}", type="negative")
             finally:
-                if not spinner.client.is_deleted:
-                    spinner.delete()
+                # THE ONLY FIX NEEDED: Remove the 'if' check.
+                spinner.delete()
 
     async def _on_row_click(self, record: Dict):
-        """Handles a row click by invoking the RelationshipExplorer."""
         await self.relationship_explorer.show_details(
             record, self.state.selected_entity_name.value, "admin"
         )
 
     def _setup_filters(self):
-        """Initializes the filter panel based on the loaded data."""
-        # --- FIX: Reference the view's container attribute ---
         self.filter_container.clear()
         with self.filter_container:
             self.filter_panel = FilterPanel(
@@ -131,24 +125,20 @@ class AdminView(BaseView):
             self.filter_panel.create()
 
     def _update_filter(self, column: str, value: Any):
-        """Callback to update the state when a filter changes."""
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
 
     def _clear_filters(self):
-        """Clears all active filters and refreshes the view."""
         self.state.filters.clear()
         if self.filter_panel:
             self.filter_panel.clear()
         self.state.apply_filters_and_sort()
 
     async def _refresh_data(self):
-        """Reloads data for the currently selected table."""
         if self.state.selected_entity_name.value:
             await self._load_table_data(self.state.selected_entity_name.value)
 
     def _open_import_dialog(self):
-        """Opens the CSV import dialog."""
         if not self.state.selected_entity_name.value:
             return ui.notify("Por favor, seleccione una tabla primero", type="warning")
         dialog = CSVImporterDialog(
@@ -159,7 +149,6 @@ class AdminView(BaseView):
         dialog.open()
 
     async def _create_record(self):
-        """Opens a dialog to create a new record."""
         if not self.state.selected_entity_name.value:
             return ui.notify("Por favor, seleccione una tabla primero", type="warning")
         dialog = EnhancedRecordDialog(
@@ -171,7 +160,6 @@ class AdminView(BaseView):
         await dialog.open()
 
     async def _edit_record(self, record: Dict):
-        """Opens a dialog to edit an existing record."""
         dialog = EnhancedRecordDialog(
             api=self.api,
             table=self.state.selected_entity_name.value,
@@ -182,7 +170,6 @@ class AdminView(BaseView):
         await dialog.open()
 
     def _delete_record(self, record: Dict):
-        """Shows a confirmation dialog before deleting a record."""
         record_id = record.get(
             TABLE_INFO.get(self.state.selected_entity_name.value, {}).get(
                 "id_field", "id"
@@ -197,7 +184,6 @@ class AdminView(BaseView):
         )
 
     async def _confirm_delete(self, record_id: int):
-        """Performs the actual deletion after confirmation."""
         if await self.api.delete_record(
             self.state.selected_entity_name.value, record_id
         ):
@@ -205,7 +191,6 @@ class AdminView(BaseView):
             await self._refresh_data()
 
     def _export_data(self):
-        """Exports the currently filtered data to a CSV file."""
         if self.state.selected_entity_name.value:
             export_to_csv(
                 self.state.filtered_records,

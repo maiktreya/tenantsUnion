@@ -1,3 +1,5 @@
+# build/niceGUI/views/views_explorer.py (Minimal Fix)
+
 from typing import Dict, Any
 from nicegui import ui
 
@@ -22,7 +24,6 @@ class ViewsExplorerView(BaseView):
         self.detail_container = None
         self.filter_panel = None
         self.relationship_explorer = None
-        # The view, not the state, will own the filter container.
         self.filter_container = None
 
     def create(self) -> ui.column:
@@ -39,7 +40,6 @@ class ViewsExplorerView(BaseView):
                     ),
                 ).classes("w-64")
 
-                # This button now calls the corrected local clear method.
                 ui.button(
                     "Limpiar Selección", icon="clear_all", on_click=self._clear_view
                 ).props("color=grey-6")
@@ -57,7 +57,6 @@ class ViewsExplorerView(BaseView):
                         "Exportar CSV", icon="download", on_click=self._export_data
                     ).props("color=orange-600")
 
-            # Assign the UI element to the view's attribute, not the state's.
             self.filter_container = ui.column().classes("w-full")
             self.data_table_container = ui.column().classes("w-full")
             ui.separator().classes("my-4")
@@ -68,10 +67,6 @@ class ViewsExplorerView(BaseView):
         return container
 
     def _clear_view(self):
-        """
-        Clears the UI containers and the data state for this specific view.
-        This method is now self-contained and safe.
-        """
         self.state.clear_selection()
         if self.select_view:
             self.select_view.value = None
@@ -84,7 +79,6 @@ class ViewsExplorerView(BaseView):
 
     async def _load_view_data(self, view_name: str = None):
         """Loads data for the selected view and dynamically creates the data table."""
-        # Clear previous content safely.
         self.data_table_container.clear()
         self.filter_container.clear()
         if self.detail_container:
@@ -121,18 +115,14 @@ class ViewsExplorerView(BaseView):
                     f"Error al cargar datos de la vista: {str(e)}", type="negative"
                 )
             finally:
-                # Safely delete the spinner only if its client still exists.
-                if not spinner.client.is_deleted:
-                    spinner.delete()
+                spinner.delete()
 
     async def _on_row_click(self, record: Dict):
-        """Handles a row click by invoking the RelationshipExplorer."""
         await self.relationship_explorer.show_details(
             record, self.state.selected_entity_name.value, "views"
         )
 
     def _setup_filters(self):
-        """Initializes the filter panel based on the loaded data."""
         self.filter_container.clear()
         with self.filter_container:
             self.filter_panel = FilterPanel(
@@ -141,24 +131,20 @@ class ViewsExplorerView(BaseView):
             self.filter_panel.create()
 
     def _update_filter(self, column: str, value: Any):
-        """Callback to update the state when a filter changes."""
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
 
     def _clear_filters(self):
-        """Clears all active filters and refreshes the view."""
         self.state.filters.clear()
         if self.filter_panel:
             self.filter_panel.clear()
         self.state.apply_filters_and_sort()
 
     async def _refresh_data(self):
-        """Reloads data for the currently selected view."""
         if self.state.selected_entity_name.value:
             await self._load_view_data(self.state.selected_entity_name.value)
 
     def _export_data(self):
-        """Exports the currently filtered data to a CSV file."""
         if self.state.selected_entity_name.value:
             export_to_csv(
                 self.state.filtered_records,

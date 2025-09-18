@@ -1,3 +1,5 @@
+# build/niceGUI/components/base_view.py (Corrected)
+
 from nicegui import app
 from nicegui import ui
 
@@ -39,8 +41,10 @@ class BaseView:
         if hasattr(self, "detail_container") and self.detail_container:
             self.detail_container.clear()
 
-        # Also clear the select component's value
+        # FIX: Use without_events to prevent the on_change from firing.
         if hasattr(self, "select_view") and self.select_view:
-            self.select_view.value = None
+            with self.select_view.without_events():
+                self.select_view.value = None
         if hasattr(self, "select_table") and self.select_table:
-            self.select_table.value = None
+            with self.select_table.without_events():
+                self.select_table.value = None

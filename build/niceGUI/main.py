@@ -1,3 +1,5 @@
+# build/niceGUI/main.py (Corrected)
+
 import os
 import logging
 from pathlib import Path
@@ -29,8 +31,6 @@ from auth.user_profile import UserProfileView
 log = logging.getLogger(__name__)
 unrestricted_page_routes = {"/login"}
 
-# Enforce authentication for all routes except the login page
-
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -46,8 +46,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(AuthMiddleware)
 
-# Main application class
-
 
 class Application:
     def __init__(self, api_client: APIClient, state: AppState):
@@ -62,6 +60,28 @@ class Application:
         assets_dir = Path(__file__).parent / "assets"
         app.add_static_files("/assets", str(assets_dir))
 
+    async def initialize_global_data(self):
+        """Fetches and caches data used across multiple views."""
+        try:
+            self.state.all_nodos = await self.api_client.get_records(
+                "nodos", order="nombre.asc"
+            )
+            records = await self.api_client.get_records(
+                "v_afiliadas_detalle", limit=5000
+            )
+            self.state.all_afiliadas_options = {
+                r[
+                    "id"
+                ]: f'{r.get("Nombre", "")} {r.get("Apellidos", "")} (ID: {r.get("id")})'
+                for r in records
+            }
+            log.info("Global application state initialized successfully.")
+        except Exception as e:
+            ui.notify(
+                f"FATAL: Could not initialize global state. Error: {e}", type="negative"
+            )
+            log.exception("Failed to initialize global state")
+
     def has_role(self, *roles: str) -> bool:
         user_roles = {role.lower() for role in app.storage.user.get("roles", [])}
         return not {role.lower() for role in roles}.isdisjoint(user_roles)
@@ -75,7 +95,6 @@ class Application:
             container.visible = name == view_name
 
     def create_header(self):
-        """Creates the header with role-based navigation and auto-hide functionality."""
         with ui.header().classes("bg-white shadow-lg").props("id=main-header"):
             with ui.row().classes("w-full items-center p-2 gap-4"):
                 ui.image("/assets/images/logo.png").classes("w-48 cursor-pointer").on(
@@ -132,7 +151,6 @@ class Application:
                         "flat dense round color=red-600"
                     ).tooltip("Cerrar sesión")
 
-        # html/js tweaks for a responsive header UX
         ui.add_head_html(
             """
             <style>
@@ -197,17 +215,18 @@ class Application:
 
 
 api_singleton = APIClient(config.API_BASE_URL)
-app_state_singleton = AppState(api_singleton)
+# This is the corrected line:
+app_state_singleton = AppState()
 app_instance: Optional[Application] = None
-
-# Main entry point
 
 
 @ui.page("/")
 def main_page_entry():
     global app_instance
     app_instance = Application(api_client=api_singleton, state=app_state_singleton)
-    ui.timer(0.2, app_state_singleton.initialize_global_data, once=True)
+
+    ui.timer(0.2, app_instance.initialize_global_data, once=True)
+
     app_instance.create_header()
     app_instance.create_views()
 
