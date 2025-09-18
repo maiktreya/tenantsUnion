@@ -1,6 +1,4 @@
-# build/niceGUI/state/app_state.py
-
-from typing import List, Dict
+from typing import List, Dict, Optional
 from .base import BaseTableState, ReactiveValue
 
 
@@ -11,8 +9,9 @@ class GenericViewState(BaseTableState):
         super().__init__()
         self.selected_entity_name = ReactiveValue()
 
-    def set_records(self, records: List[Dict]):
-        self.records = records
+    def set_records(self, records: List[Dict], table_config: Optional[Dict] = None):
+        """Set the base records and initialize the filtered view."""
+        super().set_records(records, table_config)
         self.filters.clear()
         self.sort_criteria = []
         self.apply_filters_and_sort()

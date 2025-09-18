@@ -1,4 +1,6 @@
-from typing import Dict, List, Callable, Any
+# build/niceGUI/components/filters.py (Corrected)
+
+from typing import Dict, List, Callable, Any, Optional
 from nicegui import ui
 import unicodedata
 import re
@@ -32,9 +34,11 @@ class FilterPanel:
         self,
         records: List[Dict],
         on_filter_change: Callable[[str, Any], None],
+        table_config: Optional[Dict] = None,  # <-- FIX: Accept table_config
     ):
         self.records = records
         self.on_filter_change = on_filter_change
+        self.table_config = table_config or {}  # <-- FIX: Store the config
         self.container = None
         self.inputs: Dict[str, ui.element] = {}
         self.date_range_filters: Dict[str, Dict[str, str | None]] = {}
@@ -63,7 +67,14 @@ class FilterPanel:
         self.container.clear()
         self.inputs.clear()
         self.date_range_filters.clear()
-        columns = self.records[0].keys()
+
+        # --- FIX: Use table_config to get relevant columns, fallback to record keys ---
+        if self.table_config.get("fields"):
+            columns = self.table_config["fields"] + list(
+                self.table_config.get("relations", {}).keys()
+            )
+        else:
+            columns = list(self.records[0].keys()) if self.records else []
 
         with self.container:
             ui.label("Filtros y Búsqueda").classes("text-h6 mb-2")
@@ -109,7 +120,6 @@ class FilterPanel:
                         )
 
                     elif is_date_column:
-                        # --- START OF FIX FOR LABEL PADDING ---
                         with ui.element("div").classes("flex flex-col gap-1"):
                             ui.label(f"Rango {column}").classes(
                                 "text-xs text-gray-500 ml-1"
@@ -151,7 +161,6 @@ class FilterPanel:
                                         ui.date().bind_value(end_input)
                                 self.inputs[f"date_start_{column}"] = start_input
                                 self.inputs[f"date_end_{column}"] = end_input
-                        # --- END OF FIX ---
 
                     elif (
                         1 < unique_count <= 16
@@ -185,7 +194,7 @@ class FilterPanel:
         """Clears all filter inputs."""
         for key, element in self.inputs.items():
             if key.startswith("date_"):
-                element.value = None  # Clear date inputs
+                element.value = None
             else:
                 element.value = (
                     []

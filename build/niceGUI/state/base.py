@@ -1,4 +1,4 @@
-# build/niceGUI/state/base.py
+# build/niceGUI/state/base.py (Corrected)
 
 from typing import Any, Dict, List, Callable, Tuple
 from dataclasses import dataclass, field
@@ -60,10 +60,12 @@ class BaseTableState:
         self.sort_criteria: List[Tuple[str, bool]] = []
         self.current_page = ReactiveValue(1)
         self.page_size = ReactiveValue(5)
+        self.table_config: Dict = {}  # To hold metadata for the current table/view
 
-    def set_records(self, records: List[Dict]):
+    def set_records(self, records: List[Dict], table_config: Dict = None):
         """Set the base records and initialize the filtered view."""
         self.records = records
+        self.table_config = table_config or {}
         self.apply_filters_and_sort()
 
     def apply_filters_and_sort(self):
@@ -72,9 +74,18 @@ class BaseTableState:
         """
         filtered = self.records.copy()
 
+        # --- FIX: Create a reverse map from display names to original field names ---
+        field_to_display_map = {
+            v.get("display_field", k): k
+            for k, v in self.table_config.get("relations", {}).items()
+        }
+
         for column, filter_value in self.filters.items():
-            if not filter_value:
+            if not filter_value and filter_value != 0:
                 continue
+
+            # This is the key change: determine the actual data key to filter on
+            actual_column_key = field_to_display_map.get(column, column)
 
             if column == "cuota" and isinstance(filter_value, list):
                 has_gt_zero_filter = "__GT_ZERO__" in filter_value
@@ -84,16 +95,17 @@ class BaseTableState:
                     r
                     for r in filtered
                     if (
-                        (numeric_values and r.get(column) in numeric_values)
+                        (numeric_values and r.get(actual_column_key) in numeric_values)
                         or (
                             has_gt_zero_filter
-                            and r.get(column) is not None
-                            and float(r.get(column, 0)) > 0
+                            and r.get(actual_column_key) is not None
+                            and float(r.get(actual_column_key, 0)) > 0
                         )
                     )
                 ]
 
             elif column.startswith("date_range_"):
+                # Date range filtering remains mostly the same
                 actual_column = column.replace("date_range_", "")
                 start_date_str = filter_value.get("start")
                 end_date_str = filter_value.get("end")
@@ -137,22 +149,29 @@ class BaseTableState:
 
             elif isinstance(filter_value, list):
                 if filter_value:
-                    filtered = [r for r in filtered if r.get(column) in filter_value]
+                    # Filter using the actual column key from the record
+                    filtered = [
+                        r for r in filtered if r.get(actual_column_key) in filter_value
+                    ]
             else:
+                # Filter using the actual column key from the record
                 filtered = [
                     r
                     for r in filtered
-                    if str(filter_value).lower() in str(r.get(column, "")).lower()
+                    if str(filter_value).lower()
+                    in str(r.get(actual_column_key, "")).lower()
                 ]
 
         self.filtered_records = filtered
 
         if self.sort_criteria:
             for column, ascending in reversed(self.sort_criteria):
+                # Also use the actual key for sorting
+                actual_sort_key = field_to_display_map.get(column, column)
                 self.filtered_records.sort(
                     key=lambda x: (
-                        x.get(column) is None,
-                        _normalize_for_sorting(x.get(column)),
+                        x.get(actual_sort_key) is None,
+                        _normalize_for_sorting(x.get(actual_sort_key)),
                     ),
                     reverse=not ascending,
                 )

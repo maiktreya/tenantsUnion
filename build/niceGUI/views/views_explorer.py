@@ -1,4 +1,4 @@
-# build/niceGUI/views/views_explorer.py (Minimal Fix)
+# build/niceGUI/views/views_explorer.py (Corrected)
 
 from typing import Dict, Any
 from nicegui import ui
@@ -10,7 +10,7 @@ from components.filters import FilterPanel
 from components.exporter import export_to_csv
 from components.relationship_explorer import RelationshipExplorer
 from components.base_view import BaseView
-from config import VIEW_INFO
+from config import VIEW_INFO, TABLE_INFO  # Import TABLE_INFO
 
 
 class ViewsExplorerView(BaseView):
@@ -69,7 +69,8 @@ class ViewsExplorerView(BaseView):
     def _clear_view(self):
         self.state.clear_selection()
         if self.select_view:
-            self.select_view.value = None
+            with self.select_view.without_events():
+                self.select_view.value = None
         if self.data_table_container:
             self.data_table_container.clear()
         if self.filter_container:
@@ -79,6 +80,8 @@ class ViewsExplorerView(BaseView):
 
     async def _load_view_data(self, view_name: str = None):
         """Loads data for the selected view and dynamically creates the data table."""
+        self.state.selected_entity_name.set(view_name)
+
         self.data_table_container.clear()
         self.filter_container.clear()
         if self.detail_container:
@@ -95,17 +98,34 @@ class ViewsExplorerView(BaseView):
             )
             try:
                 records = await self.api.get_records(view, limit=5000)
-                self.state.set_records(records)
-                self._setup_filters()
+
+                view_config = VIEW_INFO.get(view, {})
+                base_table_name = view_config.get("base_table")
+                if not base_table_name:
+                    ui.notify(
+                        f"Error: No se ha configurado 'base_table' para la vista '{view}'",
+                        type="negative",
+                    )
+                    return
+
+                base_table_config = TABLE_INFO.get(base_table_name, {})
+
+                self.state.set_records(records, base_table_config)
+
+                self._setup_filters(base_table_config)
 
                 view_config = VIEW_INFO.get(view, {})
                 hidden_fields = view_config.get("hidden_fields", [])
-                DataTable(
+
+                table_instance = DataTable(
                     state=self.state,
                     show_actions=False,
                     on_row_click=self._on_row_click,
                     hidden_columns=hidden_fields,
-                ).create()
+                )
+                table_instance.create()
+                # Store instance to refresh later
+                self.data_table_instance = table_instance
 
                 ui.notify(
                     f"Se cargaron {len(records)} registros de la vista", type="positive"
@@ -118,27 +138,32 @@ class ViewsExplorerView(BaseView):
                 spinner.delete()
 
     async def _on_row_click(self, record: Dict):
-        await self.relationship_explorer.show_details(
-            record, self.state.selected_entity_name.value, "views"
-        )
+        view_name = self.state.selected_entity_name.value
+        await self.relationship_explorer.show_details(record, view_name, "views")
 
-    def _setup_filters(self):
+    def _setup_filters(self, base_table_config: Dict):
         self.filter_container.clear()
         with self.filter_container:
             self.filter_panel = FilterPanel(
-                records=self.state.records, on_filter_change=self._update_filter
+                records=self.state.records,
+                on_filter_change=self._update_filter,
+                table_config=base_table_config,
             )
             self.filter_panel.create()
 
     def _update_filter(self, column: str, value: Any):
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
+        if hasattr(self, "data_table_instance"):
+            self.data_table_instance.refresh()
 
     def _clear_filters(self):
         self.state.filters.clear()
         if self.filter_panel:
             self.filter_panel.clear()
         self.state.apply_filters_and_sort()
+        if hasattr(self, "data_table_instance"):
+            self.data_table_instance.refresh()
 
     async def _refresh_data(self):
         if self.state.selected_entity_name.value:

@@ -1,25 +1,26 @@
 -- =====================================================================
--- ARCHIVO 02: CREACIÓN DE VISTAS (VERSIÓN MEJORADA CON IDs)
+-- ARCHIVO 04: CREACIÓN DE VISTAS (VERSIÓN REFACTORIZADA Y CORREGIDA)
 -- =====================================================================
 -- Este script se ejecuta después del 01. Asume que todas las tablas
 -- y datos ya existen y crea las vistas para facilitar las consultas.
--- NOTA: Se han añadido los IDs primarios y foráneos para permitir
--- la funcionalidad del explorador de relaciones en la interfaz.
+-- NOTA: Se ha garantizado que cada vista principal exponga la clave
+-- primaria de su tabla base como 'id' para permitir la funcionalidad
+-- del explorador de relaciones en la interfaz.
 -- =====================================================================
 
 -- =====================================================================
--- LISTADO DE VISTAS DISPONIBLES EN LA INTERFAZ NICEGUI (DESCRITAS  en build/niceGUI/config.py)
+-- LISTADO DE VISTAS DISPONIBLES EN LA INTERFAZ NICEGUI (DESCRITAS EN build/niceGUI/config.py)
 -- =====================================================================
 
 SET search_path TO sindicato_inq, public;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- VISTA 1: ENTRAMADO_EMPRESAS (AHORA CON MÉTRICAS AMPLIADAS Y AGRUPACIÓN CORRECTA)
+-- VISTA 1: ENTRAMADO_EMPRESAS (CORREGIDA CON 'id' EXPLÍCITO)
 -- NOTA: Esta es una vista de resumen. Al hacer clic en una fila, se mostrarán las empresas hijas (child records).
 CREATE OR REPLACE VIEW v_resumen_entramados_empresas AS
 SELECT
-    ee.id, -- ID primario del entramado (para buscar hijos)
+    ee.id, -- FIX: Se asegura que el ID primario del entramado esté presente como 'id'.
     ee.nombre AS "Entramado",
     ee.descripcion AS "Descripción",
     COUNT(DISTINCT e.id) AS "Núm. Empresas",
@@ -37,10 +38,10 @@ GROUP BY
     ee.nombre,
     ee.descripcion;
 
--- VISTA 2: RESUMEN POR NODO TERRITORIAL
+-- VISTA 2: RESUMEN POR NODO TERRITORIAL (CORREGIDA CON 'id' EXPLÍCITO)
 CREATE OR REPLACE VIEW v_resumen_nodos AS
 SELECT
-    n.id,
+    n.id, -- FIX: Se asegura que el ID primario del nodo esté presente como 'id'.
     n.nombre AS "Nodo Territorial",
     n.descripcion AS "Descripción",
     COUNT(DISTINCT b.id) AS "Núm. Bloques",
@@ -65,7 +66,7 @@ GROUP BY
 ORDER BY "Núm. Afiliadas" DESC;
 
 -- VISTA 3: VISTA DE DETALLE DE CONFLICTOS (UNIFICADA)
--- Esta vista combina la información de la afiliada, el nodo y el responsable, reemplazando las vistas anteriores.
+-- Esta vista ya incluye 'c.id' a través de 'c.*', por lo que es correcta.
 CREATE OR REPLACE VIEW v_conflictos_detalle AS
 SELECT
     c.*,
@@ -81,7 +82,7 @@ FROM
     LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id
     LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
 
--- VISTA 4: AFILIADAS (AHORA INCLUYE IDs Y NOMBRE DEL NODO)
+-- VISTA 4: AFILIADAS (ESTA VISTA YA ERA CORRECTA)
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
     a.id, -- ID primario de la afiliada (para buscar hijos)
@@ -113,8 +114,7 @@ FROM
     LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
     LEFT JOIN nodos n ON b.nodo_id = n.id;
 
--- VISTA 5: RESUMEN DE BLOQUES
-
+-- VISTA 5: RESUMEN DE BLOQUES (ESTA VISTA YA ERA CORRECTA)
 CREATE OR REPLACE VIEW v_resumen_bloques AS
 SELECT
     b.id, -- Primary key for the block
