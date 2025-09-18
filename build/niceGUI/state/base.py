@@ -60,10 +60,6 @@ class BaseTableState:
         self.sort_criteria: List[Tuple[str, bool]] = []
         self.current_page = ReactiveValue(1)
         self.page_size = ReactiveValue(5)
-        # --- FIX: Removed UI containers from the data state ---
-        # self.filter_container = None
-        # self.table_container = None
-        # self.pagination_container = None
 
     def set_records(self, records: List[Dict]):
         """Set the base records and initialize the filtered view."""
@@ -80,9 +76,7 @@ class BaseTableState:
             if not filter_value:
                 continue
 
-            # --- START OF FIX FOR "CUOTA" FILTER ---
             if column == "cuota" and isinstance(filter_value, list):
-                # Separate the special filter from the numeric values
                 has_gt_zero_filter = "__GT_ZERO__" in filter_value
                 numeric_values = [v for v in filter_value if v != "__GT_ZERO__"]
 
@@ -90,21 +84,16 @@ class BaseTableState:
                     r
                     for r in filtered
                     if (
-                        # Condition 1: Check for explicit numeric matches
                         (numeric_values and r.get(column) in numeric_values)
-                        or
-                        # Condition 2: Check for the "> 0" custom filter
-                        (
+                        or (
                             has_gt_zero_filter
                             and r.get(column) is not None
                             and float(r.get(column, 0)) > 0
                         )
                     )
                 ]
-            # --- END OF FIX ---
 
             elif column.startswith("date_range_"):
-                # (Date range logic remains the same)
                 actual_column = column.replace("date_range_", "")
                 start_date_str = filter_value.get("start")
                 end_date_str = filter_value.get("end")
