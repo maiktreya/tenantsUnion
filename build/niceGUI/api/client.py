@@ -23,26 +23,6 @@ class APIClient:
             self.client = httpx.AsyncClient(timeout=30.0)
         return self.client
 
-    # =====================================================================
-    #  CORE CRUD OPERATIONS WITH ENHANCED ERROR HANDLING
-    # =====================================================================
-
-
-class APIClient:
-    """
-    Enhanced PostgREST API client with config-driven validation.
-    """
-
-    def __init__(self, base_url: str):
-        self.base_url = base_url
-        self.client: Optional[httpx.AsyncClient] = None
-
-    def _ensure_client(self) -> httpx.AsyncClient:
-        """Ensure the HTTP client is initialized."""
-        if self.client is None:
-            self.client = httpx.AsyncClient(timeout=30.0)
-        return self.client
-
     async def get_records(
         self,
         table: str,
