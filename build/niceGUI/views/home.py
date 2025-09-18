@@ -11,8 +11,6 @@ class HomeView(BaseView):  # MODIFIED: Inherit from BaseView
     def __init__(self, navigate: Callable[[str], None]):
         self.navigate = navigate
 
-    # REMOVED: The redundant 'has_role' method has been deleted from this class.
-
     def create(self) -> ui.column:
         """Create the home view UI with role-based card visibility"""
         container = ui.column().classes("w-full p-8 items-center gap-8")

@@ -1,5 +1,3 @@
-# maiktreya/tenantsunion/maiktreya-tenantsUnion-414fb7381de7159f8d5e19480086689987d993ee/build/niceGUI/components/data_table.py
-
 from typing import List, Dict, Optional, Callable
 from nicegui import ui, events
 from state.base import BaseTableState

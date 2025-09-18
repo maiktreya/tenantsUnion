@@ -164,7 +164,6 @@ TABLE_INFO = {
             "nombre",
             "apellidos",
             "email",
-            "roles",
             "is_active",
             "created_at",
         ],
