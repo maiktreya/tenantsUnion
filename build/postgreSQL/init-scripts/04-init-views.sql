@@ -211,7 +211,6 @@ FROM
 CREATE OR REPLACE VIEW comprobar_link_pisos_bloques AS
 
 SELECT
-    -- FIX: Select the primary key as 'id' so the explorer can find it.
     p.id,
     p.direccion AS direccion1_piso,
     p.bloque_id,
