@@ -65,3 +65,10 @@ And aslo locally available, you would be able to access the postgreSQL instance 
 ```bash
 postgresql://app_user:password@localhost:5432/mydb?search_path=sindicato_inq
 ```
+
+## 5. ARBC and available roles for testing
+
+There are three three basic roles available. The user credentials are the role name itself and the password 12345678
+- **admin**: Full access to all tables and functions.
+- **gestor**: Access to conflicts, afiliadas_importer & views module.
+- **actas**: Access limited to the conflicts module.

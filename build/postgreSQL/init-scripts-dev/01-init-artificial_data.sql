@@ -1,11 +1,13 @@
 -- =====================================================================
--- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (ALINEADO CON ESQUEMA BASE)
+-- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (VERSIÓN MEJORADA)
 -- =====================================================================
--- Este script crea el esquema completo, define las tablas (alineadas con
--- 01-init-schema-and-data), crea índices, configura la autenticación,
--- genera las vistas y puebla la base de datos con datos artificiales.
--- Mantiene extensiones "dev-only": nodos y mapping CP→nodo, roles
--- normalizados, credenciales, triggers y vistas de reporting.
+-- Este script crea el esquema completo, define las tablas, crea índices,
+-- configura la autenticación, y puebla la base de datos con datos
+-- artificiales.
+--
+-- MEJORA: Las vistas han sido revisadas para garantizar que cada una
+-- exponga una clave primaria consistente como 'id', alineándose con
+-- las mejores prácticas para el consumo por parte de la API y el frontend.
 -- =====================================================================
 
 -- =====================================================================
@@ -16,12 +18,7 @@ CREATE SCHEMA IF NOT EXISTS sindicato_inq;
 SET search_path TO sindicato_inq, public;
 
 -- =====================================================================
--- PASO 1: DEFINICIÓN DE TABLAS E ÍNDICES (ALINEADO CON PRODUCCIÓN)
--- Nota: Se incorporan campos presentes en 01-init-schema-and-data:
---   - empresas.url_notas TEXT
---   - pisos.prop_vertical TEXT (en lugar de BOOLEAN), vpo, vpo_date
---   - afiliadas.fecha_nac (en lugar de fecha_nacimiento)
--- Se preservan campos dev-only que ya usabas (seccion_sindical, comision).
+-- PASO 1: DEFINICIÓN DE TABLAS E ÍNDICES
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS entramado_empresas (
@@ -65,7 +62,7 @@ CREATE TABLE IF NOT EXISTS empresas (
     cif_nif_nie TEXT UNIQUE,
     directivos TEXT,
     direccion_fiscal TEXT,
-    url_notas TEXT -- añadido para alinear con esquema base
+    url_notas TEXT
 );
 
 CREATE TABLE IF NOT EXISTS usuario_credenciales (
@@ -93,23 +90,17 @@ CREATE TABLE IF NOT EXISTS pisos (
     municipio TEXT,
     cp INTEGER,
     inmobiliaria TEXT,
-    -- prop_vertical ahora TEXT (en el script base es TEXT)
     prop_vertical TEXT,
     por_habitaciones BOOLEAN,
     n_personas INTEGER,
     fecha_firma DATE,
-    -- añadidos del script base
     vpo BOOLEAN,
     vpo_date DATE
 );
 
--- Tabla 'afiliadas' alineada con base:
--- - fecha_nac en lugar de fecha_nacimiento
--- - se mantienen seccion_sindical y comision (dev-only) para no romper vistas/dev
 CREATE TABLE IF NOT EXISTS afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
-    -- Identificación
     num_afiliada TEXT UNIQUE,
     nombre TEXT,
     apellidos TEXT,
@@ -118,13 +109,11 @@ CREATE TABLE IF NOT EXISTS afiliadas (
     genero TEXT,
     email TEXT,
     telefono TEXT,
-    -- Estado y Régimen
     estado TEXT,
     regimen TEXT,
     fecha_alta DATE,
     fecha_baja DATE,
     trato_propiedad BOOLEAN,
-    -- Participación Interna (dev-only, no está en esquema base pero se preserva)
     seccion_sindical TEXT,
     nivel_participacion TEXT,
     comision TEXT
@@ -175,7 +164,7 @@ CREATE TABLE IF NOT EXISTS diario_conflictos (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Crear índices (incluye los del base y extras dev)
+-- Crear índices
 CREATE INDEX IF NOT EXISTS idx_nodos_cp_mapping_nodo_id ON nodos_cp_mapping (nodo_id);
 
 CREATE INDEX IF NOT EXISTS idx_empresas_entramado_id ON empresas (entramado_id);
@@ -207,7 +196,7 @@ CREATE INDEX IF NOT EXISTS idx_diario_conflictos_conflicto_id ON diario_conflict
 CREATE INDEX IF NOT EXISTS idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 
 -- =====================================================================
--- PASO 2: FUNCIÓN, PROCEDIMIENTO Y TRIGGER PARA SINCRONIZACIÓN (dev)
+-- PASO 2: FUNCIÓN, PROCEDIMIENTO Y TRIGGER PARA SINCRONIZACIÓN
 -- =====================================================================
 
 CREATE OR REPLACE FUNCTION sync_bloque_nodo()
@@ -226,7 +215,6 @@ CREATE TRIGGER trigger_sync_bloque_nodo
 AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
 FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
 
--- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
 CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
 LANGUAGE plpgsql
 AS $$
@@ -253,7 +241,7 @@ END;
 $$;
 
 -- =====================================================================
--- PASO 3: VISTAS PARA PRESENTACIÓN DE DATOS (dev)
+-- PASO 3: VISTAS PARA PRESENTACIÓN DE DATOS (REVISADAS)
 -- =====================================================================
 CREATE OR REPLACE VIEW v_resumen_bloques AS
 SELECT
@@ -397,7 +385,7 @@ FROM
 
 CREATE OR REPLACE VIEW comprobar_link_pisos_bloques AS
 SELECT
-    p.id as piso_id,
+    p.id, -- --- MEJORA: Se usa 'id' en lugar de 'piso_id' para consistencia.
     p.direccion as piso_direccion,
     p.bloque_id,
     b.direccion as bloque_direccion,
@@ -468,7 +456,6 @@ FROM
 -- PASO 4: LIMPIEZA Y POBLACIÓN DE DATOS ARTIFICIALES
 -- =====================================================================
 
--- Limpiar datos existentes para evitar conflictos
 TRUNCATE TABLE diario_conflictos,
 conflictos,
 asesorias,
@@ -499,8 +486,7 @@ VALUES (
     (
         'actas',
         'Técnico para asesorías'
-    )
-ON CONFLICT (nombre) DO NOTHING;
+    );
 
 -- Insertar nodos territoriales
 INSERT INTO
@@ -561,7 +547,7 @@ VALUES (
         'Empresa local especializada en gestión de patrimonio inmobiliario urbano.'
     );
 
--- Insertar empresas (añadimos url_notas como NULL por defecto)
+-- Insertar empresas
 INSERT INTO
     empresas (
         entramado_id,
@@ -635,7 +621,6 @@ VALUES (
     (5, 'Avenida Test, 30, Madrid');
 
 -- Insertar pisos
--- Ajuste: prop_vertical como TEXT ('Si'/'No'); añadimos vpo y vpo_date como NULL
 INSERT INTO
     pisos (
         bloque_id,
@@ -785,7 +770,6 @@ VALUES (
 -- PASO 5: INSERTAR USUARIOS Y CONFIGURAR ADMIN
 -- =====================================================================
 
--- Insertar usuarios (incluyendo el admin)
 INSERT INTO
     usuarios (
         alias,
@@ -816,7 +800,6 @@ VALUES (
         TRUE
     );
 
--- Insertar credenciales para usuarios (Hash for password "12345678")
 INSERT INTO
     usuario_credenciales (usuario_id, password_hash)
 VALUES (
@@ -825,14 +808,13 @@ VALUES (
     ),
     (
         2,
-        '$2 b$12$J23QHdoGZ434MQIZH7FwEew.VMDftluCBEugd8LKLIE3B8NCuGKy6'
+        '$2b$12$J23QHdoGZ434MQIZH7FwEew.VMDftluCBEugd8LKLIE3B8NCuGKy6'
     ),
     (
         3,
         '$2b$12$.2k0jdsNjg6J/lcZL1WBkej85pFdSTq2NWdFBjPgfZ7EXjAbjoSei'
     );
 
--- Asignar roles a usuarios
 INSERT INTO
     usuario_roles (usuario_id, role_id)
 VALUES (1, 1),
@@ -840,7 +822,6 @@ VALUES (1, 1),
     (3, 3);
 
 -- Crear afiliadas
--- Ajuste: usamos fecha_nac (en lugar de fecha_nacimiento) y mantenemos seccion_sindical/comision
 INSERT INTO
     afiliadas (
         piso_id,
@@ -957,7 +938,7 @@ VALUES (
         NULL
     );
 
--- Insertar facturación (valida con constraint de IBAN)
+-- Insertar facturación
 INSERT INTO
     facturacion (
         afiliada_id,
@@ -1134,233 +1115,15 @@ VALUES (
         '2024-12-10 09:15:00'
     );
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
--- VISTA 1: ENTRAMADO_EMPRESAS (CORREGIDA CON 'id' EXPLÍCITO)
--- NOTA: Esta es una vista de resumen. Al hacer clic en una fila, se mostrarán las empresas hijas (child records).
-CREATE OR REPLACE VIEW v_resumen_entramados_empresas AS
-SELECT
-    ee.id, -- FIX: Se asegura que el ID primario del entramado esté presente como 'id'.
-    ee.nombre AS "Entramado",
-    ee.descripcion AS "Descripción",
-    COUNT(DISTINCT e.id) AS "Núm. Empresas",
-    COUNT(DISTINCT b.id) AS "Núm. Bloques",
-    COUNT(DISTINCT p.id) AS "Núm. Pisos",
-    COUNT(DISTINCT a.id) AS "Núm. Afiliadas"
-FROM
-    entramado_empresas ee
-    LEFT JOIN empresas e ON ee.id = e.entramado_id
-    LEFT JOIN bloques b ON e.id = b.empresa_id
-    LEFT JOIN pisos p ON b.id = p.bloque_id
-    LEFT JOIN afiliadas a ON p.id = a.piso_id
-GROUP BY
-    ee.id,
-    ee.nombre,
-    ee.descripcion;
-
--- VISTA 2: RESUMEN POR NODO TERRITORIAL (CORREGIDA CON 'id' EXPLÍCITO)
-CREATE OR REPLACE VIEW v_resumen_nodos AS
-SELECT
-    n.id, -- FIX: Se asegura que el ID primario del nodo esté presente como 'id'.
-    n.nombre AS "Nodo Territorial",
-    n.descripcion AS "Descripción",
-    COUNT(DISTINCT b.id) AS "Núm. Bloques",
-    COUNT(DISTINCT e.id) AS "Núm. Empresas Activas",
-    COUNT(DISTINCT a.id) AS "Núm. Afiliadas",
-    COUNT(DISTINCT c.id) AS "Total Conflictos",
-    COUNT(DISTINCT c.id) FILTER (
-        WHERE
-            c.estado = 'Abierto'
-    ) AS "Conflictos Abiertos"
-FROM
-    nodos n
-    LEFT JOIN bloques b ON n.id = b.nodo_id
-    LEFT JOIN empresas e ON b.empresa_id = e.id
-    LEFT JOIN pisos p ON b.id = p.bloque_id
-    LEFT JOIN afiliadas a ON p.id = a.piso_id
-    LEFT JOIN conflictos c ON a.id = c.afiliada_id
-GROUP BY
-    n.id,
-    n.nombre,
-    n.descripcion
-ORDER BY "Núm. Afiliadas" DESC;
-
--- VISTA 3: VISTA DE DETALLE DE CONFLICTOS (UNIFICADA)
--- Esta vista ya incluye 'c.id' a través de 'c.*', por lo que es correcta.
-CREATE OR REPLACE VIEW v_conflictos_detalle AS
-SELECT
-    c.*,
-    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
-    u.alias AS usuario_responsable_alias,
-    n.nombre AS nodo_nombre,
-    p.direccion AS direccion_piso
-FROM
-    sindicato_inq.conflictos c
-    LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
-    LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id
-    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
-
--- VISTA 4: AFILIADAS (ESTA VISTA YA ERA CORRECTA)
-CREATE OR REPLACE VIEW v_afiliadas_detalle AS
-SELECT
-    a.id, -- ID primario de la afiliada (para buscar hijos)
-    a.piso_id, -- ID foráneo del piso (para buscar padres)
-    a.num_afiliada AS "Núm.Afiliada",
-    a.nombre AS "Nombre",
-    a.apellidos AS "Apellidos",
-    a.cif AS "CIF",
-    a.genero AS "Género",
-    TRIM(
-        CONCAT_WS(
-            ', ',
-            p.direccion,
-            p.municipio,
-            p.cp::text
-        )
-    ) AS "Dirección",
-    a.regimen AS "Régimen",
-    a.estado AS "Estado",
-    p.inmobiliaria AS "Inmobiliaria",
-    e.nombre AS "Propiedad",
-    COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
-    COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"
-FROM
-    afiliadas a
-    LEFT JOIN pisos p ON a.piso_id = p.id
-    LEFT JOIN bloques b ON p.bloque_id = b.id
-    LEFT JOIN empresas e ON b.empresa_id = e.id
-    LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
-    LEFT JOIN nodos n ON b.nodo_id = n.id;
-
--- VISTA 5: RESUMEN DE BLOQUES (ESTA VISTA YA ERA CORRECTA)
-CREATE OR REPLACE VIEW v_resumen_bloques AS
-SELECT
-    b.id, -- Primary key for the block
-    b.empresa_id, -- Foreign key to empresas
-    b.nodo_id, -- Foreign key to nodos
-    b.direccion AS "Dirección",
-    e.nombre AS "Empresa Propietaria",
-    n.nombre AS "Nodo Territorial",
-    COUNT(DISTINCT p.id) AS "Pisos en el bloque",
-    COUNT(DISTINCT a.id) AS "Afiliadas en el bloque"
-FROM
-    bloques b
-    LEFT JOIN pisos p ON b.id = p.bloque_id
-    LEFT JOIN afiliadas a ON p.id = a.piso_id
-    LEFT JOIN empresas e ON b.empresa_id = e.id
-    LEFT JOIN nodos n ON b.nodo_id = n.id
-GROUP BY
-    b.id,
-    e.nombre,
-    n.nombre
-ORDER BY "Afiliadas en el bloque" DESC;
--- =====================================================================
--- VISTAS INTERNAS VISTA CONFLICTOS (NO DISPONIBLE EN LA INTERFAZ NI EN CONFIG.PY)
--- =====================================================================
-CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
-SELECT
-    d.*,
-    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
-    u.alias AS autor_nota_alias
-FROM
-    diario_conflictos d
-    LEFT JOIN conflictos c ON d.conflicto_id = c.id
-    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN usuarios u ON d.usuario_id = u.id;
-
-CREATE OR REPLACE VIEW v_conflictos_enhanced AS
-SELECT
-    c.id,
-    c.estado,
-    c.ambito,
-    c.causa,
-    c.tarea_actual,
-    c.fecha_apertura,
-    c.fecha_cierre,
-    c.descripcion,
-    c.resolucion,
-    c.afiliada_id,
-    c.usuario_responsable_id,
-    a.nombre AS afiliada_nombre,
-    a.apellidos AS afiliada_apellidos,
-    CONCAT(a.nombre, ' ', a.apellidos) AS afiliada_nombre_completo,
-    a.num_afiliada,
-    p.id AS piso_id,
-    p.direccion AS piso_direccion,
-    p.municipio AS piso_municipio,
-    p.cp AS piso_cp,
-    b.id AS bloque_id,
-    b.direccion AS bloque_direccion,
-    COALESCE(n1.id, n2.id) AS nodo_id,
-    COALESCE(n1.nombre, n2.nombre) AS nodo_nombre,
-    u.alias AS usuario_responsable_alias,
-    CONCAT(
-        'ID ',
-        c.id,
-        ' - ',
-        COALESCE(
-            p.direccion,
-            b.direccion,
-            'Sin dirección'
-        ),
-        ' | ',
-        COALESCE(
-            a.nombre || ' ' || a.apellidos,
-            'Sin afiliada'
-        ),
-        CASE
-            WHEN c.estado IS NOT NULL THEN ' [' || c.estado || ']'
-            ELSE ''
-        END
-    ) AS conflict_label
-FROM
-    sindicato_inq.conflictos c
-    LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
-    LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos n1 ON b.nodo_id = n1.id
-    LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id
-    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
-
--- =====================================================================
--- PROCEDIMIENTO: SINCRONIZACIÓN MASIVA DE NODOS PARA BLOQUES
--- =====================================================================
-CREATE OR REPLACE VIEW comprobar_link_pisos_bloques AS
-
-SELECT
-    p.id,
-    p.direccion AS direccion1_piso,
-    p.bloque_id,
-    b.direccion AS direccion2_bloque,
-    (p.bloque_id IS NOT NULL) AS linked,
-    similarity (
-        trim(
-            split_part(b.direccion, ',', 1)
-        ) || ', ' || trim(
-            split_part(b.direccion, ',', 2)
-        ),
-        trim(
-            split_part(p.direccion, ',', 1)
-        ) || ', ' || trim(
-            split_part(p.direccion, ',', 2)
-        )
-    ) AS score
-FROM pisos p
-    LEFT JOIN bloques b ON p.bloque_id = b.id
-ORDER BY linked DESC, score DESC;
-
 -- =====================================================================
 -- PASO 6: SINCRONIZACIÓN Y FINALIZACIÓN
 -- =====================================================================
 CALL sync_all_bloques_to_nodos ();
 
 -- =====================================================================
--- CONFIRMACIÓN Y ESTADÍSTICAS
+-- CONFIRMACIÓN
 -- =====================================================================
-SELECT 'Base de datos poblada correctamente con datos artificiales (alineado con esquema base)' as mensaje;
+SELECT 'Base de datos poblada correctamente con datos artificiales' as mensaje;
 
 ALTER TABLE sindicato_inq.facturacion
 ADD CONSTRAINT chk_iban_format CHECK (
