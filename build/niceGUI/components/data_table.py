@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Callable
+from typing import List, Optional, Callable
 from nicegui import ui, events
 from state.base import BaseTableState
 
