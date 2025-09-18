@@ -93,13 +93,14 @@ SET
 WHERE
     usuario_id = 1;
 
+-- create credentials with same default password for new test users for the two additional roles created
 INSERT INTO
     usuario_credenciales (usuario_id, password_hash)
 VALUES (
-        2,
+        14,
         '$2 b$12$J23QHdoGZ434MQIZH7FwEew.VMDftluCBEugd8LKLIE3B8NCuGKy6'
     ),
     (
-        3,
+        15,
         '$2b$12$.2k0jdsNjg6J/lcZL1WBkej85pFdSTq2NWdFBjPgfZ7EXjAbjoSei'
     );
