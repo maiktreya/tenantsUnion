@@ -9,13 +9,13 @@ from pathlib import Path
 # --- ROBUST FIX ---
 # Point sys.path directly to the application's source directory.
 # This makes all imports within the tests and the app itself resolve correctly.
-SRC_DIR = Path(__file__).parent.parent / 'build' / 'niceGUI'
+SRC_DIR = Path(__file__).parent.parent / "build" / "niceGUI"
 sys.path.insert(0, str(SRC_DIR))
 # --- END FIX ---
 
-from tests.debug_client import DebugAPIClient
+from debug_client import DebugAPIClient
+
 # Imports can now be made directly, as if we were inside the `niceGUI` directory
-from main import app as nicegui_app
 from nicegui import ui
 
 # =====================================================================

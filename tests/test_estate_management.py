@@ -1,5 +1,13 @@
 import pytest
+from pathlib import Path
+import sys
+
+# Add the project root to the Python path to allow imports from the app source
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from build.niceGUI.state.base import BaseTableState, _normalize_for_sorting
+from build.niceGUI.components.filters import FilterPanel
+
 
 # Sample records for testing state management
 SAMPLE_RECORDS = [
