@@ -171,7 +171,6 @@ TABLE_INFO = {
             {"table": "usuario_credenciales", "foreign_key": "usuario_id"},
             {"table": "usuario_roles", "foreign_key": "usuario_id"},
             {"table": "asesorias", "foreign_key": "tecnica_id"},
-            {"table": "conflictos", "foreign_key": "usuario_responsable_id"},
             {"table": "diario_conflictos", "foreign_key": "usuario_id"},
             {"table": "nodos", "foreign_key": "usuario_responsable_id"},
         ],

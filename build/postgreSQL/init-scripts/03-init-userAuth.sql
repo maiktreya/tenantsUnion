@@ -98,7 +98,7 @@ INSERT INTO
     usuario_credenciales (usuario_id, password_hash)
 VALUES (
         14,
-        '$2 b$12$J23QHdoGZ434MQIZH7FwEew.VMDftluCBEugd8LKLIE3B8NCuGKy6'
+        '$2b$12$REL.8vLU0slVGIVpOzFXNe7ooMmzDz6rsz.EQ.wd.80EVfXlUcb/G'
     ),
     (
         15,
