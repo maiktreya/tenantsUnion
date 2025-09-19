@@ -50,6 +50,7 @@ SELECT
     COUNT(DISTINCT c.id) AS "Total Conflictos",
     COUNT(DISTINCT c.id) FILTER (
         WHERE
+            a.estado = 'Alta',
             c.estado = 'Abierto'
     ) AS "Conflictos Abiertos"
 FROM
@@ -132,6 +133,8 @@ FROM
     LEFT JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN empresas e ON b.empresa_id = e.id
     LEFT JOIN nodos n ON b.nodo_id = n.id
+WHERE
+    a.estado = 'Alta'
 GROUP BY
     b.id,
     e.nombre,
