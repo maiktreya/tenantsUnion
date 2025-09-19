@@ -50,8 +50,8 @@ SELECT
     COUNT(DISTINCT c.id) AS "Total Conflictos",
     COUNT(DISTINCT c.id) FILTER (
         WHERE
-            a.estado = 'Alta',
-            c.estado = 'Abierto'
+            a.estado = 'Alta'
+            AND c.estado = 'Abierto'
     ) AS "Conflictos Abiertos"
 FROM
     nodos n

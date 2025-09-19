@@ -257,6 +257,8 @@ FROM
     LEFT JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN empresas e ON b.empresa_id = e.id
     LEFT JOIN nodos n ON b.nodo_id = n.id
+WHERE
+    a.estado = 'Alta'
 GROUP BY
     b.id,
     e.nombre,
@@ -277,6 +279,8 @@ FROM
     LEFT JOIN pisos p ON ncm.cp = p.cp
     LEFT JOIN bloques b ON p.bloque_id = b.id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
+WHERE
+    a.estado = 'Alta'
 GROUP BY
     n.id,
     n.nombre,
