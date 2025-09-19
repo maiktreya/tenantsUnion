@@ -222,18 +222,13 @@ TABLE_INFO = {
     "conflictos": {
         "display_name": "Conflictos",
         "id_field": "id",
-        "hidden_fields": ["id"],
+        "hidden_fields": ["id", "fecha_cierre", "estado", "tarea_actual", "resolucion"],
         "fields": [
-            "estado",
             "ambito",
             "causa",
-            "tarea_actual",
             "fecha_apertura",
-            "fecha_cierre",
             "descripcion",
-            "resolucion",
             "afiliada_id",
-            "usuario_responsable_id",
         ],
         "field_options": {
             "estado": sorted(["Abierto", "En proceso", "Resuelto", "Cerrado"]),

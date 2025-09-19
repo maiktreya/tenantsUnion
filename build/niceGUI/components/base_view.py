@@ -1,5 +1,3 @@
-# build/niceGUI/components/base_view.py (Corrected)
-
 from nicegui import app
 from nicegui import ui
 
@@ -32,19 +30,18 @@ class BaseView:
             self.data_table_container.clear()
 
         if (
-            hasattr(self, "state")
-            and hasattr(self.state, "filter_container")
-            and self.state.filter_container
+            hasattr(self, "filter_container")  # Corrected attribute check
+            and self.filter_container
         ):
-            self.state.filter_container.clear()
+            self.filter_container.clear()
 
         if hasattr(self, "detail_container") and self.detail_container:
             self.detail_container.clear()
 
-        # FIX: Use without_events to prevent the on_change from firing.
+        # --- THIS IS THE FIX ---
+        # Programmatically set the value to None. This will trigger the on_change event,
+        # which correctly handles clearing the view.
         if hasattr(self, "select_view") and self.select_view:
-            with self.select_view.without_events():
-                self.select_view.value = None
+            self.select_view.set_value(None)
         if hasattr(self, "select_table") and self.select_table:
-            with self.select_table.without_events():
-                self.select_table.value = None
+            self.select_table.set_value(None)
