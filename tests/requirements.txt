@@ -1,20 +1,33 @@
-# This file lists the Python packages required to run the automated tests.
-# Install them using: pip install -r tests/requirements.txt
+# Enhanced requirements.txt for robust UI testing
+# Install with: pip install -r tests/requirements_robust.txt
 
 # Core testing framework
 pytest
-
-# For testing asynchronous code (like our API client and NiceGUI)
 pytest-asyncio
 
-# For mocking HTTP requests in unit tests
+# For mocking HTTP requests
 respx
 
 # For managing Docker containers within integration tests
 pytest-docker
 
-# Required for NiceGUI's testing tools (provides nicegui_client)
+# Required for NiceGUI's basic functionality
 nicegui
 
-# ADD THIS LINE: Required for browser-based UI testing fixtures
-pytest-selenium
+# Selenium for robust browser automation
+selenium>=4.0.0
+
+# HTTP client for server health checks
+requests
+
+# WebDriver manager to automatically handle driver downloads
+webdriver-manager
+
+# For process management
+psutil
+
+# Optional: For more advanced wait conditions
+selenium-wire
+
+# Optional: For taking better screenshots and debugging
+pillow

@@ -4,6 +4,7 @@ import pytest
 import respx
 from httpx import Response
 from unittest.mock import AsyncMock
+import os
 
 import sys
 from pathlib import Path
@@ -13,7 +14,8 @@ SRC_DIR = Path(__file__).parent.parent / "build" / "niceGUI"
 sys.path.insert(0, str(SRC_DIR))
 
 from debug_client import DebugAPIClient
-from nicegui import ui
+from nicegui import ui, app
+from nicegui.testing import User
 
 # =====================================================================
 # Fixtures for API Client Testing
@@ -41,13 +43,30 @@ def api_client(mock_api_url: str) -> DebugAPIClient:
 # =====================================================================
 
 
-@pytest.fixture
-def screen(nicegui_client):
+@pytest.fixture(scope="session", autouse=True)
+def setup_nicegui_app():
     """
-    Provides a 'screen' object for interacting with the NiceGUI UI in tests.
-    This is a convenience pass-through for the official nicegui_client fixture.
+    Ensures the NiceGUI app and routes are properly initialized for testing.
+    This fixture runs once per test session and automatically sets up the app.
     """
-    return nicegui_client
+    # Set environment variable to indicate we're in test mode
+    os.environ["TESTING"] = "true"
+
+    # Import and initialize your main application
+    # This should register all your @ui.page decorators
+    try:
+        from main import main_page_entry  # This should register your routes
+
+        print("✅ Successfully imported main application")
+    except ImportError as e:
+        print(f"⚠️ Could not import main application: {e}")
+        # If main.py is in a different location, adjust the import
+        try:
+            import build.niceGUI.main as main_module
+
+            print("✅ Successfully imported main from build.niceGUI.main")
+        except ImportError as e2:
+            print(f"❌ Could not import main application from any location: {e2}")
 
 
 # =====================================================================
