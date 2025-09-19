@@ -1,8 +1,7 @@
 # tests/test_ui_flows.py
 """
-The primary, corrected end-to-end UI test suite for the application.
-This version uses a reliable threading model to run the NiceGUI server
-and provides a clean, robust pattern for browser-based testing with Selenium.
+End-to-end UI test suite for the application.
+Enhanced: input fields are now located by their <label> text instead of placeholder.
 """
 import pytest
 import time
@@ -58,11 +57,18 @@ class SeleniumUITester:
         time.sleep(1)  # Allow a moment for the page to render
         return self
 
-    def find_and_type(self, selector, text):
-        """Finds an input field by its placeholder text or selector and types into it."""
+    def find_and_type(self, label_text, text):
+        """
+        Finds an input field associated with a label and types into it.
+        """
         strategies = [
-            (By.XPATH, f"//input[@placeholder='{selector}']"),
-            (By.CSS_SELECTOR, selector),
+            # Input directly after a label with the given text
+            (
+                By.XPATH,
+                f"//label[contains(text(), '{label_text}')]/following::input[1]",
+            ),
+            # Fallback: look for placeholder (if ever added in future)
+            (By.XPATH, f"//input[@placeholder='{label_text}']"),
         ]
         for by, value in strategies:
             try:
@@ -73,7 +79,9 @@ class SeleniumUITester:
                 return self
             except (TimeoutException, NoSuchElementException):
                 continue
-        pytest.fail(f"Could not find input field: {selector}")
+        pytest.fail(
+            f"Could not find input field with label or placeholder: {label_text}"
+        )
 
     def click(self, selector):
         """Finds and clicks an element, trying by visible text first."""
@@ -133,8 +141,6 @@ def app_server():
             from main import main_page_entry
             from nicegui import ui
 
-            # *** THIS IS THE FIX ***
-            # Provide a storage_secret to enable app.storage.user
             ui.run(
                 port=port,
                 show=False,
@@ -155,11 +161,7 @@ def app_server():
     for _ in range(30):
         try:
             response = requests.get(base_url, timeout=1)
-            if response.status_code in [
-                200,
-                404,
-                500,
-            ]:  # 500 is ok, means server is up but hit an error
+            if response.status_code in [200, 404, 500]:
                 print(f"Server is up and running at {base_url}")
                 yield base_url
                 return
@@ -185,7 +187,6 @@ async def test_successful_login_and_navigation(
     ui_tester: SeleniumUITester, mock_api_url: str
 ):
     """Tests the full login flow and navigation to a protected page."""
-    # Mock API responses for user 'sumate'
     respx.get(f"{mock_api_url}/usuarios").mock(
         return_value=Response(200, json=[{"id": 1, "alias": "sumate"}])
     )
@@ -206,19 +207,14 @@ async def test_successful_login_and_navigation(
         return_value=Response(200, json=[{"id": 1, "nombre": "admin"}])
     )
 
-    # 1. Navigate to login page
     ui_tester.open("/login")
-
-    # 2. Fill in credentials and log in
     ui_tester.find_and_type("Username", "sumate")
     ui_tester.find_and_type("Password", "12345678")
     ui_tester.click("Log in")
 
-    # 3. Verify successful login and presence of home page content
     ui_tester.assert_text_present("Bienvenido al Sistema de Gestión")
     ui_tester.assert_text_present("User: sumate (admin)")
 
-    # 4. Navigate to a protected page and verify it loads
     ui_tester.click("Admin BBDD")
     ui_tester.assert_text_present("Administración de Tablas y Registros BBDD")
 
@@ -245,6 +241,5 @@ async def test_failed_login_shows_error(ui_tester: SeleniumUITester, mock_api_ur
     ui_tester.find_and_type("Password", "wrong_password")
     ui_tester.click("Log in")
 
-    # Verify error message is shown and we are still on the login page
     ui_tester.assert_text_present("Wrong username or password")
     assert "login" in ui_tester.get_url()
