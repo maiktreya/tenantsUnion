@@ -145,12 +145,21 @@ ORDER BY "Afiliadas en el bloque" DESC;
 -- =====================================================================
 CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
 SELECT
-    d.*,
-    a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
-    c.tarea_actual AS autor_nota_alias
+    dc.id,
+    dc.conflicto_id,
+    dc.estado,
+    dc.accion,
+    dc.notas,
+    dc.tarea_actual,
+    dc.created_at,
+    u.alias as usuario_alias,
+    a.nombre as afiliada_nombre,
+    a.apellidos as afiliada_apellidos,
+    CONCAT(a.nombre, ' ', a.apellidos) as afiliada_nombre_completo
 FROM
-    diario_conflictos d
-    LEFT JOIN conflictos c ON d.conflicto_id = c.id
+    diario_conflictos dc
+    LEFT JOIN usuarios u ON dc.usuario_id = u.id
+    LEFT JOIN conflictos c ON dc.conflicto_id = c.id
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id;
 
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS

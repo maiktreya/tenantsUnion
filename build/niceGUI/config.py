@@ -251,8 +251,7 @@ TABLE_INFO = {
             ),
         },
         "relations": {
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
-            "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"},
+            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"}
         },
         "child_relations": [
             {"table": "diario_conflictos", "foreign_key": "conflicto_id"},

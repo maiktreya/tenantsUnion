@@ -65,8 +65,11 @@ class EnhancedRecordDialog:
         on_success: Optional[Callable] = None,
         on_save: Optional[Callable[[Dict], Awaitable[bool]]] = None,
         custom_options: Optional[Dict[str, Dict]] = None,
+        # --- MODIFICATION START ---
+        custom_labels: Optional[Dict[str, str]] = None,  # Add new parameter
+        # --- MODIFICATION END ---
         calling_view: str = "default",
-        sort_fields: bool = True,  # <-- New parameter
+        sort_fields: bool = True,
     ):
         self.api = api
         self.table = table
@@ -75,10 +78,13 @@ class EnhancedRecordDialog:
         self.on_success = on_success
         self.on_save = on_save
         self.custom_options = custom_options or {}
+        # --- MODIFICATION START ---
+        self.custom_labels = custom_labels or {}  # Store the custom labels
+        # --- MODIFICATION END ---
         self.dialog = None
         self.inputs = {}
         self.calling_view = calling_view
-        self.sort_fields = sort_fields  # <-- Store the new parameter
+        self.sort_fields = sort_fields
 
     async def open(self):
         """Open the dialog asynchronously."""
@@ -143,16 +149,12 @@ class EnhancedRecordDialog:
         field_options = table_info.get("field_options", {})
         fields = self._get_fields()
 
-        # --- THIS IS THE ENHANCEMENT ---
-        # Conditionally sort the fields based on the new parameter.
         if self.sort_fields:
-            # Sort fields to show relationship dropdowns first, then alphabetically.
             fields = sorted(fields, key=lambda f: (0 if f in relations else 1, f))
-        # --- END OF ENHANCEMENT ---
 
         for field in fields:
             value = self.record.get(field)
-            label = field.replace("_", " ").title()
+            label = self.custom_labels.get(field, field.replace("_", " ").title())
             lower_field = field.lower()
 
             if field in self.custom_options:

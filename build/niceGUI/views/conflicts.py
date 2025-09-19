@@ -189,9 +189,6 @@ class ConflictsView(BaseView):
         self.stats_card.clear()
         with self.stats_card:
             ui.label("Estadísticas").classes("text-h6 mb-2")
-
-            # --- FIX: Ensure all keys are strings to prevent sorting errors ---
-            # Use collections.Counter for a more efficient and safer count.
             all_estados = [
                 str(conflict.get("estado", "Sin estado"))
                 for conflict in self.state.filtered_records
@@ -204,7 +201,6 @@ class ConflictsView(BaseView):
                     color="blue",
                     icon="inventory",
                 )
-                # Now that all keys are strings, sorting is safe.
                 for estado, count in sorted(status_counts.items()):
                     color = {
                         "Abierto": "red",
@@ -313,9 +309,13 @@ class ConflictsView(BaseView):
             ui.notify(f"Error loading history: {str(e)}", type="negative")
 
     def _create_history_entry(self, entry: dict):
-        title = f"Nota con fecha {entry.get('created_at', 'Sin fecha').split('T')[0]}"
-        if entry.get("autor_nota_alias"):
-            title += f" | Autor: {entry['autor_nota_alias']}"
+        title = f"{entry.get('created_at', 'Sin fecha').split('T')[0]}"
+        if entry.get("usuario_alias"):
+            title += f" |-----| AUTOR: {entry['usuario_alias']}"
+        if entry.get("accion"):
+            title += f" | ACCION: {entry['tarea_actual']}"
+        if entry.get("tarea_actual"):
+            title += f" | TAREA: {entry['tarea_actual']}"
         with ui.card().classes("w-full mb-2"):
             with ui.expansion(title).classes("w-full"):
                 with ui.element("div").classes("p-2"):
@@ -391,6 +391,8 @@ class ConflictsView(BaseView):
             on_success=self._load_conflicts,
             sort_fields=False,
             custom_options={"afiliada_id": self.global_state.all_afiliadas_options},
+            # --- ADD THIS LINE ---
+            custom_labels={"afiliada_id": "Contacto:"},
         )
         await dialog.open()
 
@@ -416,7 +418,6 @@ class ConflictsView(BaseView):
             data["conflicto_id"] = self.selected_conflict["id"]
             data["usuario_id"] = user_id
 
-            # Use the create_record which returns a tuple
             if record:
                 result = await self.api.update_record(
                     "diario_conflictos", record["id"], data

@@ -32,6 +32,11 @@ log = logging.getLogger(__name__)
 unrestricted_page_routes = {"/login"}
 
 
+# =====================================================================
+# AUTHENTICATION MIDDLEWARE
+# =====================================================================
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if (
@@ -45,6 +50,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(AuthMiddleware)
+
+# =====================================================================
+# MAIN APPLICATION CLASS
+# =====================================================================
 
 
 class Application:
@@ -214,10 +223,18 @@ class Application:
             await self.api_client.close()
 
 
+# =====================================================================
+# INITIALIZATION AND GLOBAL SINGLETONS
+# =====================================================================
+
 api_singleton = APIClient(config.API_BASE_URL)
-# This is the corrected line:
 app_state_singleton = AppState()
 app_instance: Optional[Application] = None
+
+
+# =====================================================================
+# MAIN APP ENTRY POINT
+# =====================================================================
 
 
 @ui.page("/")
