@@ -117,9 +117,10 @@ CREATE TABLE conflictos (
     resolucion TEXT
 );
 
-CREATE TABLE diario_conflictos (
+CREATE TABLE IF NOT EXISTS diario_conflictos (
     id SERIAL PRIMARY KEY,
     conflicto_id INTEGER NOT NULL REFERENCES conflictos (id) ON DELETE CASCADE,
+    usuario_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
     estado TEXT,
     accion TEXT,
     notas TEXT,
@@ -146,7 +147,9 @@ CREATE INDEX idx_asesorias_tecnica_id ON asesorias (tecnica_id);
 
 CREATE INDEX idx_conflictos_afiliada_id ON conflictos (afiliada_id);
 
-CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
+CREATE INDEX IF NOT EXISTS idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
+
+CREATE INDEX IF NOT EXISTS idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 
 -- =====================================================================
 -- PARTE 2: LÓGICA DE IMPORTACIÓN CON TABLAS STAGING

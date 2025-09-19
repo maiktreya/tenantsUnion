@@ -1,11 +1,13 @@
 -- =====================================================================
--- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (VERSIÓN MEJORADA)
+-- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (VERSIÓN REVISADA Y CORREGIDA)
 -- =====================================================================
 -- Este script crea el esquema completo, define las tablas, crea índices,
 -- configura la autenticación, y puebla la base de datos con datos
 -- artificiales.
 --
--- MEJORA: Las vistas han sido revisadas para garantizar que cada una
+-- REVISIÓN: El esquema de las tablas comunes ha sido sincronizado con
+-- el script de producción '01-init-schema-and-data.sql'.
+-- Las vistas han sido revisadas para garantizar que cada una
 -- exponga una clave primaria consistente como 'id', alineándose con
 -- las mejores prácticas para el consumo por parte de la API y el frontend.
 -- =====================================================================
@@ -46,8 +48,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 CREATE TABLE IF NOT EXISTS nodos (
     id SERIAL PRIMARY KEY,
     nombre TEXT UNIQUE NOT NULL,
-    descripcion TEXT,
-    usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL
+    descripcion TEXT
 );
 
 CREATE TABLE IF NOT EXISTS nodos_cp_mapping (
@@ -83,14 +84,16 @@ CREATE TABLE IF NOT EXISTS bloques (
     nodo_id INTEGER REFERENCES nodos (id) ON DELETE SET NULL
 );
 
+-- CORREGIDO: Añadido el campo 'propiedad' para alinear con el esquema final.
 CREATE TABLE IF NOT EXISTS pisos (
     id SERIAL PRIMARY KEY,
     bloque_id INTEGER REFERENCES bloques (id) ON DELETE SET NULL,
     direccion TEXT NOT NULL UNIQUE,
     municipio TEXT,
     cp INTEGER,
-    inmobiliaria TEXT,
-    prop_vertical TEXT,
+    inmobiliaria TEXT, -- Agencia Inmobiliaria (atributo del piso)
+    propiedad TEXT,
+    prop_vertical TEXT, -- Propiedad Vertical (atributo del piso)
     por_habitaciones BOOLEAN,
     n_personas INTEGER,
     fecha_firma DATE,
@@ -98,6 +101,7 @@ CREATE TABLE IF NOT EXISTS pisos (
     vpo_date DATE
 );
 
+-- CORREGIDO: Eliminados campos 'trato_propiedad', 'seccion_sindical', 'comision'.
 CREATE TABLE IF NOT EXISTS afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
@@ -113,10 +117,7 @@ CREATE TABLE IF NOT EXISTS afiliadas (
     regimen TEXT,
     fecha_alta DATE,
     fecha_baja DATE,
-    trato_propiedad BOOLEAN,
-    seccion_sindical TEXT,
-    nivel_participacion TEXT,
-    comision TEXT
+    nivel_participacion TEXT
 );
 
 CREATE TABLE IF NOT EXISTS facturacion (
@@ -142,7 +143,6 @@ CREATE TABLE IF NOT EXISTS asesorias (
 CREATE TABLE IF NOT EXISTS conflictos (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
-    usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
     estado TEXT,
     ambito TEXT,
     causa TEXT,
@@ -188,8 +188,6 @@ CREATE INDEX IF NOT EXISTS idx_asesorias_afiliada_id ON asesorias (afiliada_id);
 CREATE INDEX IF NOT EXISTS idx_asesorias_tecnica_id ON asesorias (tecnica_id);
 
 CREATE INDEX IF NOT EXISTS idx_conflictos_afiliada_id ON conflictos (afiliada_id);
-
-CREATE INDEX IF NOT EXISTS idx_conflictos_usuario_responsable_id ON conflictos (usuario_responsable_id);
 
 CREATE INDEX IF NOT EXISTS idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
 
@@ -352,14 +350,12 @@ SELECT
     a.apellidos as afiliada_apellidos,
     CONCAT(a.nombre, ' ', a.apellidos) as afiliada_nombre_completo,
     a.num_afiliada,
-    u.alias as usuario_responsable_alias,
     p.direccion as direccion_piso,
     b.direccion as direccion_bloque,
     n.nombre as nodo_nombre
 FROM
     conflictos c
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN usuarios u ON c.usuario_responsable_id = u.id
     LEFT JOIN pisos p ON a.piso_id = p.id
     LEFT JOIN bloques b ON p.bloque_id = b.id
     LEFT JOIN nodos n ON b.nodo_id = n.id;
@@ -409,7 +405,6 @@ SELECT
     c.descripcion,
     c.resolucion,
     c.afiliada_id,
-    c.usuario_responsable_id,
     a.nombre AS afiliada_nombre,
     a.apellidos AS afiliada_apellidos,
     CONCAT(a.nombre, ' ', a.apellidos) AS afiliada_nombre_completo,
@@ -422,7 +417,6 @@ SELECT
     b.direccion AS bloque_direccion,
     COALESCE(n1.id, n2.id) AS nodo_id,
     COALESCE(n1.nombre, n2.nombre) AS nodo_nombre,
-    u.alias AS usuario_responsable_alias,
     CONCAT(
         'ID ',
         c.id,
@@ -449,9 +443,7 @@ FROM
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
     LEFT JOIN sindicato_inq.nodos n1 ON b.nodo_id = n1.id
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id
-    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
-
+    LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id;
 -- =====================================================================
 -- PASO 4: LIMPIEZA Y POBLACIÓN DE DATOS ARTIFICIALES
 -- =====================================================================
@@ -620,7 +612,7 @@ VALUES (
     ),
     (5, 'Avenida Test, 30, Madrid');
 
--- Insertar pisos
+-- CORREGIDO: Añadidos valores para el nuevo campo 'propiedad'.
 INSERT INTO
     pisos (
         bloque_id,
@@ -628,6 +620,7 @@ INSERT INTO
         municipio,
         cp,
         inmobiliaria,
+        propiedad,
         prop_vertical,
         por_habitaciones,
         n_personas,
@@ -641,6 +634,7 @@ VALUES (
         'Madrid',
         28080,
         'No',
+        'Fidere Vivienda Madrid SL',
         'Si',
         false,
         2,
@@ -654,6 +648,7 @@ VALUES (
         'Madrid',
         28080,
         'No',
+        'Fidere Vivienda Madrid SL',
         'Si',
         false,
         3,
@@ -667,6 +662,7 @@ VALUES (
         'Madrid',
         28080,
         'No',
+        'Fidere Vivienda Madrid SL',
         'Si',
         false,
         1,
@@ -680,6 +676,7 @@ VALUES (
         'Madrid',
         28013,
         'No',
+        'Fidere Vivienda Madrid SL',
         'No',
         true,
         4,
@@ -693,6 +690,7 @@ VALUES (
         'Madrid',
         28013,
         'No',
+        'Fidere Vivienda Madrid SL',
         'No',
         false,
         2,
@@ -706,6 +704,7 @@ VALUES (
         'Madrid',
         28081,
         'Sí',
+        'Azora Gestión Inmobiliaria SA',
         'Si',
         false,
         3,
@@ -719,6 +718,7 @@ VALUES (
         'Madrid',
         28081,
         'Sí',
+        'Azora Gestión Inmobiliaria SA',
         'Si',
         false,
         2,
@@ -732,6 +732,7 @@ VALUES (
         'Madrid',
         28082,
         'No',
+        'Elix Housing SOCIMI',
         'Si',
         false,
         1,
@@ -745,6 +746,7 @@ VALUES (
         'Madrid',
         28028,
         'Sí',
+        'Inmobiliaria Centro Madrid SL',
         'Si',
         true,
         5,
@@ -758,6 +760,7 @@ VALUES (
         'Madrid',
         28025,
         'No',
+        'Inmobiliaria Centro Madrid SL',
         'Si',
         false,
         2,
@@ -821,7 +824,7 @@ VALUES (1, 1),
     (2, 2),
     (3, 3);
 
--- Crear afiliadas
+-- CORREGIDO: Eliminados valores para 'seccion_sindical', 'comision', 'trato_propiedad'.
 INSERT INTO
     afiliadas (
         piso_id,
@@ -832,13 +835,10 @@ INSERT INTO
         genero,
         email,
         telefono,
-        seccion_sindical,
         nivel_participacion,
-        comision,
         regimen,
         estado,
         fecha_alta,
-        trato_propiedad,
         fecha_nac,
         fecha_baja
     )
@@ -851,13 +851,10 @@ VALUES (
         'Mujer',
         'lucia.garcia@email.com',
         '600123456',
-        'Latina',
         'Activa',
-        'No',
         'Alquiler',
         'Alta',
         '2023-01-15',
-        false,
         '1985-03-15',
         NULL
     ),
@@ -870,13 +867,10 @@ VALUES (
         'Hombre',
         'javier.rodriguez@email.com',
         '600234567',
-        'Latina',
         'Colaboradora',
-        'Si',
         'Alquiler',
         'Alta',
         '2023-02-20',
-        true,
         '1978-11-22',
         NULL
     ),
@@ -889,13 +883,10 @@ VALUES (
         'Mujer',
         'maria.sanchez@email.com',
         '600345678',
-        'Centro',
         'Referente',
-        'No',
         'Alquiler',
         'Baja',
         '2023-03-25',
-        false,
         '1992-07-08',
         NULL
     ),
@@ -908,13 +899,10 @@ VALUES (
         'Hombre',
         'carlos.lopez@email.com',
         '600456789',
-        'Centro',
         'Activa',
-        'No',
         'Alquiler',
         'Alta',
         '2023-04-10',
-        true,
         '1980-12-03',
         NULL
     ),
@@ -927,13 +915,10 @@ VALUES (
         'Mujer',
         'ana.fernandez@email.com',
         '600567890',
-        'Este',
         'Colaboradora',
-        'No',
         'Propiedad',
         'Alta',
         '2023-05-18',
-        false,
         '1975-09-17',
         NULL
     );
@@ -1019,7 +1004,6 @@ VALUES (
 INSERT INTO
     conflictos (
         afiliada_id,
-        usuario_responsable_id,
         estado,
         ambito,
         causa,
@@ -1029,7 +1013,6 @@ INSERT INTO
     )
 VALUES (
         1,
-        3,
         'En proceso',
         'Afiliada',
         'No renovación',
@@ -1039,7 +1022,6 @@ VALUES (
     ),
     (
         2,
-        3,
         'Cerrado',
         'Afiliada',
         'Fianza',
@@ -1049,7 +1031,6 @@ VALUES (
     ),
     (
         4,
-        3,
         'Abierto',
         'Afiliada',
         'Subida de alquiler',
@@ -1071,7 +1052,7 @@ INSERT INTO
     )
 VALUES (
         1,
-        3,
+        1,
         'En proceso',
         'comunicación enviada',
         'Se envió burofax al propietario solicitando renovación del contrato.',
@@ -1080,7 +1061,7 @@ VALUES (
     ),
     (
         1,
-        3,
+        2,
         'En proceso',
         'llamada',
         'Contacto telefónico con la afiliada para informar del estado.',
@@ -1098,7 +1079,7 @@ VALUES (
     ),
     (
         2,
-        3,
+        2,
         'Cerrado',
         'MASC',
         'Mediación exitosa. El propietario acepta devolver la fianza.',
