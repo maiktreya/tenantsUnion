@@ -1,5 +1,6 @@
 # This file lists the Python packages required to run the automated tests.
 # Install them using: pip install -r tests/requirements.txt
+
 # Core testing framework
 pytest
 
@@ -11,3 +12,9 @@ respx
 
 # For managing Docker containers within integration tests
 pytest-docker
+
+# Required for NiceGUI's testing tools (provides nicegui_client)
+nicegui
+
+# ADD THIS LINE: Required for browser-based UI testing fixtures
+pytest-selenium
