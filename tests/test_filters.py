@@ -3,12 +3,15 @@
 import sys
 from pathlib import Path
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 # Add the project root to the Python path to allow imports from the app source
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from build.niceGUI.components.filters import FilterPanel
+
+# Import ui for creating the necessary context in the test fixture
+from nicegui import ui
 
 
 # Sample data for testing, includes multiple date columns
@@ -50,9 +53,12 @@ def filter_panel_with_mock_callback(sample_records):
     mock_callback = MagicMock()
 
     panel = FilterPanel(records=sample_records, on_filter_change=mock_callback)
-    # We need to call refresh() to populate the component's internal structures
-    # In the real app, this happens after create()
-    panel.refresh()
+
+    # FIX: Simulate the UI creation process within a NiceGUI context.
+    # This ensures that panel.create() and its internal call to refresh()
+    # can successfully create UI elements and populate the `panel.inputs` dict.
+    with ui.column():
+        panel.create()
 
     # Yield both the panel and the mock so tests can use them
     yield panel, mock_callback
@@ -65,7 +71,7 @@ def test_filter_panel_initialization(filter_panel_with_mock_callback):
     """
     panel, _ = filter_panel_with_mock_callback
 
-    # The refresh method should have identified the columns
+    # The create() method should have identified the columns and created inputs
     assert "global_search" in panel.inputs
     assert "status" in panel.inputs
 
@@ -122,9 +128,10 @@ def test_selecting_new_date_field_clears_old_filter(filter_panel_with_mock_callb
     # 2. Now, user selects a DIFFERENT date field from the dropdown
     panel._on_date_field_select(MagicMock(value="fecha_baja"))
 
-    # Assert that the callback was called again, this time with a `None` value
-    # for the OLD key, effectively clearing that filter in the parent state.
-    mock_callback.assert_called_with("date_range_fecha_alta", None)
+    # FIX: Use a more robust assertion. The logic fires two calls: one to clear
+    # the old filter and one to set the new (empty) one. We check for the
+    # clearing call specifically.
+    mock_callback.assert_any_call("date_range_fecha_alta", None)
 
     # The currently selected column should now be 'fecha_baja'
     assert panel.selected_date_column == "fecha_baja"

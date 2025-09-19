@@ -1,12 +1,13 @@
 import pytest
 import respx
 from httpx import Response, ConnectError
-from build.niceGUI.api.client import APIClient
 from pathlib import Path
 import sys
 
 # Add the project root to the Python path to allow imports from the app source
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from build.niceGUI.api.client import APIClient
 
 # Marks all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
@@ -88,11 +89,13 @@ async def test_create_record_success(api_client: APIClient, mock_api_url: str):
     )
 
     # Act
-    result = await api_client.create_record(table_name, data_to_create)
+    # FIX: Unpack the (result, error) tuple returned by the method
+    result, error = await api_client.create_record(table_name, data_to_create)
 
     # Assert
     assert route.called
-    assert result == mock_response_data[0]
+    assert error is None  # Explicitly check that no error was returned
+    assert result == mock_response_data[0]  # Assert against the result dictionary
     # Check that the Prefer header was sent to get the record back
     assert route.calls.last.request.headers["prefer"] == "return=representation"
 

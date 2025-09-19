@@ -89,11 +89,13 @@ async def test_create_record_success(api_client: APIClient, mock_api_url: str):
     )
 
     # Act
-    result = await api_client.create_record(table_name, data_to_create)
+    # FIX: Unpack the (result, error) tuple returned by the method
+    result, error = await api_client.create_record(table_name, data_to_create)
 
     # Assert
     assert route.called
-    assert result == mock_response_data[0]
+    assert error is None  # Explicitly check that no error was returned
+    assert result == mock_response_data[0]  # Assert against the result dictionary
     # Check that the Prefer header was sent to get the record back
     assert route.calls.last.request.headers["prefer"] == "return=representation"
 
