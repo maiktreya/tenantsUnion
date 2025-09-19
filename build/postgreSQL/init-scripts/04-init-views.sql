@@ -71,16 +71,13 @@ CREATE OR REPLACE VIEW v_conflictos_detalle AS
 SELECT
     c.*,
     a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
-    u.alias AS usuario_responsable_alias,
     n.nombre AS nodo_nombre,
     p.direccion AS direccion_piso
-FROM
-    sindicato_inq.conflictos c
+FROM sindicato_inq.conflictos c
     LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id
-    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
+    LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id;
 
 -- VISTA 4: AFILIADAS (ESTA VISTA YA ERA CORRECTA)
 -- VISTA 4: AFILIADAS (CORRECTED ALIASES)
@@ -103,11 +100,9 @@ SELECT
     ) AS "Dirección",
     a.regimen AS "Régimen",
     a.estado AS "Estado",
-    -- ### START OF FIX: Changed Aliases ###
     a.fecha_alta as "Fecha Alta",
     a.fecha_baja as "Fecha Baja",
     p.fecha_firma as "Fecha Firma",
-    -- ### END OF FIX ###
     p.inmobiliaria AS "Inmob.",
     e.nombre AS "Propiedad",
     COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
@@ -149,12 +144,11 @@ CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
 SELECT
     d.*,
     a.nombre || ' ' || a.apellidos AS afiliada_nombre_completo,
-    u.alias AS autor_nota_alias
+    c.tarea_actual AS autor_nota_alias
 FROM
     diario_conflictos d
     LEFT JOIN conflictos c ON d.conflicto_id = c.id
-    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN usuarios u ON d.usuario_id = u.id;
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id;
 
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS
 SELECT
@@ -168,7 +162,6 @@ SELECT
     c.descripcion,
     c.resolucion,
     c.afiliada_id,
-    c.usuario_responsable_id,
     a.nombre AS afiliada_nombre,
     a.apellidos AS afiliada_apellidos,
     CONCAT(a.nombre, ' ', a.apellidos) AS afiliada_nombre_completo,
@@ -183,7 +176,6 @@ SELECT
     b.direccion AS bloque_direccion,
     COALESCE(n1.id, n2.id) AS nodo_id,
     COALESCE(n1.nombre, n2.nombre) AS nodo_nombre,
-    u.alias AS usuario_responsable_alias,
     CONCAT(
         'ID ',
         c.id,
@@ -210,8 +202,7 @@ FROM
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
     LEFT JOIN sindicato_inq.nodos n1 ON b.nodo_id = n1.id
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id
-    LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
+    LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id;
 
 -- =====================================================================
 -- PROCEDIMIENTO: SINCRONIZACIÓN MASIVA DE NODOS PARA BLOQUES

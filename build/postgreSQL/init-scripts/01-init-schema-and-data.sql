@@ -107,9 +107,8 @@ CREATE TABLE asesorias (
 CREATE TABLE conflictos (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE SET NULL,
-    usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
-    estado TEXT DEFAULT NULL,
     ambito TEXT,
+    estado TEXT DEFAULT NULL,
     causa TEXT,
     tarea_actual TEXT,
     fecha_apertura DATE,
@@ -121,7 +120,6 @@ CREATE TABLE conflictos (
 CREATE TABLE diario_conflictos (
     id SERIAL PRIMARY KEY,
     conflicto_id INTEGER NOT NULL REFERENCES conflictos (id) ON DELETE CASCADE,
-    usuario_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL,
     estado TEXT,
     accion TEXT,
     notas TEXT,
@@ -148,11 +146,7 @@ CREATE INDEX idx_asesorias_tecnica_id ON asesorias (tecnica_id);
 
 CREATE INDEX idx_conflictos_afiliada_id ON conflictos (afiliada_id);
 
-CREATE INDEX idx_conflictos_usuario_responsable_id ON conflictos (usuario_responsable_id);
-
 CREATE INDEX idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
-
-CREATE INDEX idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
 
 -- =====================================================================
 -- PARTE 2: LÓGICA DE IMPORTACIÓN CON TABLAS STAGING

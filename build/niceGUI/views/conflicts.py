@@ -255,7 +255,6 @@ class ConflictsView(BaseView):
                     ("Causa", conflict.get("causa")),
                     ("Fecha Apertura", conflict.get("fecha_apertura")),
                     ("Fecha Cierre", conflict.get("fecha_cierre")),
-                    ("Responsable", conflict.get("usuario_responsable_alias")),
                     ("Tarea Actual", conflict.get("tarea_actual")),
                 ]
                 for label, value in info_items:
