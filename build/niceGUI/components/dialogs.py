@@ -53,7 +53,7 @@ class ConfirmationDialog:
 class EnhancedRecordDialog:
     """
     Enhanced dialog for creating/editing records, driven by TABLE_INFO,
-    with support for custom on_save logic.
+    with support for custom on_save logic and view-aware field rendering.
     """
 
     def __init__(
@@ -65,6 +65,8 @@ class EnhancedRecordDialog:
         on_success: Optional[Callable] = None,
         on_save: Optional[Callable[[Dict], Awaitable[bool]]] = None,
         custom_options: Optional[Dict[str, Dict]] = None,
+        calling_view: str = "default",
+        sort_fields: bool = True,  # <-- New parameter
     ):
         self.api = api
         self.table = table
@@ -75,6 +77,8 @@ class EnhancedRecordDialog:
         self.custom_options = custom_options or {}
         self.dialog = None
         self.inputs = {}
+        self.calling_view = calling_view
+        self.sort_fields = sort_fields  # <-- Store the new parameter
 
     async def open(self):
         """Open the dialog asynchronously."""
@@ -98,27 +102,39 @@ class EnhancedRecordDialog:
 
         self.dialog.open()
 
-    def _get_fields(self):
-        """Get list of fields for the table, prioritizing explicit 'fields' list."""
+    def _get_fields(self) -> list[str]:
+        """
+        Gets a list of fields for the table. For the 'admin' view, it returns all
+        fields, including hidden ones, to allow for complete editing.
+        """
         table_info = TABLE_INFO.get(self.table, {})
+        visible_fields = table_info.get("fields", [])
+
+        if self.calling_view == "admin":
+            hidden_fields = table_info.get("hidden_fields", [])
+            all_fields = sorted(list(set(visible_fields + hidden_fields)))
+            pk_field = table_info.get("id_field", "id")
+            if pk_field in all_fields:
+                all_fields.remove(pk_field)
+            return all_fields
+
         if "fields" in table_info:
-            return table_info["fields"]
+            return visible_fields
+
         if self.mode == "edit" and self.record:
             fields = list(self.record.keys())
-            pk_field = TABLE_INFO.get(self.table, {}).get("id_field", "id")
+            pk_field = table_info.get("id_field", "id")
             if pk_field in fields:
                 fields.remove(pk_field)
             return fields
 
-        fields = set()
-        if "relations" in table_info:
-            fields.update(table_info["relations"].keys())
-        if not fields:
+        fields_set = set(table_info.get("relations", {}).keys())
+        if not fields_set:
             ui.notify(
                 f"No fields configured for table '{self.table}' in create mode.",
                 type="warning",
             )
-        return list(fields)
+        return list(fields_set)
 
     async def _create_inputs(self):
         """Create input fields dynamically based on TABLE_INFO configuration."""
@@ -127,7 +143,12 @@ class EnhancedRecordDialog:
         field_options = table_info.get("field_options", {})
         fields = self._get_fields()
 
-        fields = sorted(fields, key=lambda f: (0 if f in relations else 1, f))
+        # --- THIS IS THE ENHANCEMENT ---
+        # Conditionally sort the fields based on the new parameter.
+        if self.sort_fields:
+            # Sort fields to show relationship dropdowns first, then alphabetically.
+            fields = sorted(fields, key=lambda f: (0 if f in relations else 1, f))
+        # --- END OF ENHANCEMENT ---
 
         for field in fields:
             value = self.record.get(field)
@@ -136,10 +157,7 @@ class EnhancedRecordDialog:
 
             if field in self.custom_options:
                 options = self.custom_options[field]
-                current_value = value
-                if current_value not in options:
-                    current_value = None
-
+                current_value = value if value in options else None
                 self.inputs[field] = (
                     ui.select(options=options, label=label, value=current_value)
                     .classes("w-full")
@@ -166,9 +184,7 @@ class EnhancedRecordDialog:
                     )
                     options = {}
 
-                current_value = value
-                if current_value not in options:
-                    current_value = None
+                current_value = value if value in options else None
 
                 if field in ["conflicto_id", "usuario_id"] and self.mode == "create":
                     self.inputs[field] = ui.input(value=current_value).style(
@@ -181,24 +197,17 @@ class EnhancedRecordDialog:
                     .classes("w-full")
                     .props("use-input")
                 )
-
             elif field in field_options:
                 options = field_options[field]
-                current_value = value
-
-                if current_value not in options:
-                    current_value = None
-
+                current_value = value if value in options else None
                 self.inputs[field] = ui.select(
                     options=options, label=label, value=current_value
                 ).classes("w-full")
-
             elif "fecha" in lower_field:
                 default_value = value
                 if self.mode == "create" and not value and field == "fecha_apertura":
                     default_value = date.today().isoformat()
-                elif self.mode == "create" and not value:
-                    default_value = None
+
                 with ui.input(label=label, value=default_value) as input_field:
                     with input_field.add_slot("append"):
                         ui.icon("edit_calendar").on(
@@ -223,11 +232,15 @@ class EnhancedRecordDialog:
         """Central save handler that cleans data before sending to the API."""
         try:
             raw_data = {field: self.inputs[field].value for field in self.inputs}
-
             cleaned_data = _clean_dialog_record(raw_data)
-            final_data = {
-                key: value for key, value in cleaned_data.items() if value is not None
-            }
+
+            final_data = cleaned_data
+            if self.mode == "create":
+                final_data = {
+                    key: value
+                    for key, value in cleaned_data.items()
+                    if value is not None
+                }
 
             if self.on_save:
                 success = await self.on_save(final_data)
@@ -238,9 +251,14 @@ class EnhancedRecordDialog:
                 return
 
             if self.mode == "create":
-                result = await self.api.create_record(self.table, final_data)
+                result, error_message = await self.api.create_record(
+                    self.table, final_data
+                )
                 if result:
                     ui.notify("Record created successfully", type="positive")
+                else:
+                    ui.notify(f"Error: {error_message}", type="negative")
+
             else:
                 record_id = self.record.get(
                     TABLE_INFO.get(self.table, {}).get("id_field", "id")

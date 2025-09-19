@@ -389,6 +389,7 @@ class ConflictsView(BaseView):
             table="conflictos",
             mode="create",
             on_success=self._load_conflicts,
+            sort_fields=False,
             custom_options={"afiliada_id": self.global_state.all_afiliadas_options},
         )
         await dialog.open()
