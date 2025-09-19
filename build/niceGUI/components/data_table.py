@@ -1,5 +1,3 @@
-# build/niceGUI/components/data_table.py (Corrected)
-
 from typing import List, Optional, Callable
 from nicegui import ui, events
 from state.base import BaseTableState
@@ -29,7 +27,6 @@ class DataTable:
         """Create the table UI's container and initial render."""
         self.container = ui.column().classes("w-full")
         self.refresh()
-        # REFACTOR: Subscriptions are removed. The parent view will call refresh() explicitly.
         return self.container
 
     def refresh(self):
@@ -40,7 +37,6 @@ class DataTable:
         self.container.clear()
 
         with self.container:
-            # This logic is now guaranteed to run whenever refresh() is called.
             records = self.state.get_paginated_records()
 
             if not self.state.records:
@@ -55,7 +51,7 @@ class DataTable:
                 ui.label("Ningún registro coincide con los filtros actuales.").classes(
                     "text-gray-500"
                 )
-                self._create_pagination()  # Show pagination even if no results
+                self._create_pagination()
                 return
 
             if records:
@@ -196,7 +192,10 @@ class DataTable:
                 ui.select(
                     options=[5, 10, 25, 50, 100],
                     value=self.state.page_size.value,
-                    on_change=lambda e: self.state.page_size.set(e.value),
+                    # --- MODIFICATION START ---
+                    # Use the new handler function to trigger a refresh
+                    on_change=lambda e: self._change_page_size(e.value),
+                    # --- MODIFICATION END ---
                 ).props("dense").classes("w-20")
                 ui.label("por página")
 
@@ -206,3 +205,11 @@ class DataTable:
         if page_num and 1 <= page_num <= total_pages:
             self.state.current_page.set(page_num)
         self.refresh()
+
+    def _change_page_size(self, new_size: int):
+        """Updates the page size, resets to page 1, and refreshes the table."""
+        self.state.page_size.set(new_size)
+        self.state.current_page.set(1)  # Reset to the first page
+        self.refresh()
+
+    # --- MODIFICATION END ---

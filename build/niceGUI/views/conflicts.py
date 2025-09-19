@@ -244,14 +244,12 @@ class ConflictsView(BaseView):
                     }.get(conflict["estado"], "blue")
                     ui.badge(conflict["estado"], color=color).props("outline")
                 info_items = [
-                    ("ID", conflict.get("id")),
-                    ("Afiliada", conflict.get("afiliada_nombre_completo")),
-                    ("Nº Afiliada", conflict.get("num_afiliada")),
                     ("Ámbito", conflict.get("ambito")),
                     ("Causa", conflict.get("causa")),
                     ("Fecha Apertura", conflict.get("fecha_apertura")),
                     ("Fecha Cierre", conflict.get("fecha_cierre")),
                     ("Tarea Actual", conflict.get("tarea_actual")),
+                    ("Contacto", conflict.get("afiliada_nombre_completo")),
                 ]
                 for label, value in info_items:
                     with ui.row().classes("mb-1"):
@@ -275,8 +273,6 @@ class ConflictsView(BaseView):
                     ("Nodo Territorial", conflict.get("nodo_nombre")),
                     ("Dirección Piso", conflict.get("piso_direccion")),
                     ("Dirección Bloque", conflict.get("bloque_direccion")),
-                    ("Municipio", conflict.get("piso_municipio")),
-                    ("Código Postal", conflict.get("piso_cp")),
                 ]
                 for label, value in location_items:
                     with ui.row().classes("mb-1"):

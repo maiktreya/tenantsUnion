@@ -23,7 +23,7 @@ class UserManagementView(BaseView):
         container = ui.column().classes("w-full p-4 gap-4")
 
         with container:
-            ui.label("Gestión de Usuarios y Roles").classes("text-h4")
+            ui.label("Gestión de Usuarios y Roles").classes("text-h6")
 
             # Check permissions
             if not self.has_role("admin", "sistemas"):
