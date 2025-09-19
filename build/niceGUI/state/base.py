@@ -74,7 +74,6 @@ class BaseTableState:
         """
         filtered = self.records.copy()
 
-        # --- FIX: Create a reverse map from display names to original field names ---
         field_to_display_map = {
             v.get("display_field", k): k
             for k, v in self.table_config.get("relations", {}).items()
@@ -84,13 +83,48 @@ class BaseTableState:
             if not filter_value and filter_value != 0:
                 continue
 
-            # This is the key change: determine the actual data key to filter on
             actual_column_key = field_to_display_map.get(column, column)
 
-            if column == "cuota" and isinstance(filter_value, list):
+            if column.startswith("date_range_"):
+                actual_column = column.replace("date_range_", "")
+                start_date_str = filter_value.get("start")
+                end_date_str = filter_value.get("end")
+
+                if not start_date_str and not end_date_str:
+                    continue
+
+                start_date = (
+                    datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                    if start_date_str
+                    else None
+                )
+                end_date = (
+                    datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                    if end_date_str
+                    else None
+                )
+
+                def date_matches(record):
+                    record_date_str = record.get(actual_column)
+                    if not record_date_str:
+                        return False
+                    try:
+                        date_part = str(record_date_str).split("T")[0]
+                        record_date = datetime.strptime(date_part, "%Y-%m-%d").date()
+
+                        if start_date and record_date < start_date:
+                            return False
+                        if end_date and record_date > end_date:
+                            return False
+                        return True
+                    except (ValueError, TypeError):
+                        return False
+
+                filtered = [r for r in filtered if date_matches(r)]
+
+            elif column == "cuota" and isinstance(filter_value, list):
                 has_gt_zero_filter = "__GT_ZERO__" in filter_value
                 numeric_values = [v for v in filter_value if v != "__GT_ZERO__"]
-
                 filtered = [
                     r
                     for r in filtered
@@ -104,41 +138,6 @@ class BaseTableState:
                     )
                 ]
 
-            elif column.startswith("date_range_"):
-                # Date range filtering remains mostly the same
-                actual_column = column.replace("date_range_", "")
-                start_date_str = filter_value.get("start")
-                end_date_str = filter_value.get("end")
-                if not start_date_str and not end_date_str:
-                    continue
-                start_date = (
-                    datetime.strptime(start_date_str, "%Y-%m-%d").date()
-                    if start_date_str
-                    else None
-                )
-                end_date = (
-                    datetime.strptime(end_date_str, "%Y-%m-%d").date()
-                    if end_date_str
-                    else None
-                )
-                temp_filtered = []
-                for r in filtered:
-                    record_date_str = r.get(actual_column)
-                    if not record_date_str:
-                        continue
-                    try:
-                        record_date = datetime.fromisoformat(
-                            record_date_str.replace("Z", "+00:00")
-                        ).date()
-                        if start_date and record_date < start_date:
-                            continue
-                        if end_date and record_date > end_date:
-                            continue
-                        temp_filtered.append(r)
-                    except (ValueError, TypeError):
-                        continue
-                filtered = temp_filtered
-
             elif column == "global_search":
                 search_term = str(filter_value).lower()
                 filtered = [
@@ -149,12 +148,10 @@ class BaseTableState:
 
             elif isinstance(filter_value, list):
                 if filter_value:
-                    # Filter using the actual column key from the record
                     filtered = [
                         r for r in filtered if r.get(actual_column_key) in filter_value
                     ]
             else:
-                # Filter using the actual column key from the record
                 filtered = [
                     r
                     for r in filtered
@@ -166,7 +163,6 @@ class BaseTableState:
 
         if self.sort_criteria:
             for column, ascending in reversed(self.sort_criteria):
-                # Also use the actual key for sorting
                 actual_sort_key = field_to_display_map.get(column, column)
                 self.filtered_records.sort(
                     key=lambda x: (

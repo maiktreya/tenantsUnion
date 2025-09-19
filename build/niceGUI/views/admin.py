@@ -27,7 +27,7 @@ class AdminView(BaseView):
         self.filter_panel = None
         self.relationship_explorer = None
         self.filter_container = None
-        self.data_table_instance = None  # <-- FIX: Added to hold the DataTable instance
+        self.data_table_instance = None
 
     def create(self) -> ui.column:
         """Create the enhanced CRUD view UI."""
@@ -92,16 +92,17 @@ class AdminView(BaseView):
             self.state.set_records([])
             return
 
+        table_config = TABLE_INFO.get(table, {})
+
         with self.data_table_container:
             spinner = ui.spinner(size="lg", color="orange-600").classes(
                 "absolute-center"
             )
             try:
                 records = await self.api.get_records(table, limit=5000)
-                self.state.set_records(records)
-                self._setup_filters()
+                self.state.set_records(records, table_config)
+                self._setup_filters(table_config)
 
-                # <-- FIX: Store the DataTable instance -->
                 self.data_table_instance = DataTable(
                     state=self.state,
                     on_edit=self._edit_record,
@@ -120,28 +121,28 @@ class AdminView(BaseView):
             record, self.state.selected_entity_name.value, "admin"
         )
 
-    def _setup_filters(self):
+    def _setup_filters(self, table_config: Dict):
         self.filter_container.clear()
         with self.filter_container:
             self.filter_panel = FilterPanel(
-                records=self.state.records, on_filter_change=self._update_filter
+                records=self.state.records,
+                on_filter_change=self._update_filter,
+                table_config=table_config,
             )
             self.filter_panel.create()
 
     def _update_filter(self, column: str, value: Any):
-        """Updates filters and explicitly refreshes the table UI."""
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
-        if self.data_table_instance:  # <-- FIX: Refresh the table
+        if self.data_table_instance:
             self.data_table_instance.refresh()
 
     def _clear_filters(self):
-        """Clears filters and explicitly refreshes the table UI."""
         self.state.filters.clear()
         if self.filter_panel:
             self.filter_panel.clear()
         self.state.apply_filters_and_sort()
-        if self.data_table_instance:  # <-- FIX: Refresh the table
+        if self.data_table_instance:
             self.data_table_instance.refresh()
 
     async def _refresh_data(self):

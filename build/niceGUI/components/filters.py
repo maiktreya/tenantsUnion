@@ -1,3 +1,5 @@
+# build/niceGUI/components/filters.py (Corrected)
+
 from typing import Dict, List, Callable, Any, Optional
 from nicegui import ui
 import unicodedata
@@ -66,12 +68,7 @@ class FilterPanel:
         self.inputs.clear()
         self.date_range_filters.clear()
 
-        if self.table_config.get("fields"):
-            columns = self.table_config["fields"] + list(
-                self.table_config.get("relations", {}).keys()
-            )
-        else:
-            columns = list(self.records[0].keys()) if self.records else []
+        columns = list(self.records[0].keys()) if self.records else []
 
         with self.container:
             ui.label("Filtros y Búsqueda").classes("text-h6 mb-2")
@@ -136,11 +133,12 @@ class FilterPanel:
                                         ),
                                     )
                                     with start_input.add_slot("append"):
+                                        with ui.menu() as start_menu:
+                                            ui.date().bind_value(start_input)
                                         ui.icon("edit_calendar").on(
-                                            "click", lambda: start_menu.open()
+                                            "click", start_menu.open
                                         ).classes("cursor-pointer")
-                                    with ui.menu() as start_menu:
-                                        ui.date().bind_value(start_input)
+
                                 with ui.input(label="Hasta").props(
                                     "dense outlined"
                                 ).classes("w-32") as end_input:
@@ -151,11 +149,12 @@ class FilterPanel:
                                         ),
                                     )
                                     with end_input.add_slot("append"):
+                                        with ui.menu() as end_menu:
+                                            ui.date().bind_value(end_input)
                                         ui.icon("edit_calendar").on(
-                                            "click", lambda: end_menu.open()
+                                            "click", end_menu.open
                                         ).classes("cursor-pointer")
-                                    with ui.menu() as end_menu:
-                                        ui.date().bind_value(end_input)
+
                                 self.inputs[f"date_start_{column}"] = start_input
                                 self.inputs[f"date_end_{column}"] = end_input
 

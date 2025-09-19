@@ -335,7 +335,7 @@ VIEW_INFO = {
     "v_afiliadas_detalle": {
         "display_name": "Detalle de Afiliadas",
         "base_table": "afiliadas",
-        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
+        "hidden_fields": ["id", "piso_id", "entramado_id", "empresa_id", "nodo_id"],
     },
     "v_conflictos_detalle": {
         "display_name": "Detalle de Conflictos",

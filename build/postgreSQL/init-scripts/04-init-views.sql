@@ -83,6 +83,7 @@ FROM
     LEFT JOIN sindicato_inq.usuarios u ON c.usuario_responsable_id = u.id;
 
 -- VISTA 4: AFILIADAS (ESTA VISTA YA ERA CORRECTA)
+-- VISTA 4: AFILIADAS (CORRECTED ALIASES)
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
     a.id, -- ID primario de la afiliada (para buscar hijos)
@@ -102,9 +103,11 @@ SELECT
     ) AS "Dirección",
     a.regimen AS "Régimen",
     a.estado AS "Estado",
-    a.fecha_alta as "F.alta",
-    a.fecha_baja as "F.baja",
-    p.fecha_firma as "F.firma",
+    -- ### START OF FIX: Changed Aliases ###
+    a.fecha_alta as "Fecha Alta",
+    a.fecha_baja as "Fecha Baja",
+    p.fecha_firma as "Fecha Firma",
+    -- ### END OF FIX ###
     p.inmobiliaria AS "Inmob.",
     e.nombre AS "Propiedad",
     COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
