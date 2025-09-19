@@ -1,179 +1,250 @@
 # tests/test_ui_flows.py
-
+"""
+The primary, corrected end-to-end UI test suite for the application.
+This version uses a reliable threading model to run the NiceGUI server
+and provides a clean, robust pattern for browser-based testing with Selenium.
+"""
 import pytest
+import time
 import respx
 from httpx import Response
-
-# Skip UI tests temporarily until we can resolve the NiceGUI testing setup
-pytestmark = pytest.mark.skip(
-    reason="UI testing setup needs to be resolved - NiceGUI route registration issues"
-)
-
-# This import is necessary so pytest can discover the @ui.page decorator
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+import threading
 import sys
 from pathlib import Path
+import requests
 
+# Add project paths to allow the test server to import the application
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "build" / "niceGUI"))
 
-# Import your main application to register routes
-try:
-    from main import main_page_entry
-except ImportError:
-    # Alternative import path if main.py is elsewhere
-    try:
-        import build.niceGUI.main as main_module
-    except ImportError:
-        pass
+pytestmark = pytest.mark.asyncio
 
 
-# For now, let's create unit tests that test the underlying logic instead of the UI
-# These tests verify the authentication logic without the browser automation
+class SeleniumUITester:
+    """A simple and robust UI tester using Selenium with Chrome."""
+
+    def __init__(self, base_url, headless=True):
+        self.base_url = base_url
+        self.driver = None
+        self.wait = None
+        self.headless = headless
+        self._setup_driver()
+
+    def _setup_driver(self):
+        """Initializes the Chrome driver with appropriate options."""
+        chrome_options = Options()
+        if self.headless:
+            chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--window-size=1920,1080")
+        try:
+            self.driver = webdriver.Chrome(options=chrome_options)
+            self.wait = WebDriverWait(self.driver, 10)
+            print(f"Chrome driver initialized (headless={self.headless})")
+        except Exception as e:
+            pytest.fail(f"Failed to initialize Chrome driver: {e}")
+
+    def open(self, path):
+        """Navigates to a specific path on the test server."""
+        url = f"{self.base_url}{path}"
+        print(f"Navigating to: {url}")
+        self.driver.get(url)
+        time.sleep(1)  # Allow a moment for the page to render
+        return self
+
+    def find_and_type(self, selector, text):
+        """Finds an input field by its placeholder text or selector and types into it."""
+        strategies = [
+            (By.XPATH, f"//input[@placeholder='{selector}']"),
+            (By.CSS_SELECTOR, selector),
+        ]
+        for by, value in strategies:
+            try:
+                element = self.wait.until(EC.element_to_be_clickable((by, value)))
+                element.clear()
+                element.send_keys(text)
+                print(f"Typed '{text}' into field found by {by.name}: {value}")
+                return self
+            except (TimeoutException, NoSuchElementException):
+                continue
+        pytest.fail(f"Could not find input field: {selector}")
+
+    def click(self, selector):
+        """Finds and clicks an element, trying by visible text first."""
+        strategies = [
+            (By.XPATH, f"//button[contains(text(), '{selector}')]"),
+            (By.XPATH, f"//*[contains(text(), '{selector}')]"),
+            (By.CSS_SELECTOR, selector),
+        ]
+        for by, value in strategies:
+            try:
+                element = self.wait.until(EC.element_to_be_clickable((by, value)))
+                element.click()
+                print(f"Clicked element found by {by.name}: {value}")
+                time.sleep(0.5)
+                return self
+            except (TimeoutException, NoSuchElementException):
+                continue
+        pytest.fail(f"Could not find clickable element: {selector}")
+
+    def assert_text_present(self, text, timeout=5):
+        """Asserts that specific text is visible on the page."""
+        try:
+            WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, f"//*[contains(text(), '{text}')]")
+                )
+            )
+            print(f"Found expected text: {text}")
+        except TimeoutException:
+            pytest.fail(f"Expected text not found within {timeout}s: {text}")
+
+    def assert_text_absent(self, text):
+        """Asserts that specific text is NOT visible on the page."""
+        try:
+            self.driver.find_element(By.XPATH, f"//*[contains(text(), '{text}')]")
+            pytest.fail(f"Text should not be present but was found: {text}")
+        except NoSuchElementException:
+            print(f"Confirmed text is absent: {text}")
+
+    def get_url(self):
+        return self.driver.current_url
+
+    def close(self):
+        if self.driver:
+            self.driver.quit()
+            print("Browser closed.")
 
 
-class MockAPIClient:
-    """Mock API client for testing authentication logic"""
+@pytest.fixture(scope="session")
+def app_server():
+    """Starts the NiceGUI app in a separate thread for the entire test session."""
+    port = 8899
+    base_url = f"http://localhost:{port}"
 
-    def __init__(self, responses):
-        self.responses = responses
-        self.calls = []
+    def run_nicegui_app():
+        try:
+            from main import main_page_entry
+            from nicegui import ui
 
-    async def get_records(self, table_name, filters=None):
-        key = f"{table_name}_{filters}" if filters else table_name
-        self.calls.append(("get", table_name, filters))
-        return self.responses.get(key, [])
+            # *** THIS IS THE FIX ***
+            # Provide a storage_secret to enable app.storage.user
+            ui.run(
+                port=port,
+                show=False,
+                reload=False,
+                host="127.0.0.1",
+                storage_secret="my_test_secret_key",
+            )
+
+        except ImportError as e:
+            pytest.fail(f"Failed to import and run the main NiceGUI application: {e}")
+        except Exception as e:
+            print(f"An error occurred while running the NiceGUI app: {e}")
+
+    server_thread = threading.Thread(target=run_nicegui_app, daemon=True)
+    server_thread.start()
+
+    # Wait for the server to become available
+    for _ in range(30):
+        try:
+            response = requests.get(base_url, timeout=1)
+            if response.status_code in [
+                200,
+                404,
+                500,
+            ]:  # 500 is ok, means server is up but hit an error
+                print(f"Server is up and running at {base_url}")
+                yield base_url
+                return
+        except requests.RequestException:
+            time.sleep(1)
+
+    pytest.fail("The NiceGUI test server failed to start within 30 seconds.")
 
 
-@pytest.mark.asyncio
-async def test_login_authentication_logic():
-    """
-    Tests the authentication logic that would be called during login,
-    without testing the UI itself.
-    """
-    # Mock responses for a successful login
-    mock_responses = {
-        "usuarios_{'alias': 'eq.sumate'}": [{"id": 1, "alias": "sumate"}],
-        "usuario_credenciales_{'usuario_id': 'eq.1'}": [
-            {
-                "password_hash": "$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6"
-            }
-        ],
-        "usuario_roles_{'usuario_id': 'eq.1'}": [{"role_id": 1}],
-        "roles_{'id': 'in.(1)'}": [{"id": 1, "nombre": "admin"}],
-    }
+@pytest.fixture
+def ui_tester(app_server):
+    """Provides a clean Selenium UI tester instance for each test."""
+    tester = SeleniumUITester(app_server, headless=True)
+    yield tester
+    tester.close()
 
-    client = MockAPIClient(mock_responses)
 
-    # Test the authentication flow
-    username = "sumate"
-    password = "12345678"
+# --- Actual UI Tests ---
 
-    # Step 1: Get user by alias
-    users = await client.get_records("usuarios", {"alias": f"eq.{username}"})
-    assert len(users) == 1
-    user_id = users[0]["id"]
 
-    # Step 2: Get user credentials
-    credentials = await client.get_records(
-        "usuario_credenciales", {"usuario_id": f"eq.{user_id}"}
+@respx.mock
+async def test_successful_login_and_navigation(
+    ui_tester: SeleniumUITester, mock_api_url: str
+):
+    """Tests the full login flow and navigation to a protected page."""
+    # Mock API responses for user 'sumate'
+    respx.get(f"{mock_api_url}/usuarios").mock(
+        return_value=Response(200, json=[{"id": 1, "alias": "sumate"}])
     )
-    assert len(credentials) == 1
-
-    # Step 3: Get user roles
-    user_roles = await client.get_records(
-        "usuario_roles", {"usuario_id": f"eq.{user_id}"}
+    respx.get(f"{mock_api_url}/usuario_credenciales").mock(
+        return_value=Response(
+            200,
+            json=[
+                {
+                    "password_hash": "$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6"
+                }
+            ],
+        )
     )
-    assert len(user_roles) == 1
-    role_id = user_roles[0]["role_id"]
-
-    # Step 4: Get role details
-    roles = await client.get_records("roles", {"id": f"in.({role_id})"})
-    assert len(roles) == 1
-    assert roles[0]["nombre"] == "admin"
-
-
-@pytest.mark.asyncio
-async def test_failed_login_authentication_logic():
-    """
-    Tests the authentication logic for a failed login attempt.
-    """
-    # Mock responses for a failed login (user exists but wrong password)
-    mock_responses = {
-        "usuarios_{'alias': 'eq.sumate'}": [{"id": 1, "alias": "sumate"}],
-        "usuario_credenciales_{'usuario_id': 'eq.1'}": [
-            {
-                "password_hash": "$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6"
-            }
-        ],
-    }
-
-    client = MockAPIClient(mock_responses)
-
-    username = "sumate"
-    wrong_password = "wrong_password"
-
-    # Step 1: Get user by alias
-    users = await client.get_records("usuarios", {"alias": f"eq.{username}"})
-    assert len(users) == 1
-    user_id = users[0]["id"]
-
-    # Step 2: Get user credentials
-    credentials = await client.get_records(
-        "usuario_credenciales", {"usuario_id": f"eq.{user_id}"}
+    respx.get(f"{mock_api_url}/usuario_roles").mock(
+        return_value=Response(200, json=[{"role_id": 1}])
     )
-    assert len(credentials) == 1
-    stored_hash = credentials[0]["password_hash"]
-
-    # Step 3: In a real implementation, you would verify the password here
-    # For this test, we just verify we got the hash to check against
-    assert stored_hash.startswith("$2b$")
-
-
-@pytest.mark.asyncio
-async def test_role_based_access_logic():
-    """
-    Tests the logic for determining user access based on roles.
-    """
-    # Mock responses for actas user
-    mock_responses = {
-        "usuarios_{'alias': 'eq.actas'}": [{"id": 3, "alias": "actas"}],
-        "usuario_credenciales_{'usuario_id': 'eq.3'}": [
-            {
-                "password_hash": "$2b$12$.2k0jdsNjg6J/lcZL1WBkej85pFdSTq2NWdFBjPgfZ7EXjAbjoSei"
-            }
-        ],
-        "usuario_roles_{'usuario_id': 'eq.3'}": [{"role_id": 3}],
-        "roles_{'id': 'in.(3)'}": [{"id": 3, "nombre": "actas"}],
-    }
-
-    client = MockAPIClient(mock_responses)
-
-    username = "actas"
-
-    # Get user and their role
-    users = await client.get_records("usuarios", {"alias": f"eq.{username}"})
-    user_id = users[0]["id"]
-
-    user_roles = await client.get_records(
-        "usuario_roles", {"usuario_id": f"eq.{user_id}"}
+    respx.get(f"{mock_api_url}/roles").mock(
+        return_value=Response(200, json=[{"id": 1, "nombre": "admin"}])
     )
-    role_id = user_roles[0]["role_id"]
 
-    roles = await client.get_records("roles", {"id": f"in.({role_id})"})
-    user_role = roles[0]["nombre"]
+    # 1. Navigate to login page
+    ui_tester.open("/login")
 
-    # Test role-based access logic
-    assert user_role == "actas"
+    # 2. Fill in credentials and log in
+    ui_tester.find_and_type("Username", "sumate")
+    ui_tester.find_and_type("Password", "12345678")
+    ui_tester.click("Log in")
 
-    # Simulate what UI elements should be visible
-    should_see_admin_panel = user_role == "admin"
-    should_see_conflictos = user_role in ["admin", "actas"]
-    should_see_vistas = user_role == "admin"
+    # 3. Verify successful login and presence of home page content
+    ui_tester.assert_text_present("Bienvenido al Sistema de Gestión")
+    ui_tester.assert_text_present("User: sumate (admin)")
 
-    assert not should_see_admin_panel  # actas user shouldn't see admin panel
-    assert should_see_conflictos  # actas user should see conflictos
-    assert not should_see_vistas  # actas user shouldn't see vistas
+    # 4. Navigate to a protected page and verify it loads
+    ui_tester.click("Admin BBDD")
+    ui_tester.assert_text_present("Administración de Tablas y Registros BBDD")
 
 
-# TODO: Re-enable actual UI tests once NiceGUI testing setup is resolved
-# The above tests verify the core authentication and authorization logic
-# without requiring browser automation or UI testing infrastructure
+@respx.mock
+async def test_failed_login_shows_error(ui_tester: SeleniumUITester, mock_api_url: str):
+    """Tests that an incorrect password displays an error message."""
+    respx.get(f"{mock_api_url}/usuarios").mock(
+        return_value=Response(200, json=[{"id": 1, "alias": "sumate"}])
+    )
+    respx.get(f"{mock_api_url}/usuario_credenciales").mock(
+        return_value=Response(
+            200,
+            json=[
+                {
+                    "password_hash": "$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6"
+                }
+            ],
+        )
+    )
+
+    ui_tester.open("/login")
+    ui_tester.find_and_type("Username", "sumate")
+    ui_tester.find_and_type("Password", "wrong_password")
+    ui_tester.click("Log in")
+
+    # Verify error message is shown and we are still on the login page
+    ui_tester.assert_text_present("Wrong username or password")
+    assert "login" in ui_tester.get_url()
