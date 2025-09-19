@@ -125,7 +125,6 @@ TABLE_INFO = {
             "regimen",
             "fecha_alta",
             "fecha_baja",
-            "trato_propiedad",
         ],
         "relations": {"piso_id": {"view": "pisos", "display_field": "direccion"}},
         "child_relations": [
@@ -356,7 +355,6 @@ IMPORTER_HEADER_MAP = {
     "municipio": "Municipio",
     "cp": "CP",
     "fecha_nac": "Fecha Nacimiento",
-    "trato_propiedad": "Trato Directo",
     "propiedad": "Propiedad",
     "prop_vertical": "Prop. Vertical",
     "fecha_alta": "Fecha Alta",

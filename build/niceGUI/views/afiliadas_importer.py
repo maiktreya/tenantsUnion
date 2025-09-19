@@ -128,7 +128,6 @@ class AfiliadasImporterView:
                 "fecha_alta": date.today().isoformat(),
                 "regimen": get_val(17),
                 "estado": "Alta",
-                "trato_propiedad": "Si" if get_val(19) else "No",
                 "piso_id": None,
             }
             piso_data = {
