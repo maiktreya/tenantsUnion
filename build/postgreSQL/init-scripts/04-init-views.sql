@@ -177,9 +177,12 @@ SELECT
     COALESCE(n1.id, n2.id) AS nodo_id,
     COALESCE(n1.nombre, n2.nombre) AS nodo_nombre,
     CONCAT(
-        'ID ',
+        '(',
         c.id,
-        ' - ',
+        '-',
+        ' ',
+        c.ambito,
+        ') ',
         COALESCE(
             p.direccion,
             b.direccion,

@@ -25,7 +25,7 @@ from nicegui.testing import User
 @pytest.fixture
 def mock_api_url() -> str:
     """Provides a consistent mock URL for the API."""
-    return "http://test-api:3000"
+    return "http://test-api:300"
 
 
 @pytest.fixture
