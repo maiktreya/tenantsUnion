@@ -128,7 +128,7 @@ class AfiliadasImporterView:
                 "fecha_alta": date.today().isoformat(),
                 "regimen": get_val(17),
                 "estado": "Alta",
-                "trato_propiedad": get_val(18).lower() in ["true", "si", "1"],
+                "trato_propiedad": "Si" if get_val(19) else "No",
                 "piso_id": None,
             }
             piso_data = {
@@ -137,7 +137,8 @@ class AfiliadasImporterView:
                 "cp": int(get_val(14)) if get_val(14).isdigit() else None,
                 "n_personas": int(get_val(15)) if get_val(15).isdigit() else None,
                 "inmobiliaria": get_val(18),
-                "prop_vertical": get_val(20),
+                "propiedad": get_val(20),
+                "prop_vertical": get_val(21),
                 "fecha_firma": _parse_date(get_val(16)),
             }
             cuota_str = get_val(23) or get_val(24) or get_val(25)
@@ -190,7 +191,6 @@ class AfiliadasImporterView:
                 "email",
                 "telefono",
                 "fecha_nac",
-                "trato_propiedad",
             ],
         )
         self._render_panel(
@@ -203,6 +203,7 @@ class AfiliadasImporterView:
                 "n_personas",
                 "inmobiliaria",
                 "prop_vertical",
+                "fecha_firma",
             ],
         )
         self._render_panel(

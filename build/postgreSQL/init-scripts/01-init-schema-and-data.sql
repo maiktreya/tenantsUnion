@@ -45,6 +45,7 @@ CREATE TABLE pisos (
     municipio TEXT,
     cp INTEGER,
     inmobiliaria TEXT, -- Agencia Inmobiliaria (atributo del piso)
+    propiedad TEXT,
     prop_vertical TEXT, -- Propiedad Vertical (atributo del piso)
     por_habitaciones BOOLEAN,
     n_personas INTEGER,
@@ -80,7 +81,6 @@ CREATE TABLE sindicato_inq.afiliadas (
     regimen TEXT,
     fecha_alta DATE,
     fecha_baja DATE,
-    trato_propiedad BOOLEAN,
     nivel_participacion TEXT
 );
 
@@ -185,7 +185,8 @@ CREATE TABLE staging_afiliadas (
     api TEXT,
     propiedad TEXT,
     entramado TEXT,
-    fecha_nac TEXT
+    fecha_nac TEXT,
+    n_personas INTEGER
 );
 
 CREATE TABLE staging_empresas (
@@ -355,10 +356,16 @@ ON CONFLICT (direccion) DO NOTHING;
 -- Se crean los pisos a partir de las direcciones únicas en staging_afiliadas.
 -- Este es el primer paso para asegurar que cada piso exista antes de ser referenciado.
 INSERT INTO
-    pisos (direccion, municipio, cp)
+    pisos (
+        direccion,
+        municipio,
+        propiedad,
+        cp
+    )
 SELECT DISTINCT
     s.direccion,
     s.municipio,
+    s.propiedad,
     CAST(
         NULLIF(s.codigo_postal, '') AS INTEGER
     )
@@ -374,14 +381,12 @@ UPDATE pisos p
 
 SET
     inmobiliaria = s.api,
-    prop_vertical = CASE
-        WHEN s.prop_vertical = 'Si' THEN TRUE
-        ELSE FALSE
-    END
+    prop_vertical = s.prop_vertical,
+    n_personas = s.n_personas
 FROM (
         -- Usamos una subconsulta para obtener una única fila por dirección
         SELECT DISTINCT
-            ON (sa.direccion) sa.direccion, sa.api, sp.prop_vertical
+            ON (sa.direccion) sa.direccion, sa.api, sp.prop_vertical, sa.n_personas
         FROM
             staging_afiliadas sa
             LEFT JOIN staging_pisos sp ON sa.direccion = sp.direccion
@@ -408,7 +413,6 @@ INSERT INTO
         regimen,
         fecha_alta,
         fecha_baja,
-        trato_propiedad,
         nivel_participacion
     )
 SELECT p.id, s.num_afiliada, s.nombre, s.apellidos, s.cif, to_date(
@@ -417,7 +421,7 @@ SELECT p.id, s.num_afiliada, s.nombre, s.apellidos, s.cif, to_date(
         NULLIF(s.fecha_alta, ''), 'DD/MM/YYYY'
     ), to_date(
         NULLIF(s.fecha_baja, ''), 'DD/MM/YYYY'
-    ), FALSE, s.nivel_participacion
+    ), s.nivel_participacion
 FROM staging_afiliadas s
     JOIN pisos p ON s.direccion = p.direccion -- Se usa JOIN para asegurar la vinculación
 ON CONFLICT (num_afiliada) DO NOTHING;

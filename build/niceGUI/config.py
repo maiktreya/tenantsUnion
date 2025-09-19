@@ -47,6 +47,7 @@ TABLE_INFO = {
             "directivos",
             "direccion_fiscal",
             "entramado_id",
+            "url_notas",
         ],
         "relations": {
             "entramado_id": {"view": "entramado_empresas", "display_field": "nombre"}

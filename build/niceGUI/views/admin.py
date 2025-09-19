@@ -1,4 +1,4 @@
-# build/niceGUI/views/admin.py (Minimal Fix)
+# build/niceGUI/views/admin.py (Corrected)
 
 from typing import Dict, Any
 from nicegui import ui
@@ -27,6 +27,7 @@ class AdminView(BaseView):
         self.filter_panel = None
         self.relationship_explorer = None
         self.filter_container = None
+        self.data_table_instance = None  # <-- FIX: Added to hold the DataTable instance
 
     def create(self) -> ui.column:
         """Create the enhanced CRUD view UI."""
@@ -99,16 +100,19 @@ class AdminView(BaseView):
                 records = await self.api.get_records(table, limit=5000)
                 self.state.set_records(records)
                 self._setup_filters()
-                DataTable(
+
+                # <-- FIX: Store the DataTable instance -->
+                self.data_table_instance = DataTable(
                     state=self.state,
                     on_edit=self._edit_record,
                     on_delete=self._delete_record,
                     on_row_click=self._on_row_click,
-                ).create()
+                )
+                self.data_table_instance.create()
+
             except Exception as e:
                 ui.notify(f"Error al cargar datos: {str(e)}", type="negative")
             finally:
-                # THE ONLY FIX NEEDED: Remove the 'if' check.
                 spinner.delete()
 
     async def _on_row_click(self, record: Dict):
@@ -125,14 +129,20 @@ class AdminView(BaseView):
             self.filter_panel.create()
 
     def _update_filter(self, column: str, value: Any):
+        """Updates filters and explicitly refreshes the table UI."""
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
+        if self.data_table_instance:  # <-- FIX: Refresh the table
+            self.data_table_instance.refresh()
 
     def _clear_filters(self):
+        """Clears filters and explicitly refreshes the table UI."""
         self.state.filters.clear()
         if self.filter_panel:
             self.filter_panel.clear()
         self.state.apply_filters_and_sort()
+        if self.data_table_instance:  # <-- FIX: Refresh the table
+            self.data_table_instance.refresh()
 
     async def _refresh_data(self):
         if self.state.selected_entity_name.value:

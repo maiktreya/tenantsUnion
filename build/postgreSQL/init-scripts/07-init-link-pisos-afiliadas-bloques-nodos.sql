@@ -23,7 +23,7 @@ CALL sync_all_bloques_to_nodos ();
 -- system that were not associated with a 'bloque'.
 
 -- 1. Re-create the staging table to access the original 'propiedad' field.
-CREATE TABLE IF NOT EXISTS staging_pisos_check (
+CREATE TABLE staging_pisos_check (
     direccion TEXT,
     estado TEXT,
     api TEXT,
@@ -31,9 +31,9 @@ CREATE TABLE IF NOT EXISTS staging_pisos_check (
     entramado TEXT,
     num_afiliadas TEXT,
     num_preafiliadas TEXT,
-    num_inq_colaboradoras TEXT
+    num_inq_colaboradoras TEXT,
+    prop_vertical TEXT
 );
-
 -- 2. Load the original data from the CSV file again for comparison.
 COPY staging_pisos_check
 FROM '/csv-data/Pisos.csv'
