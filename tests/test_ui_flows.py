@@ -1,7 +1,6 @@
 # tests/test_ui_flows.py
 """
 End-to-end UI test suite for the application.
-Enhanced: input fields are now located by their <label> text instead of placeholder.
 """
 import pytest
 import time
@@ -17,15 +16,19 @@ import threading
 import sys
 from pathlib import Path
 import requests
+import os  # <<< FINAL FIX: Import the 'os' module
 
 # Add project paths to allow the test server to import the application
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "build" / "niceGUI"))
 
 pytestmark = pytest.mark.asyncio
 
+# The application running in the test server is configured to call this API URL.
+REAL_API_URL = "http://localhost:3001"
+
 
 class SeleniumUITester:
-    """A simple and robust UI tester using Selenium with Chrome."""
+    """UI tester using Selenium with Chrome, tuned for NiceGUI components."""
 
     def __init__(self, base_url, headless=True):
         self.base_url = base_url
@@ -54,39 +57,36 @@ class SeleniumUITester:
         url = f"{self.base_url}{path}"
         print(f"Navigating to: {url}")
         self.driver.get(url)
-        time.sleep(1)  # Allow a moment for the page to render
+        time.sleep(1)
         return self
 
     def find_and_type(self, label_text, text):
-        """
-        Finds an input field associated with a label and types into it.
-        """
+        """Finds an input field by its visible label and types into it."""
         strategies = [
-            # Input directly after a label with the given text
             (
                 By.XPATH,
-                f"//label[contains(text(), '{label_text}')]/following::input[1]",
+                f"//label[normalize-space(text())='{label_text}']/following::input[1]",
             ),
-            # Fallback: look for placeholder (if ever added in future)
-            (By.XPATH, f"//input[@placeholder='{label_text}']"),
+            (
+                By.XPATH,
+                f"//div[contains(@class,'q-field')]//*[text()='{label_text}']/ancestor::div[contains(@class,'q-field')]//input",
+            ),
         ]
         for by, value in strategies:
             try:
                 element = self.wait.until(EC.element_to_be_clickable((by, value)))
                 element.clear()
                 element.send_keys(text)
-                print(f"Typed '{text}' into field found by {by.name}: {value}")
+                print(f"Typed '{text}' into field found by {by}: {value}")
                 return self
             except (TimeoutException, NoSuchElementException):
                 continue
-        pytest.fail(
-            f"Could not find input field with label or placeholder: {label_text}"
-        )
+        pytest.fail(f"Could not find input field with label: {label_text}")
 
     def click(self, selector):
         """Finds and clicks an element, trying by visible text first."""
         strategies = [
-            (By.XPATH, f"//button[contains(text(), '{selector}')]"),
+            (By.XPATH, f"//button[contains(., '{selector}')]"),
             (By.XPATH, f"//*[contains(text(), '{selector}')]"),
             (By.CSS_SELECTOR, selector),
         ]
@@ -94,7 +94,7 @@ class SeleniumUITester:
             try:
                 element = self.wait.until(EC.element_to_be_clickable((by, value)))
                 element.click()
-                print(f"Clicked element found by {by.name}: {value}")
+                print(f"Clicked element found by {by}: {value}")
                 time.sleep(0.5)
                 return self
             except (TimeoutException, NoSuchElementException):
@@ -113,14 +113,6 @@ class SeleniumUITester:
         except TimeoutException:
             pytest.fail(f"Expected text not found within {timeout}s: {text}")
 
-    def assert_text_absent(self, text):
-        """Asserts that specific text is NOT visible on the page."""
-        try:
-            self.driver.find_element(By.XPATH, f"//*[contains(text(), '{text}')]")
-            pytest.fail(f"Text should not be present but was found: {text}")
-        except NoSuchElementException:
-            print(f"Confirmed text is absent: {text}")
-
     def get_url(self):
         return self.driver.current_url
 
@@ -138,6 +130,8 @@ def app_server():
 
     def run_nicegui_app():
         try:
+            # We must set the API URL for the app running in the test thread
+            os.environ["POSTGREST_API_URL"] = REAL_API_URL
             from main import main_page_entry
             from nicegui import ui
 
@@ -148,16 +142,11 @@ def app_server():
                 host="127.0.0.1",
                 storage_secret="my_test_secret_key",
             )
-
-        except ImportError as e:
-            pytest.fail(f"Failed to import and run the main NiceGUI application: {e}")
         except Exception as e:
             print(f"An error occurred while running the NiceGUI app: {e}")
 
     server_thread = threading.Thread(target=run_nicegui_app, daemon=True)
     server_thread.start()
-
-    # Wait for the server to become available
     for _ in range(30):
         try:
             response = requests.get(base_url, timeout=1)
@@ -167,7 +156,6 @@ def app_server():
                 return
         except requests.RequestException:
             time.sleep(1)
-
     pytest.fail("The NiceGUI test server failed to start within 30 seconds.")
 
 
@@ -183,14 +171,13 @@ def ui_tester(app_server):
 
 
 @respx.mock
-async def test_successful_login_and_navigation(
-    ui_tester: SeleniumUITester, mock_api_url: str
-):
+async def test_successful_login_and_navigation(ui_tester: SeleniumUITester):
     """Tests the full login flow and navigation to a protected page."""
-    respx.get(f"{mock_api_url}/usuarios").mock(
+    # Mock the REAL_API_URL that the application uses
+    respx.get(f"{REAL_API_URL}/usuarios?alias=eq.sumate").mock(
         return_value=Response(200, json=[{"id": 1, "alias": "sumate"}])
     )
-    respx.get(f"{mock_api_url}/usuario_credenciales").mock(
+    respx.get(f"{REAL_API_URL}/usuario_credenciales?usuario_id=eq.1").mock(
         return_value=Response(
             200,
             json=[
@@ -200,10 +187,10 @@ async def test_successful_login_and_navigation(
             ],
         )
     )
-    respx.get(f"{mock_api_url}/usuario_roles").mock(
+    respx.get(f"{REAL_API_URL}/usuario_roles?usuario_id=eq.1").mock(
         return_value=Response(200, json=[{"role_id": 1}])
     )
-    respx.get(f"{mock_api_url}/roles").mock(
+    respx.get(f"{REAL_API_URL}/roles?id=in.(1)").mock(
         return_value=Response(200, json=[{"id": 1, "nombre": "admin"}])
     )
 
@@ -220,12 +207,13 @@ async def test_successful_login_and_navigation(
 
 
 @respx.mock
-async def test_failed_login_shows_error(ui_tester: SeleniumUITester, mock_api_url: str):
+async def test_failed_login_shows_error(ui_tester: SeleniumUITester):
     """Tests that an incorrect password displays an error message."""
-    respx.get(f"{mock_api_url}/usuarios").mock(
+    # Mock the REAL_API_URL that the application uses
+    respx.get(f"{REAL_API_URL}/usuarios?alias=eq.sumate").mock(
         return_value=Response(200, json=[{"id": 1, "alias": "sumate"}])
     )
-    respx.get(f"{mock_api_url}/usuario_credenciales").mock(
+    respx.get(f"{REAL_API_URL}/usuario_credenciales?usuario_id=eq.1").mock(
         return_value=Response(
             200,
             json=[

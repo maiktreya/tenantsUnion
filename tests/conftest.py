@@ -55,7 +55,9 @@ def setup_nicegui_app():
     # Import and initialize your main application
     # This should register all your @ui.page decorators
     try:
-        from main import main_page_entry  # This should register your routes
+        from build.niceGUI.main import (
+            main_page_entry,
+        )  # This should register your routes
 
         print("✅ Successfully imported main application")
     except ImportError as e:
