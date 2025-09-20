@@ -1,4 +1,4 @@
-# build/niceGUI/components/dialogs.py
+# build/niceGUI/components/dialogs.py (Corrected)
 
 from typing import Dict, Optional, Callable, Awaitable, Any
 from nicegui import ui
@@ -65,9 +65,7 @@ class EnhancedRecordDialog:
         on_success: Optional[Callable] = None,
         on_save: Optional[Callable[[Dict], Awaitable[bool]]] = None,
         custom_options: Optional[Dict[str, Dict]] = None,
-        # --- MODIFICATION START ---
-        custom_labels: Optional[Dict[str, str]] = None,  # Add new parameter
-        # --- MODIFICATION END ---
+        custom_labels: Optional[Dict[str, str]] = None,
         calling_view: str = "default",
         sort_fields: bool = True,
     ):
@@ -78,9 +76,7 @@ class EnhancedRecordDialog:
         self.on_success = on_success
         self.on_save = on_save
         self.custom_options = custom_options or {}
-        # --- MODIFICATION START ---
-        self.custom_labels = custom_labels or {}  # Store the custom labels
-        # --- MODIFICATION END ---
+        self.custom_labels = custom_labels or {}
         self.dialog = None
         self.inputs = {}
         self.calling_view = calling_view
@@ -110,30 +106,36 @@ class EnhancedRecordDialog:
 
     def _get_fields(self) -> list[str]:
         """
-        Gets a list of fields for the table. For the 'admin' view, it returns all
-        fields, including hidden ones, to allow for complete editing.
+        Gets a list of fields for the table, prioritizing TABLE_INFO config.
+        For the 'admin' view, it returns all fields.
         """
         table_info = TABLE_INFO.get(self.table, {})
-        visible_fields = table_info.get("fields", [])
+        pk_field = table_info.get("id_field", "id")
 
+        # --- FIX START ---
+        # Priority 1: Always use the 'fields' list from config if it exists.
+        # This makes 'create' and 'edit' modes consistent.
+        if "fields" in table_info:
+            return table_info.get("fields", [])
+        # --- FIX END ---
+
+        # Priority 2: For 'admin' view, show all fields (visible + hidden).
         if self.calling_view == "admin":
+            visible_fields = table_info.get("fields", [])
             hidden_fields = table_info.get("hidden_fields", [])
             all_fields = sorted(list(set(visible_fields + hidden_fields)))
-            pk_field = table_info.get("id_field", "id")
             if pk_field in all_fields:
                 all_fields.remove(pk_field)
             return all_fields
 
-        if "fields" in table_info:
-            return visible_fields
-
+        # Fallback for 'edit' mode if no 'fields' are configured: use record keys.
         if self.mode == "edit" and self.record:
             fields = list(self.record.keys())
-            pk_field = table_info.get("id_field", "id")
             if pk_field in fields:
                 fields.remove(pk_field)
             return fields
 
+        # Fallback for 'create' mode if no 'fields' are configured: use relations.
         fields_set = set(table_info.get("relations", {}).keys())
         if not fields_set:
             ui.notify(

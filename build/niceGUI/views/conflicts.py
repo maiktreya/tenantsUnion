@@ -387,7 +387,6 @@ class ConflictsView(BaseView):
             on_success=self._load_conflicts,
             sort_fields=False,
             custom_options={"afiliada_id": self.global_state.all_afiliadas_options},
-            # --- ADD THIS LINE ---
             custom_labels={"afiliada_id": "Contacto:"},
         )
         await dialog.open()
