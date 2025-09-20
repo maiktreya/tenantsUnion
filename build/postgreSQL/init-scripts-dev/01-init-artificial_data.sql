@@ -307,37 +307,37 @@ GROUP BY
 
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
-    a.id,
-    a.num_afiliada,
-    a.nombre,
-    a.apellidos,
-    CONCAT(a.nombre, ' ', a.apellidos) as nombre_completo,
-    a.cif,
-    a.genero,
-    a.email,
-    a.telefono,
-    a.regimen,
-    a.estado,
-    a.fecha_alta,
-    a.fecha_baja,
-    p.direccion as direccion_piso,
-    p.municipio,
-    p.cp,
-    b.direccion as direccion_bloque,
-    e.nombre as empresa_nombre,
-    ee.nombre as entramado_nombre,
-    n.nombre as nodo_nombre,
-    f.cuota,
-    f.periodicidad,
-    f.forma_pago
+    a.id, -- ID primario de la afiliada (para buscar hijos)
+    a.piso_id, -- ID foráneo del piso (para buscar padres)
+    a.num_afiliada AS "Núm.Afiliada",
+    a.nombre AS "Nombre",
+    a.apellidos AS "Apellidos",
+    a.cif AS "CIF",
+    a.genero AS "Género",
+    TRIM(
+        CONCAT_WS(
+            ', ',
+            p.direccion,
+            p.municipio,
+            p.cp::text
+        )
+    ) AS "Dirección",
+    a.regimen AS "Régimen",
+    a.estado AS "Estado",
+    a.fecha_alta as "Fecha Alta",
+    a.fecha_baja as "Fecha Baja",
+    p.fecha_firma as "Fecha Firma",
+    p.inmobiliaria AS "Inmob.",
+    e.nombre AS "Propiedad",
+    COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
+    COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"
 FROM
     afiliadas a
     LEFT JOIN pisos p ON a.piso_id = p.id
     LEFT JOIN bloques b ON p.bloque_id = b.id
     LEFT JOIN empresas e ON b.empresa_id = e.id
     LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
-    LEFT JOIN nodos n ON b.nodo_id = n.id
-    LEFT JOIN facturacion f ON a.id = f.afiliada_id;
+    LEFT JOIN nodos n ON b.nodo_id = n.id;
 
 CREATE OR REPLACE VIEW v_conflictos_detalle AS
 SELECT
