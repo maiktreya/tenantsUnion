@@ -47,7 +47,20 @@ crontab -e
 
 ```
 
-### 5. **Deployment Commands**
+### 4. **Automatic DB backup**
+
+Add to your system  backup of the DB storage folder ever 24 h at 3am. The script automatizes holding just a max of the 3 latest scripts:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add this line to check for renewal twice daily at 12:00 and 00:00
+0 3 * * * /path/to/tenantsUnion/backup_storage.sh >> /home/$USER/back/backup.log 2>&1
+
+```
+
+### 6. **Deployment Commands**
 
 **First-time deployment:**
 
@@ -68,7 +81,7 @@ docker compose --profile Secured up -d
 docker compose --profile Secured up -d
 ```
 
-### 6. **Troubleshooting**
+### 7. **Troubleshooting**
 
 **Test with staging first:**
 Edit the script and set `staging=1` to test with Let's Encrypt's staging environment to avoid rate limits.
@@ -85,7 +98,7 @@ docker compose run --rm --entrypoint "certbot certificates" certbot
 bash utils/renew-certificates.sh
 ```
 
-### 7. **Directory Structure**
+### 8. **Directory Structure**
 
 Your project should have:
 
