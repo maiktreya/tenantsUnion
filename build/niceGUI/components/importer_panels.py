@@ -245,7 +245,6 @@ def _render_bloques_panel(
                         size="sm",
                     )
             ui.label("Dirección Piso").classes("flex-1 min-w-[18rem]")
-            # --- MODIFICATION 1: Swapped Header Order ---
             ui.label("Sugerencia").classes("flex-1 min-w-[18rem]")
             ui.label("Dirección Bloque (Editable)").classes("flex-1 min-w-[18rem]")
             ui.label("Vinculación").classes("w-36")
@@ -300,9 +299,9 @@ def _render_bloques_panel(
                 ui.label(record.get("piso", {}).get("direccion", "")).classes(
                     "flex-1 min-w-[18rem] text-sm truncate"
                 )
-
-                # --- MODIFICATION 2: Swapped Row Order and Enhanced Suggestion Label ---
-                suggestion_label = ui.label().classes("flex-1 min-w-[18rem] text-xs text-gray-600 whitespace-pre-line")
+                suggestion_label = ui.label().classes(
+                    "flex-1 min-w-[18rem] text-xs text-gray-600 whitespace-pre-line"
+                )
 
                 bloque_dir_input = (
                     ui.input(value=record.setdefault("bloque", {}).get("direccion"))
@@ -358,11 +357,13 @@ def _render_bloques_panel(
                 # --- MODIFICATION 3: New logic for the suggestion label updater ---
                 def _update_suggestion_label(lbl=suggestion_label, rec=record):
                     suggestion = rec.get("meta", {}).get("bloque")
-                    if suggestion and suggestion.get('direccion'):
+                    if suggestion and suggestion.get("direccion"):
                         score_text = f"({rec['meta'].get('bloque_score', 0)*100:.1f}%)"
                         id_text = f"ID: {suggestion.get('id', 'N/A')}"
                         # Use an f-string with a newline character for better readability
-                        lbl.set_text(f"{suggestion['direccion']}\n{id_text} {score_text}")
+                        lbl.set_text(
+                            f"{suggestion['direccion']}\n{id_text} {score_text}"
+                        )
                     else:
                         lbl.set_text("Sin sugerencia")
 

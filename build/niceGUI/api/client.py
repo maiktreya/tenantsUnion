@@ -7,6 +7,10 @@ from difflib import SequenceMatcher
 
 log = logging.getLogger(__name__)
 
+# =====================================================================
+#  GENERIC METHODS
+# =====================================================================
+
 
 class APIClient:
     """
@@ -53,7 +57,8 @@ class APIClient:
             if validate_response and isinstance(records, list):
                 validated_records = []
                 for record in records:
-                    is_valid, errors = validator.validate_record(table, record, "read")
+                    is_valid, errors = validator.validate_record(
+                        table, record, "read")
                     if is_valid:
                         validated_records.append(record)
                     else:
@@ -65,19 +70,25 @@ class APIClient:
 
             return records
         except httpx.HTTPStatusError as e:
-            log.error(f"HTTP Error getting records from '{table}'", exc_info=True)
+            log.error(
+                f"HTTP Error getting records from '{table}'", exc_info=True)
             ui.notify(
                 f"Error HTTP {e.response.status_code}: {e.response.text}",
                 type="negative",
             )
             return []
         except Exception as e:
-            log.error(f"Unexpected error getting records from '{table}'", exc_info=True)
+            log.error(
+                f"Unexpected error getting records from '{table}'", exc_info=True)
             ui.notify(f"Error al obtener registros: {str(e)}", type="negative")
             return []
 
     async def call_rpc(
-        self, fn_name: str, payload: Optional[Dict[str, Any]] = None, *, timeout: Optional[float] = None
+        self,
+        fn_name: str,
+        payload: Optional[Dict[str, Any]] = None,
+        *,
+        timeout: Optional[float] = None,
     ) -> Optional[Any]:
         """Call a PostgREST RPC endpoint and return the JSON response."""
         client = self._ensure_client()
@@ -93,9 +104,9 @@ class APIClient:
             log.info(f"RPC '{fn_name}' timed out; falling back if supported.")
             return None
         except httpx.HTTPStatusError as e:
-            # Silence 404 for optional RPCs; caller may fallback locally
             if e.response is not None and e.response.status_code == 404:
-                log.info(f"RPC '{fn_name}' not found (404); falling back if supported.")
+                log.info(
+                    f"RPC '{fn_name}' not found (404); falling back if supported.")
                 return None
             log.error(f"HTTP Error calling RPC '{fn_name}'", exc_info=True)
             ui.notify(
@@ -104,8 +115,10 @@ class APIClient:
             )
             return None
         except Exception as e:
-            log.error(f"Unexpected error calling RPC '{fn_name}'", exc_info=True)
-            ui.notify(f"Error al invocar función {fn_name}: {str(e)}", type="negative")
+            log.error(
+                f"Unexpected error calling RPC '{fn_name}'", exc_info=True)
+            ui.notify(
+                f"Error al invocar función {fn_name}: {str(e)}", type="negative")
             return None
 
     async def get_bloque_suggestions(
@@ -118,17 +131,14 @@ class APIClient:
             return []
 
         payload = {"p_addresses": addresses, "p_score_limit": score_limit}
-        # Short timeout so UI remains responsive; fall back locally if slow
         result = await self.call_rpc("rpc_get_bloque_suggestions", payload, timeout=5.0)
 
-        # If RPC is available and returns data, normalize and return
         if result:
             if isinstance(result, list):
                 return result
             if isinstance(result, dict):
                 return [result]
 
-        # Fallback: do a simple local fuzzy match using difflib
         try:
             bloques = await self.get_records("bloques", limit=2000)
             if not bloques:
@@ -152,7 +162,8 @@ class APIClient:
 
             suggestions: List[Dict[str, Any]] = []
             for item in addresses:
-                idx = item.get("index") if "index" in item else item.get("piso_id")
+                idx = item.get(
+                    "index") if "index" in item else item.get("piso_id")
                 direccion = item.get("direccion")
                 norm_src = _normalize(direccion)
                 best = None
@@ -270,7 +281,8 @@ class APIClient:
                 f"Error creating record in '{table}' with data: {data}", exc_info=True
             )
             if show_validation_errors:
-                ui.notify(f"Error al crear registro: {str(e)}", type="negative")
+                ui.notify(
+                    f"Error al crear registro: {str(e)}", type="negative")
             return None, f"Error Inesperado: {str(e)}"
 
     async def update_record(
@@ -321,7 +333,8 @@ class APIClient:
             log.error(
                 f"Error updating record ID '{record_id}' in '{table}'", exc_info=True
             )
-            ui.notify(f"Error al actualizar registro: {str(e)}", type="negative")
+            ui.notify(
+                f"Error al actualizar registro: {str(e)}", type="negative")
             return None
 
     async def delete_record(self, table: str, record_id: int) -> bool:
@@ -438,7 +451,8 @@ class APIClient:
 
         child_relations = schema.get("child_relations", [])
         relation_config = next(
-            (rel for rel in child_relations if rel["table"] == relation_table), None
+            (rel for rel in child_relations if rel["table"]
+             == relation_table), None
         )
 
         if not relation_config:

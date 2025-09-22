@@ -8,7 +8,8 @@ import os
 class Config:
     """Application configuration settings."""
 
-    API_BASE_URL: str = os.environ.get("POSTGREST_API_URL", "http://localhost:3001")
+    API_BASE_URL: str = os.environ.get(
+        "POSTGREST_API_URL", "http://localhost:3001")
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8081
     APP_TITLE: str = "Gestión Sindicato de Inquilinas de Madrid"

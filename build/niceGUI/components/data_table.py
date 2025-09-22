@@ -21,7 +21,7 @@ class DataTable:
         self.on_row_click = on_row_click
         self.show_actions = show_actions
         self.hidden_columns = hidden_columns or []
-        self.container = None  # Initialize container attribute
+        self.container = None
 
     def create(self) -> ui.column:
         """Create the table UI's container and initial render."""
@@ -40,7 +40,8 @@ class DataTable:
             records = self.state.get_paginated_records()
 
             if not self.state.records:
-                ui.label("No se encontraron registros").classes("text-gray-500")
+                ui.label("No se encontraron registros").classes(
+                    "text-gray-500")
                 return
 
             ui.label(
@@ -56,7 +57,8 @@ class DataTable:
 
             if records:
                 all_columns = list(records[0].keys())
-                columns = [col for col in all_columns if col not in self.hidden_columns]
+                columns = [
+                    col for col in all_columns if col not in self.hidden_columns]
 
                 with ui.card().classes("w-full"):
                     with ui.row().classes("w-full bg-gray-100 p-2 items-center"):
@@ -86,13 +88,16 @@ class DataTable:
                                     ui.icon(icon, size="sm")
                                     if len(self.state.sort_criteria) > 1:
                                         sort_index = (
-                                            self.state.sort_criteria.index(sort_info)
+                                            self.state.sort_criteria.index(
+                                                sort_info)
                                             + 1
                                         )
-                                        ui.label(f"({sort_index})").classes("text-xs")
+                                        ui.label(f"({sort_index})").classes(
+                                            "text-xs")
 
                         if self.show_actions:
-                            ui.label("Acciones").classes("font-bold w-32 text-center")
+                            ui.label("Acciones").classes(
+                                "font-bold w-32 text-center")
 
                     for record in records:
                         row_classes = (
@@ -121,12 +126,14 @@ class DataTable:
                                     if self.on_edit:
                                         ui.button(
                                             icon="edit",
-                                            on_click=lambda r=record: self.on_edit(r),
+                                            on_click=lambda r=record: self.on_edit(
+                                                r),
                                         ).props("size=sm flat dense color=orange-600")
                                     if self.on_delete:
                                         ui.button(
                                             icon="delete",
-                                            on_click=lambda r=record: self.on_delete(r),
+                                            on_click=lambda r=record: self.on_delete(
+                                                r),
                                         ).props("size=sm flat dense color=negative")
 
                         if self.on_row_click:
@@ -148,7 +155,8 @@ class DataTable:
         else:
             if existing_criterion:
                 idx = self.state.sort_criteria.index(existing_criterion)
-                self.state.sort_criteria[idx] = (column, not existing_criterion[1])
+                self.state.sort_criteria[idx] = (
+                    column, not existing_criterion[1])
             else:
                 self.state.sort_criteria.append((column, True))
 
@@ -192,10 +200,7 @@ class DataTable:
                 ui.select(
                     options=[5, 10, 25, 50, 100],
                     value=self.state.page_size.value,
-                    # --- MODIFICATION START ---
-                    # Use the new handler function to trigger a refresh
                     on_change=lambda e: self._change_page_size(e.value),
-                    # --- MODIFICATION END ---
                 ).props("dense").classes("w-20")
                 ui.label("por página")
 
@@ -211,5 +216,3 @@ class DataTable:
         self.state.page_size.set(new_size)
         self.state.current_page.set(1)  # Reset to the first page
         self.refresh()
-
-    # --- MODIFICATION END ---

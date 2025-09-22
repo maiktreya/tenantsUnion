@@ -9,7 +9,7 @@ def _clean_record(record: Dict) -> Dict:
     """
     cleaned = {}
     for key, value in record.items():
-        if value is None or value == '':
+        if value is None or value == "":
             cleaned[key] = None
         else:
             try:

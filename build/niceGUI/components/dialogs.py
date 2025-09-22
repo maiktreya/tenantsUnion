@@ -113,15 +113,8 @@ class EnhancedRecordDialog:
         """
         table_info = TABLE_INFO.get(self.table, {})
         pk_field = table_info.get("id_field", "id")
-
-        # --- FIX START ---
-        # Priority 1: Always use the 'fields' list from config if it exists.
-        # This makes 'create' and 'edit' modes consistent.
         if "fields" in table_info:
             return table_info.get("fields", [])
-        # --- FIX END ---
-
-        # Priority 2: For 'admin' view, show all fields (visible + hidden).
         if self.calling_view == "admin":
             visible_fields = table_info.get("fields", [])
             hidden_fields = table_info.get("hidden_fields", [])
@@ -156,23 +149,27 @@ class EnhancedRecordDialog:
         always_hide = configured_hidden.union(self.extra_hidden_fields)
 
         if self.sort_fields:
-            fields = sorted(fields, key=lambda f: (0 if f in relations else 1, f))
+            fields = sorted(fields, key=lambda f: (
+                0 if f in relations else 1, f))
 
         for field in fields:
             value = self.record.get(field)
-            label = self.custom_labels.get(field, field.replace("_", " ").title())
+            label = self.custom_labels.get(
+                field, field.replace("_", " ").title())
             lower_field = field.lower()
 
             # Honor configured hidden fields and caller-provided extra_hidden_fields
             if field in always_hide:
-                self.inputs[field] = ui.input(value=value).style("display: none")
+                self.inputs[field] = ui.input(
+                    value=value).style("display: none")
                 continue
 
             if field in self.custom_options:
                 options = self.custom_options[field]
                 current_value = value if value in options else None
                 self.inputs[field] = (
-                    ui.select(options=options, label=label, value=current_value)
+                    ui.select(options=options, label=label,
+                              value=current_value)
                     .classes("w-full")
                     .props("use-input")
                 )
@@ -183,11 +180,12 @@ class EnhancedRecordDialog:
                 try:
                     options_records = await self.api.get_records(view_name, limit=2000)
                     if "," in display_field:
-                        get_disp = lambda r: " ".join(
-                            [str(r.get(df, "")) for df in display_field.split(",")]
+                        def get_disp(r): return " ".join(
+                            [str(r.get(df, ""))
+                             for df in display_field.split(",")]
                         ).strip()
                     else:
-                        get_disp = lambda r: str(
+                        def get_disp(r): return str(
                             r.get(display_field, f"ID: {r.get('id')}")
                         )
                     options = {r["id"]: get_disp(r) for r in options_records}
@@ -206,7 +204,8 @@ class EnhancedRecordDialog:
                     continue
 
                 self.inputs[field] = (
-                    ui.select(options=options, label=label, value=current_value)
+                    ui.select(options=options, label=label,
+                              value=current_value)
                     .classes("w-full")
                     .props("use-input")
                 )
@@ -244,7 +243,8 @@ class EnhancedRecordDialog:
     async def _save_handler(self):
         """Central save handler that cleans data before sending to the API."""
         try:
-            raw_data = {field: self.inputs[field].value for field in self.inputs}
+            raw_data = {
+                field: self.inputs[field].value for field in self.inputs}
             cleaned_data = _clean_dialog_record(raw_data)
 
             final_data = cleaned_data

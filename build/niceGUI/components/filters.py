@@ -30,7 +30,6 @@ def _normalize_for_sorting(value: Any) -> str:
     return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
 
 
-# --- Refactored Filter Panel ---
 class FilterPanel:
     """
     Reusable client-side filter panel with a consolidated date range filter

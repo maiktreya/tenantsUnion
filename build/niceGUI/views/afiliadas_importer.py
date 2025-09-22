@@ -17,6 +17,7 @@ from components.importer_panels import render_preview_tabs
 
 log = logging.getLogger(__name__)
 
+
 class AfiliadasImporterView:
     """
     A view to import 'afiliadas' by orchestrating data parsing, UI components,
@@ -27,7 +28,10 @@ class AfiliadasImporterView:
         self.api = api_client
         self.state = state
         self.panels: Dict[str, Optional[ui.column]] = {
-            "afiliadas": None, "pisos": None, "bloques": None, "facturacion": None
+            "afiliadas": None,
+            "pisos": None,
+            "bloques": None,
+            "facturacion": None,
         }
         self.import_button: Optional[ui.button] = None
         self.bloque_score_limit: float = 0.88
@@ -37,14 +41,18 @@ class AfiliadasImporterView:
     def create(self) -> ui.column:
         """Create the main UI for the CSV importer view."""
         with ui.column().classes("w-full p-4 gap-4") as container:
-            ui.label("Importar Nuevas Afiliadas desde CSV").classes("text-h6 font-italic")
-            ui.markdown("Sube un archivo CSV. Los datos se validarán y se mostrarán en pestañas para su revisión y edición antes de la importación final.")
+            ui.label("Importar Nuevas Afiliadas desde CSV").classes(
+                "text-h6 font-italic"
+            )
+            ui.markdown(
+                "Sube un archivo CSV. Los datos se validarán y se mostrarán en pestañas para su revisión y edición antes de la importación final."
+            )
 
             with ui.row().classes("w-full gap-4 items-center"):
                 ui.upload(
                     on_upload=self._handle_upload,
                     auto_upload=True,
-                    label="Subir archivo CSV"
+                    label="Subir archivo CSV",
                 ).props('accept=".csv"')
                 self.import_button = ui.button(
                     "Iniciar Importación", icon="upload", on_click=self._start_import
@@ -54,7 +62,9 @@ class AfiliadasImporterView:
                 for key in self.panels:
                     ui.tab(key, label=key.replace("_", " ").title())
 
-            with ui.tab_panels(tabs, value="afiliadas").classes("w-full border rounded-md"):
+            with ui.tab_panels(tabs, value="afiliadas").classes(
+                "w-full border rounded-md"
+            ):
                 for key in self.panels:
                     with ui.tab_panel(key):
                         self.panels[key] = ui.column().classes("w-full")
@@ -65,7 +75,9 @@ class AfiliadasImporterView:
         """A computed property to check if all records in the state are valid."""
         if not self.state.records:
             return False
-        return all(r.get("validation", {}).get("is_valid", False) for r in self.state.records)
+        return all(
+            r.get("validation", {}).get("is_valid", False) for r in self.state.records
+        )
 
     async def _handle_upload(self, e: events.UploadEventArguments):
         """Handle the file upload, parse the data, fetch suggestions, and render the UI."""
@@ -73,13 +85,20 @@ class AfiliadasImporterView:
             content = e.content.read().decode("utf-8-sig")
             df = pd.read_csv(io.StringIO(content), header=None, dtype=str).fillna("")
 
-            records = [rec for _, row in df.iloc[1:].iterrows() if (rec := transform_and_validate_row(row)) is not None]
+            records = [
+                rec
+                for _, row in df.iloc[1:].iterrows()
+                if (rec := transform_and_validate_row(row)) is not None
+            ]
 
             self._bloque_details_cache.clear()
             self.state.set_records(records)
             await self._apply_batch_bloque_suggestions()
             self._render_all_panels()
-            ui.notify(f"{len(records)} registros han sido procesados desde el archivo.", type="positive")
+            ui.notify(
+                f"{len(records)} registros han sido procesados desde el archivo.",
+                type="positive",
+            )
         except Exception as ex:
             log.error("Error processing the uploaded CSV file.", exc_info=True)
             ui.notify(f"Error al procesar el archivo: {ex}", type="negative")
@@ -139,10 +158,18 @@ class AfiliadasImporterView:
 
         self.state.records.sort(
             key=lambda r: self._normalize_for_sorting(
-                r["validation"]["is_valid"] if column == "is_valid" else
-                next((r[key].get(column) for key in ["afiliada", "piso", "facturacion", "bloque"] if column in r.get(key, {})), None)
+                r["validation"]["is_valid"]
+                if column == "is_valid"
+                else next(
+                    (
+                        r[key].get(column)
+                        for key in ["afiliada", "piso", "facturacion", "bloque"]
+                        if column in r.get(key, {})
+                    ),
+                    None,
+                )
             ),
-            reverse=is_reverse
+            reverse=is_reverse,
         )
 
         # Update sort criteria: True means ascending for icon display
@@ -156,15 +183,28 @@ class AfiliadasImporterView:
 
     def _revalidate_record(self, record: Dict):
         """Re-validates a single record after an edit, and updates its UI elements."""
-        is_valid_afiliada, err_afiliada = validator.validate_record("afiliadas", record["afiliada"], "create")
-        is_valid_piso, err_piso = validator.validate_record("pisos", record["piso"], "create")
-        is_valid_bloque, err_bloque = validator.validate_record("bloques", record.setdefault("bloque", {}), "create")
-        is_valid_facturacion, err_facturacion = validator.validate_record("facturacion", record["facturacion"], "create")
+        is_valid_afiliada, err_afiliada = validator.validate_record(
+            "afiliadas", record["afiliada"], "create"
+        )
+        is_valid_piso, err_piso = validator.validate_record(
+            "pisos", record["piso"], "create"
+        )
+        is_valid_bloque, err_bloque = validator.validate_record(
+            "bloques", record.setdefault("bloque", {}), "create"
+        )
+        is_valid_facturacion, err_facturacion = validator.validate_record(
+            "facturacion", record["facturacion"], "create"
+        )
 
-        record["validation"].update({
-            "is_valid": is_valid_afiliada and is_valid_piso and is_valid_bloque and is_valid_facturacion,
-            "errors": err_afiliada + err_piso + err_bloque + err_facturacion,
-        })
+        record["validation"].update(
+            {
+                "is_valid": is_valid_afiliada
+                and is_valid_piso
+                and is_valid_bloque
+                and is_valid_facturacion,
+                "errors": err_afiliada + err_piso + err_bloque + err_facturacion,
+            }
+        )
 
         for updater in record.get("ui_updaters", {}).values():
             updater()
@@ -180,7 +220,9 @@ class AfiliadasImporterView:
         """Schedules a debounced refresh of bloque suggestions."""
         if self._suggestion_task and not self._suggestion_task.done():
             self._suggestion_task.cancel()
-        self._suggestion_task = asyncio.create_task(self._apply_batch_bloque_suggestions())
+        self._suggestion_task = asyncio.create_task(
+            self._apply_batch_bloque_suggestions()
+        )
         try:
             await self._suggestion_task
         finally:
@@ -188,37 +230,55 @@ class AfiliadasImporterView:
 
     async def _apply_batch_bloque_suggestions(self):
         """Fetches bloque suggestions from the API and updates the records' state."""
-        if not self.state.records: return
+        if not self.state.records:
+            return
 
         addresses = [
             {"index": idx, "direccion": r["piso"]["direccion"]}
             for idx, r in enumerate(self.state.records)
             if r.get("piso", {}).get("direccion")
         ]
-        if not addresses: return
+        if not addresses:
+            return
 
         try:
-            suggestions = await self.api.get_bloque_suggestions(addresses, self.bloque_score_limit)
-            suggestion_map = {s["piso_id"]: s for s in suggestions if s.get("piso_id") is not None}
+            suggestions = await self.api.get_bloque_suggestions(
+                addresses, self.bloque_score_limit
+            )
+            suggestion_map = {
+                s["piso_id"]: s for s in suggestions if s.get("piso_id") is not None
+            }
 
             for idx, record in enumerate(self.state.records):
                 suggestion = suggestion_map.get(idx)
                 meta = record.setdefault("meta", {})
-                if suggestion and (suggestion.get("suggested_bloque_id") or suggestion.get("suggested_bloque_direccion")):
-                    meta["bloque"] = {"id": suggestion.get("suggested_bloque_id"), "direccion": suggestion.get("suggested_bloque_direccion")}
+                if suggestion and (
+                    suggestion.get("suggested_bloque_id")
+                    or suggestion.get("suggested_bloque_direccion")
+                ):
+                    meta["bloque"] = {
+                        "id": suggestion.get("suggested_bloque_id"),
+                        "direccion": suggestion.get("suggested_bloque_direccion"),
+                    }
                     meta["bloque_score"] = suggestion.get("suggested_score")
                     # Preview should show the suggested bloque address for easier comparison
-                    record.setdefault("bloque", {})["direccion"] = suggestion.get("suggested_bloque_direccion") or record.get("bloque", {}).get("direccion")
+                    record.setdefault("bloque", {})["direccion"] = suggestion.get(
+                        "suggested_bloque_direccion"
+                    ) or record.get("bloque", {}).get("direccion")
                 else:
                     meta["bloque"] = None
                     meta["bloque_score"] = None
                     # If not already linked, revert preview field to default derived from piso address
                     if record.get("piso", {}).get("bloque_id") is None:
-                        record.setdefault("bloque", {})["direccion"] = short_address(record.get("piso", {}).get("direccion", ""))
+                        record.setdefault("bloque", {})["direccion"] = short_address(
+                            record.get("piso", {}).get("direccion", "")
+                        )
                 self._revalidate_record(record)
         except Exception as e:
             log.warning("Failed to get bloque suggestions", exc_info=True)
-            ui.notify(f"No se pudieron obtener sugerencias de bloques: {e}", type="warning")
+            ui.notify(
+                f"No se pudieron obtener sugerencias de bloques: {e}", type="warning"
+            )
 
     def _handle_bloque_assignment_change(self, record: Dict):
         """Handles manual changes to a bloque assignment."""
@@ -229,7 +289,7 @@ class AfiliadasImporterView:
         """Fetches full details for a manually assigned bloque ID."""
         bloque_id_str = record.get("piso", {}).get("bloque_id")
         bloque_id = int(bloque_id_str) if str(bloque_id_str).isdigit() else None
-        record["piso"]["bloque_id"] = bloque_id # Ensure it's stored as int or None
+        record["piso"]["bloque_id"] = bloque_id  # Ensure it's stored as int or None
 
         if not bloque_id:
             record["meta"]["bloque_manual"] = None
@@ -259,7 +319,9 @@ class AfiliadasImporterView:
         if suggestion and suggestion.get("id"):
             record["piso"]["bloque_id"] = suggestion["id"]
             # Mirror the suggested address into the preview field for comparison
-            record.setdefault("bloque", {})["direccion"] = suggestion.get("direccion") or record.get("bloque", {}).get("direccion")
+            record.setdefault("bloque", {})["direccion"] = suggestion.get(
+                "direccion"
+            ) or record.get("bloque", {}).get("direccion")
             self._handle_bloque_assignment_change(record)
         else:
             ui.notify("No hay sugerencia disponible.", type="warning")
@@ -268,7 +330,9 @@ class AfiliadasImporterView:
         """Clears the manual bloque assignment."""
         record["piso"]["bloque_id"] = None
         # Also revert the preview field to baseline from piso address
-        record.setdefault("bloque", {})["direccion"] = short_address(record.get("piso", {}).get("direccion", ""))
+        record.setdefault("bloque", {})["direccion"] = short_address(
+            record.get("piso", {}).get("direccion", "")
+        )
         self._handle_bloque_assignment_change(record)
 
     def _reset_bloques_entries(self):
@@ -277,7 +341,9 @@ class AfiliadasImporterView:
             return
         for record in self.state.records:
             record.setdefault("piso", {})["bloque_id"] = None
-            record.setdefault("bloque", {})["direccion"] = short_address(record.get("piso", {}).get("direccion", ""))
+            record.setdefault("bloque", {})["direccion"] = short_address(
+                record.get("piso", {}).get("direccion", "")
+            )
             meta = record.setdefault("meta", {})
             meta["bloque_manual"] = None
             # Keep suggestions available; they will reappear as labels but not pre-fill
@@ -290,7 +356,10 @@ class AfiliadasImporterView:
         in the correct order: bloques, pisos, afiliadas, facturacion.
         """
         if not self.all_records_valid:
-            ui.notify("Hay registros con errores. Por favor, corríjalos antes de importar.", type="negative")
+            ui.notify(
+                "Hay registros con errores. Por favor, corríjalos antes de importar.",
+                type="negative",
+            )
             return
 
         valid_records = self.state.records
@@ -304,7 +373,9 @@ class AfiliadasImporterView:
             ui.label("Proceso de Importación").classes("text-h6")
             status_label = ui.label(f"Iniciando importación de {total} registros...")
             progress = ui.linear_progress(0).classes("w-full my-2")
-            log_area = ui.log(max_lines=15).classes("w-full h-64 bg-gray-100 p-2 rounded")
+            log_area = ui.log(max_lines=15).classes(
+                "w-full h-64 bg-gray-100 p-2 rounded"
+            )
 
         progress_dialog.open()
 
@@ -322,46 +393,74 @@ class AfiliadasImporterView:
                 bloque_direccion = record["bloque"].get("direccion")
 
                 if bloque_id:
-                    existing_bloques = await self.api.get_records("bloques", {"id": f"eq.{bloque_id}"})
+                    existing_bloques = await self.api.get_records(
+                        "bloques", {"id": f"eq.{bloque_id}"}
+                    )
                     if not existing_bloques:
-                        raise ValueError(f"El ID de bloque '{bloque_id}' proporcionado no existe.")
+                        raise ValueError(
+                            f"El ID de bloque '{bloque_id}' proporcionado no existe."
+                        )
                 elif bloque_direccion:
-                    existing_bloques = await self.api.get_records("bloques", {"direccion": f"eq.{bloque_direccion}"})
+                    existing_bloques = await self.api.get_records(
+                        "bloques", {"direccion": f"eq.{bloque_direccion}"}
+                    )
                     if existing_bloques:
                         bloque_id = existing_bloques[0]["id"]
-                        log_message(f"ℹ️ Bloque encontrado: {bloque_direccion} (ID: {bloque_id})")
+                        log_message(
+                            f"ℹ️ Bloque encontrado: {bloque_direccion} (ID: {bloque_id})"
+                        )
                     else:
-                        new_bloque, error = await self.api.create_record("bloques", {"direccion": bloque_direccion})
-                        if error: raise Exception(f"Error al crear bloque: {error}")
+                        new_bloque, error = await self.api.create_record(
+                            "bloques", {"direccion": bloque_direccion}
+                        )
+                        if error:
+                            raise Exception(f"Error al crear bloque: {error}")
                         bloque_id = new_bloque["id"]
-                        log_message(f"➕ Bloque creado: {bloque_direccion} (ID: {bloque_id})")
+                        log_message(
+                            f"➕ Bloque creado: {bloque_direccion} (ID: {bloque_id})"
+                        )
 
                 record["piso"]["bloque_id"] = bloque_id
 
                 # Step 2: Ensure Piso exists
                 piso_direccion = record["piso"]["direccion"]
-                existing_pisos = await self.api.get_records("pisos", {"direccion": f"eq.{piso_direccion}"})
+                existing_pisos = await self.api.get_records(
+                    "pisos", {"direccion": f"eq.{piso_direccion}"}
+                )
                 if existing_pisos:
                     piso_id = existing_pisos[0]["id"]
                     log_message(f"ℹ️ Piso encontrado: {piso_direccion} (ID: {piso_id})")
                 else:
-                    new_piso, error = await self.api.create_record("pisos", record["piso"])
-                    if error: raise Exception(f"Error al crear piso: {error}")
+                    new_piso, error = await self.api.create_record(
+                        "pisos", record["piso"]
+                    )
+                    if error:
+                        raise Exception(f"Error al crear piso: {error}")
                     piso_id = new_piso["id"]
                     log_message(f"➕ Piso creado: {piso_direccion} (ID: {piso_id})")
 
                 # Step 3: Create Afiliada
                 record["afiliada"]["piso_id"] = piso_id
-                new_afiliada, error = await self.api.create_record("afiliadas", record["afiliada"])
-                if error: raise Exception(f"Error al crear afiliada: {error}")
+                new_afiliada, error = await self.api.create_record(
+                    "afiliadas", record["afiliada"]
+                )
+                if error:
+                    raise Exception(f"Error al crear afiliada: {error}")
                 afiliada_id = new_afiliada["id"]
                 newly_created_afiliadas.append(new_afiliada)
-                log_message(f"✅ Afiliada creada: {name} (ID: {afiliada_id}, Nº: {new_afiliada.get('num_afiliada')})")
+                log_message(
+                    f"✅ Afiliada creada: {name} (ID: {afiliada_id}, Nº: {new_afiliada.get('num_afiliada')})"
+                )
 
                 # Step 4: Create Facturacion
-                if record["facturacion"].get("iban") or record["facturacion"].get("cuota", 0) > 0:
+                if (
+                    record["facturacion"].get("iban")
+                    or record["facturacion"].get("cuota", 0) > 0
+                ):
                     record["facturacion"]["afiliada_id"] = afiliada_id
-                    _, error = await self.api.create_record("facturacion", record["facturacion"])
+                    _, error = await self.api.create_record(
+                        "facturacion", record["facturacion"]
+                    )
                     if error:
                         log_message(f"⚠️ Aviso (Facturación): {name}: {error}")
                     else:
@@ -378,16 +477,22 @@ class AfiliadasImporterView:
 
         progress_dialog.close()
 
-        with ui.dialog() as summary_dialog, ui.card().classes("w-[90vw] max-w-[1200px]"):
+        with ui.dialog() as summary_dialog, ui.card().classes(
+            "w-[90vw] max-w-[1200px]"
+        ):
             ui.label("Resultado de la Importación").classes("text-h6 mb-2")
             # Render sections stacked vertically instead of side-by-side
             with ui.column().classes("w-full gap-4"):
                 # Summary box
                 with ui.card().classes("w-full"):
                     if success_count > 0:
-                        ui.markdown(f"✅ **Se importaron {success_count} de {total} registros exitosamente.**").classes("text-positive")
+                        ui.markdown(
+                            f"✅ **Se importaron {success_count} de {total} registros exitosamente.**"
+                        ).classes("text-positive")
                     if failed_imports:
-                        ui.markdown(f"❌ **Fallaron {len(failed_imports)} de {total} registros.**").classes("text-negative")
+                        ui.markdown(
+                            f"❌ **Fallaron {len(failed_imports)} de {total} registros.**"
+                        ).classes("text-negative")
 
                 # Errors box
                 with ui.card().classes("w-full"):
@@ -395,7 +500,11 @@ class AfiliadasImporterView:
                     if failed_imports:
                         ui.table(
                             columns=[
-                                {"name": "afiliada", "label": "Afiliada", "field": "afiliada"},
+                                {
+                                    "name": "afiliada",
+                                    "label": "Afiliada",
+                                    "field": "afiliada",
+                                },
                                 {"name": "error", "label": "Error", "field": "error"},
                             ],
                             rows=failed_imports,
@@ -407,8 +516,9 @@ class AfiliadasImporterView:
                 # Full log box
                 with ui.card().classes("w-full"):
                     ui.label("Registro Completo").classes("text-subtitle2 mb-1")
-                    # Use a moderate height to fit nicely in stacked layout
-                    ui.textarea(value="\n".join(full_log)).props("readonly outlined").classes("w-full h-[40vh]")
+                    ui.textarea(value="\n".join(full_log)).props(
+                        "readonly outlined"
+                    ).classes("w-full h-[40vh]")
 
             ui.button("Cerrar", on_click=summary_dialog.close).classes("mt-4 self-end")
 

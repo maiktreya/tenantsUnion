@@ -1,9 +1,10 @@
-# /build/niceGUI/api/validate.py
-
-from typing import Dict, Any, List, Tuple
-import re
-from datetime import datetime
+# Create a singleton instance for easy import across the application
 from config import TABLE_INFO
+from datetime import datetime
+import re
+from typing import Dict, Any, List, Tuple
+validator = TableValidator()
+# /build/niceGUI/api/validate.py
 
 
 class TableValidator:
@@ -65,10 +66,8 @@ class TableValidator:
     def _validate_field_types(self, table: str, data: Dict[str, Any]) -> List[str]:
         """Validate field types based on naming conventions."""
         errors = []
-        # --- THIS IS THE FIX ---
         # Get the config for the current table to correctly check for existing patterns.
         config = self.table_info.get(table, {})
-        # ---------------------
 
         for field, value in data.items():
             if value is None or str(value).strip() == "":
@@ -79,7 +78,8 @@ class TableValidator:
                 # Avoid re-validating if a pattern already exists for this field
                 if not config.get("field_patterns", {}).get(field):
                     if not re.match(r"^[^@]+@[^@]+\.[^@]+$", str(value)):
-                        errors.append(f"Formato de email inválido para '{field}'")
+                        errors.append(
+                            f"Formato de email inválido para '{field}'")
 
             # Date validation
             if any(date_word in field.lower() for date_word in ["fecha", "date"]):
@@ -93,7 +93,8 @@ class TableValidator:
                 try:
                     int(value)
                 except (ValueError, TypeError):
-                    errors.append(f"El formato del ID para '{field}' debe ser numérico")
+                    errors.append(
+                        f"El formato del ID para '{field}' debe ser numérico")
 
         return errors
 
@@ -142,7 +143,3 @@ class TableValidator:
             constraints["relationship"] = config["relations"][field]
 
         return constraints
-
-
-# Create a singleton instance for easy import across the application
-validator = TableValidator()

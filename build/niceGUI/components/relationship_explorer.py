@@ -1,5 +1,3 @@
-# /build/niceGUI/components/relationship_explorer.py
-
 from typing import Dict, List, Set, Optional
 from nicegui import ui
 from api.client import APIClient

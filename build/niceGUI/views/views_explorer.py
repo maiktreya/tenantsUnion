@@ -10,7 +10,7 @@ from components.filters import FilterPanel
 from components.exporter import export_to_csv
 from components.relationship_explorer import RelationshipExplorer
 from components.base_view import BaseView
-from config import VIEW_INFO, TABLE_INFO  # Import TABLE_INFO
+from config import VIEW_INFO, TABLE_INFO
 
 
 class ViewsExplorerView(BaseView):
@@ -25,7 +25,6 @@ class ViewsExplorerView(BaseView):
         self.filter_panel = None
         self.relationship_explorer = None
         self.filter_container = None
-        # --- ADD THIS LINE ---
         self.data_table_instance = None
 
     def create(self) -> ui.column:
@@ -53,8 +52,6 @@ class ViewsExplorerView(BaseView):
                     icon="filter_alt_off",
                     on_click=self._clear_filters,
                 ).props("color=orange-600")
-
-                # --- This check was missing the 'sistemas' role ---
                 if self.has_role("admin", "sistemas", "gestor"):
                     ui.button(
                         "Exportar CSV", icon="download", on_click=self._export_data
@@ -73,8 +70,6 @@ class ViewsExplorerView(BaseView):
         """Clears the current view state and UI elements."""
         self.state.clear_selection()
         if self.select_view:
-            # --- THIS IS THE FIX ---
-            # Use set_value(None) to clear the selection without causing an error.
             self.select_view.set_value(None)
         if self.data_table_container:
             self.data_table_container.clear()
@@ -111,7 +106,7 @@ class ViewsExplorerView(BaseView):
                         f"Error: No se ha configurado 'base_table' para la vista '{view}'",
                         type="negative",
                     )
-                    spinner.delete()  # --- ADD THIS LINE ---
+                    spinner.delete()
                     return
 
                 base_table_config = TABLE_INFO.get(base_table_name, {})
@@ -130,10 +125,8 @@ class ViewsExplorerView(BaseView):
                     hidden_columns=hidden_fields,
                 )
                 table_instance.create()
-                # Store instance to refresh later
                 self.data_table_instance = table_instance
 
-                # --- This notification logic was moved from inside the table creation ---
                 if records:
                     ui.notify(
                         f"Se cargaron {len(records)} registros de la vista",
@@ -146,11 +139,9 @@ class ViewsExplorerView(BaseView):
             finally:
                 spinner.delete()
 
-    # --- The rest of the file remains the same ---
-
     async def _on_row_click(self, record: Dict):
         view_name = self.state.selected_entity_name.value
-        if view_name:  # --- ADD THIS CHECK ---
+        if view_name:
             await self.relationship_explorer.show_details(record, view_name, "views")
 
     def _setup_filters(self, base_table_config: Dict):
@@ -166,7 +157,7 @@ class ViewsExplorerView(BaseView):
     def _update_filter(self, column: str, value: Any):
         self.state.filters[column] = value
         self.state.apply_filters_and_sort()
-        if self.data_table_instance:  # --- FIX: Check if instance exists ---
+        if self.data_table_instance:
             self.data_table_instance.refresh()
 
     def _clear_filters(self):
@@ -174,7 +165,7 @@ class ViewsExplorerView(BaseView):
         if self.filter_panel:
             self.filter_panel.clear()
         self.state.apply_filters_and_sort()
-        if self.data_table_instance:  # --- FIX: Check if instance exists ---
+        if self.data_table_instance:
             self.data_table_instance.refresh()
 
     async def _refresh_data(self):
