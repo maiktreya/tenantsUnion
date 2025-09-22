@@ -111,8 +111,8 @@ def _render_bloques_panel(panel: ui.column, state: Any, on_drop: Callable, on_re
                 sort_info_b = next((c for c in state.sort_criteria if c[0] == "is_valid"), None)
                 if sort_info_b:
                     ui.icon("arrow_upward" if sort_info_b[1] else "arrow_downward", size="sm")
-            ui.label("Dirección Piso").classes("w-48")
-            ui.label("Dirección Bloque").classes("flex-grow")
+            ui.label("Dirección Piso").classes("flex-1 min-w-[18rem]")
+            ui.label("Dirección Bloque").classes("flex-1 min-w-[18rem]")
             ui.label("Vinculación").classes("w-36")
             ui.label("Sugerencia").classes("w-48")
 
@@ -131,8 +131,8 @@ def _render_bloques_panel(panel: ui.column, state: Any, on_drop: Callable, on_re
                         ))
                     record["ui_updaters"]["bloques_status_icon"] = _update_bloques_status_icon
 
-                ui.label(record.get("piso", {}).get("direccion", "")).classes("w-48 text-sm")
-                bloque_dir_input = ui.input(value=record.setdefault("bloque", {}).get("direccion")).classes("flex-grow transition-opacity").bind_value(record["bloque"], "direccion").on("change", lambda r=record: on_revalidate(r))
+                ui.label(record.get("piso", {}).get("direccion", "")).classes("flex-1 min-w-[18rem] text-sm truncate")
+                bloque_dir_input = ui.input(value=record.setdefault("bloque", {}).get("direccion")).classes("flex-1 min-w-[18rem] transition-opacity").bind_value(record["bloque"], "direccion").on("change", lambda r=record: on_revalidate(r))
 
                 with ui.column().classes("w-36 items-center gap-1"):
                     # Linked status icon
