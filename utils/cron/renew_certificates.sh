@@ -20,7 +20,7 @@ fi
 
 domain="${HOSTNAME:-inquilinato.duckdns.org}"
 duckdns_token="${DUCKDNS_TOKEN}"
-data_path="/home/other/GitHub/prod/tenantsUnion/build/nginx/certbot"
+data_path="/home/other/github/prod/tenantsUnion/build/nginx/certbot"
 
 echo "$(date): Starting certificate renewal check for $domain"
 
