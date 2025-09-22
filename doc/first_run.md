@@ -33,16 +33,18 @@ bash utils/init-letsencrypt-duckdns.sh
 4. Requests real certificates via DNS-01 challenge
 5. Reloads nginx with real certificates
 
-### 4. **Automatic Renewal**
+### 4. **Automatic Renewal & backup**
 
-Add to your system crontab for automatic renewal:
+Add to your system crontab for automatic renewal & backupp:
 
 ```bash
 # Edit crontab
 crontab -e
 
 # Add this line to check for renewal twice daily at 12:00 and 00:00
-0 0,12 * * * /path/to/your/project/renew-certificates.sh >> /path/to/your/project/renewal.log 2>&1
+0 2 * * * /path/to/your/project/renew-certificates.sh >> /path/to/your/project/renewal.log 2>&1
+0 3 * * * /path/to/tenantsUnion/backup_storage.sh >> /home/$USER/back/backup.log 2>&1
+
 ```
 
 ### 5. **Deployment Commands**
