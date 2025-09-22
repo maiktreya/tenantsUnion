@@ -4,6 +4,8 @@ services:
   db:
     ports:
       - "5432:5432"
+    volumes:
+      - /var/lib/postgresql/data # Explicit anonymous volume for --renew-anon-volumes
   server:
     ports:
       - "3001:3000"

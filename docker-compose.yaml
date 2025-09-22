@@ -8,8 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      # - ./storage:/var/lib/postgresql/data # Bind mount to project root storage folder
-      - /var/lib/postgresql/data # Explicit anonymous volume for --renew-anon-volumes
+      - ./storage:/var/lib/postgresql/data # Bind mount to project root storage folder
       - ${INIT_SCRIPTS_PATH:-./build/postgreSQL/init-scripts}:/docker-entrypoint-initdb.d
       - ./dev/back/SI_MAD/db_fork:/csv-data
     healthcheck:
