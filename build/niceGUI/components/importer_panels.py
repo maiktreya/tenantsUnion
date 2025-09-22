@@ -1,5 +1,3 @@
-# build/niceGUI/components/importer_panels.py (Corrected)
-
 from nicegui import ui
 from typing import List, Dict, Any, Callable, Awaitable
 
@@ -247,9 +245,10 @@ def _render_bloques_panel(
                         size="sm",
                     )
             ui.label("Dirección Piso").classes("flex-1 min-w-[18rem]")
-            ui.label("Dirección Bloque").classes("flex-1 min-w-[18rem]")
+            # --- MODIFICATION 1: Swapped Header Order ---
+            ui.label("Sugerencia").classes("flex-1 min-w-[18rem]")
+            ui.label("Dirección Bloque (Editable)").classes("flex-1 min-w-[18rem]")
             ui.label("Vinculación").classes("w-36")
-            ui.label("Sugerencia").classes("w-48")
 
         for record in state.records:
             with ui.row().classes(
@@ -301,6 +300,10 @@ def _render_bloques_panel(
                 ui.label(record.get("piso", {}).get("direccion", "")).classes(
                     "flex-1 min-w-[18rem] text-sm truncate"
                 )
+
+                # --- MODIFICATION 2: Swapped Row Order and Enhanced Suggestion Label ---
+                suggestion_label = ui.label().classes("flex-1 min-w-[18rem] text-xs text-gray-600 whitespace-pre-line")
+
                 bloque_dir_input = (
                     ui.input(value=record.setdefault("bloque", {}).get("direccion"))
                     .classes("flex-1 min-w-[18rem] transition-opacity")
@@ -352,16 +355,20 @@ def _render_bloques_panel(
 
                     record["ui_updaters"]["bloque_vincular_btn"] = _update_vinc_btn
 
-                suggestion_label = ui.label().classes("w-48 text-xs text-gray-500")
-                record["ui_updaters"]["suggestion_label"] = (
-                    lambda lbl=suggestion_label, rec=record: lbl.set_text(
-                        f"ID: {rec['meta'].get('bloque', {}).get('id')} ({rec['meta'].get('bloque_score', 0)*100:.1f}%)"
-                        if rec.get("meta", {}).get("bloque")
-                        else "Sin sugerencia"
-                    )
-                )
+                # --- MODIFICATION 3: New logic for the suggestion label updater ---
+                def _update_suggestion_label(lbl=suggestion_label, rec=record):
+                    suggestion = rec.get("meta", {}).get("bloque")
+                    if suggestion and suggestion.get('direccion'):
+                        score_text = f"({rec['meta'].get('bloque_score', 0)*100:.1f}%)"
+                        id_text = f"ID: {suggestion.get('id', 'N/A')}"
+                        # Use an f-string with a newline character for better readability
+                        lbl.set_text(f"{suggestion['direccion']}\n{id_text} {score_text}")
+                    else:
+                        lbl.set_text("Sin sugerencia")
 
-                # Updaters for dynamic UI: row bg, suggestion label, link icon, vincular button, and blocking of address input
+                record["ui_updaters"]["suggestion_label"] = _update_suggestion_label
+
+                # Updaters for dynamic UI: row bg, link icon, vincular button, and blocking of address input
                 def _update_bloque_dir_input(inp=bloque_dir_input, rec=record):
                     is_linked = rec.get("piso", {}).get("bloque_id") is not None
                     inp.classes(
@@ -371,6 +378,7 @@ def _render_bloques_panel(
 
                 record["ui_updaters"]["bloque_dir_input"] = _update_bloque_dir_input
 
+                # Initial UI updates
                 record["ui_updaters"]["bloques_row"]()
                 record["ui_updaters"]["suggestion_label"]()
                 record["ui_updaters"]["bloque_link_icon"]()
