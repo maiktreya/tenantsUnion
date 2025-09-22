@@ -73,9 +73,9 @@ FROM (VALUES
     (28935), (28936), (28937), (28938), (28939), (28941), (28942),
     (28943), (28944), (28945), (28946), (28947), (28950), (28970),
     (28971), (28976), (28977), (28978), (28979), (28980), (28981),
-    (28982), (28983), (28984), (28990), (28991)
+    (28982), (28983), (28984), (28990), (28991), (28901), (28902),
+    (28903), (28904), (28905), (28906), (28907)
 ) AS data(cp) ON CONFLICT (cp) DO NOTHING;
-
 -- Nodo: Corredor
 INSERT INTO sindicato_inq.nodos_cp_mapping (cp, nodo_id)
 SELECT cp, (SELECT id FROM sindicato_inq.nodos WHERE nombre = 'Corredor')
