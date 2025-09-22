@@ -366,8 +366,7 @@ SELECT DISTINCT
     s.propiedad,
     CAST(
         NULLIF(s.codigo_postal, '') AS INTEGER
-    ),
-    to_date( NULLIF(s.fecha_alta, ''), 'DD/MM/YYYY'
+    )
 FROM staging_afiliadas s
 WHERE
     s.direccion IS NOT NULL
@@ -474,7 +473,7 @@ INSERT INTO
         fecha_apertura
     )
 SELECT a.id, s.estado, s.ambito, s.causa, to_date(
-        NULLIF(s.fecha_apertura, ''), 'DD/MM/YYYY'
+        NULLIF(s.fecha_apertura, ''), 'YYYY-MM-DD'
     )
 FROM
     staging_conflictos s
