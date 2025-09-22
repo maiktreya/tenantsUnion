@@ -221,7 +221,8 @@ CREATE TABLE staging_pisos (
     num_afiliadas TEXT,
     num_preafiliadas TEXT,
     num_inq_colaboradoras TEXT,
-    prop_vertical TEXT
+    prop_vertical TEXT,
+    fecha_firma TEXT
 );
 
 CREATE TABLE staging_asesorias (
@@ -365,7 +366,8 @@ SELECT DISTINCT
     s.propiedad,
     CAST(
         NULLIF(s.codigo_postal, '') AS INTEGER
-    )
+    ),
+    to_date( NULLIF(s.fecha_alta, ''), 'DD/MM/YYYY'
 FROM staging_afiliadas s
 WHERE
     s.direccion IS NOT NULL
@@ -379,11 +381,14 @@ UPDATE pisos p
 SET
     inmobiliaria = s.api,
     prop_vertical = s.prop_vertical,
-    n_personas = s.n_personas
+    n_personas = s.n_personas,
+    fecha_firma = to_date(
+        NULLIF(s.fecha_firma, ''),
+        'DD/MM/YYYY'
+    )
 FROM (
-        -- Usamos una subconsulta para obtener una única fila por dirección
         SELECT DISTINCT
-            ON (sa.direccion) sa.direccion, sa.api, sp.prop_vertical, sa.n_personas
+            ON (sa.direccion) sa.direccion, sa.api, sp.prop_vertical, sa.n_personas, sp.fecha_firma
         FROM
             staging_afiliadas sa
             LEFT JOIN staging_pisos sp ON sa.direccion = sp.direccion
