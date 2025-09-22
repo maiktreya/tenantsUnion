@@ -383,7 +383,7 @@ SET
     n_personas = s.n_personas,
     fecha_firma = to_date(
         NULLIF(s.fecha_firma, ''),
-        'DD/MM/YYYY'
+        'YYYY-MM-DD'
     )
 FROM (
         SELECT DISTINCT
@@ -473,7 +473,7 @@ INSERT INTO
         fecha_apertura
     )
 SELECT a.id, s.estado, s.ambito, s.causa, to_date(
-        NULLIF(s.fecha_apertura, ''), 'YYYY-MM-DD'
+        NULLIF(s.fecha_apertura, ''), 'DD/MM/YYYY'
     )
 FROM
     staging_conflictos s
