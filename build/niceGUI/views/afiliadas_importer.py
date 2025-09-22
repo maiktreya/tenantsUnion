@@ -380,16 +380,17 @@ class AfiliadasImporterView:
 
         with ui.dialog() as summary_dialog, ui.card().classes("w-[90vw] max-w-[1200px]"):
             ui.label("Resultado de la Importación").classes("text-h6 mb-2")
-            with ui.row().classes("w-full gap-4 items-stretch"):
+            # Render sections stacked vertically instead of side-by-side
+            with ui.column().classes("w-full gap-4"):
                 # Summary box
-                with ui.card().classes("flex-1"):
+                with ui.card().classes("w-full"):
                     if success_count > 0:
                         ui.markdown(f"✅ **Se importaron {success_count} de {total} registros exitosamente.**").classes("text-positive")
                     if failed_imports:
                         ui.markdown(f"❌ **Fallaron {len(failed_imports)} de {total} registros.**").classes("text-negative")
 
                 # Errors box
-                with ui.card().classes("flex-1"):
+                with ui.card().classes("w-full"):
                     ui.label("Errores").classes("text-subtitle2 mb-1")
                     if failed_imports:
                         ui.table(
@@ -404,9 +405,10 @@ class AfiliadasImporterView:
                         ui.label("Sin errores").classes("text-gray-500")
 
                 # Full log box
-                with ui.card().classes("flex-[2]"):
+                with ui.card().classes("w-full"):
                     ui.label("Registro Completo").classes("text-subtitle2 mb-1")
-                    ui.textarea(value="\n".join(full_log)).props("readonly outlined").classes("w-full h-[60vh]")
+                    # Use a moderate height to fit nicely in stacked layout
+                    ui.textarea(value="\n".join(full_log)).props("readonly outlined").classes("w-full h-[40vh]")
 
             ui.button("Cerrar", on_click=summary_dialog.close).classes("mt-4 self-end")
 
