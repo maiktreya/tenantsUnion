@@ -376,6 +376,7 @@ class ConflictsView(BaseView):
             record=initial_record,
             on_success=self._on_note_saved,
             on_save=self._save_note_handler(None),
+            extra_hidden_fields=["conflicto_id", "usuario_id"],
         )
         await dialog.open()
 
@@ -399,6 +400,7 @@ class ConflictsView(BaseView):
             mode="edit",
             on_success=self._on_note_saved,
             on_save=self._save_note_handler(note),
+            extra_hidden_fields=["conflicto_id", "usuario_id"],
         )
         await dialog.open()
 

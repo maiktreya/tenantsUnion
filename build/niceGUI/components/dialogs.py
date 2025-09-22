@@ -68,6 +68,7 @@ class EnhancedRecordDialog:
         custom_labels: Optional[Dict[str, str]] = None,
         calling_view: str = "default",
         sort_fields: bool = True,
+        extra_hidden_fields: Optional[list[str]] = None,
     ):
         self.api = api
         self.table = table
@@ -81,6 +82,7 @@ class EnhancedRecordDialog:
         self.inputs = {}
         self.calling_view = calling_view
         self.sort_fields = sort_fields
+        self.extra_hidden_fields = set(extra_hidden_fields or [])
 
     async def open(self):
         """Open the dialog asynchronously."""
@@ -150,6 +152,8 @@ class EnhancedRecordDialog:
         relations = table_info.get("relations", {})
         field_options = table_info.get("field_options", {})
         fields = self._get_fields()
+        configured_hidden = set(table_info.get("hidden_fields", []))
+        always_hide = configured_hidden.union(self.extra_hidden_fields)
 
         if self.sort_fields:
             fields = sorted(fields, key=lambda f: (0 if f in relations else 1, f))
@@ -158,6 +162,11 @@ class EnhancedRecordDialog:
             value = self.record.get(field)
             label = self.custom_labels.get(field, field.replace("_", " ").title())
             lower_field = field.lower()
+
+            # Honor configured hidden fields and caller-provided extra_hidden_fields
+            if field in always_hide:
+                self.inputs[field] = ui.input(value=value).style("display: none")
+                continue
 
             if field in self.custom_options:
                 options = self.custom_options[field]
