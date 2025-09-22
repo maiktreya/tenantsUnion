@@ -32,7 +32,8 @@ CREATE TABLE staging_pisos_check (
     num_afiliadas TEXT,
     num_preafiliadas TEXT,
     num_inq_colaboradoras TEXT,
-    prop_vertical TEXT
+    prop_vertical TEXT,
+    fecha_firma TEXT
 );
 -- 2. Load the original data from the CSV file again for comparison.
 COPY staging_pisos_check
