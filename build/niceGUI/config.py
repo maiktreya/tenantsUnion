@@ -362,6 +362,7 @@ IMPORTER_HEADER_MAP = {
     "periodicidad": "Periodicidad (m)",
     "forma_pago": "Forma Pago",
     "iban": "IBAN",
+    "bloque_id": "Bloque sugerido",
 }
 
 config = Config()

@@ -575,7 +575,7 @@ class AfiliadasImporterView:
             bloque_id = record.get("piso", {}).get("bloque_id")
             if bloque_id:
                 asyncio.create_task(
-                    self._hydrate_assigned_bloque(record, int(bloque_id))
+                    self._hydrate_assigned_bloque(record, bloque_id)
                 )
             else:
                 record.setdefault("meta", {})["bloque_manual"] = None

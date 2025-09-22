@@ -75,6 +75,71 @@ class APIClient:
             ui.notify(f"Error al obtener registros: {str(e)}", type="negative")
             return []
 
+    async def call_rpc(
+        self, fn_name: str, payload: Optional[Dict[str, Any]] = None
+    ) -> Optional[Any]:
+        """Call a PostgREST RPC endpoint and return the JSON response."""
+        client = self._ensure_client()
+        url = f"{self.base_url}/rpc/{fn_name}"
+
+        try:
+            response = await client.post(url, json=payload or {})
+            response.raise_for_status()
+            if response.text == "":
+                return None
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            log.error(f"HTTP Error calling RPC '{fn_name}'", exc_info=True)
+            ui.notify(
+                f"Error HTTP {e.response.status_code} al invocar {fn_name}: {e.response.text}",
+                type="negative",
+            )
+            return None
+        except Exception as e:
+            log.error(f"Unexpected error calling RPC '{fn_name}'", exc_info=True)
+            ui.notify(f"Error al invocar función {fn_name}: {str(e)}", type="negative")
+            return None
+
+    async def get_bloque_suggestions(
+        self,
+        addresses: List[Dict[str, Any]],
+        score_limit: float = 0.88,
+    ) -> List[Dict[str, Any]]:
+        """Batch fuzzy matching of piso addresses to bloques."""
+        if not addresses:
+            return []
+
+        payload = {"p_addresses": addresses, "p_score_limit": score_limit}
+        result = await self.call_rpc("rpc_get_bloque_suggestions", payload)
+
+        if not result:
+            return []
+
+        if isinstance(result, list):
+            return result
+
+        if isinstance(result, dict):
+            return [result]
+
+        return []
+
+    async def guess_bloque(
+        self, direccion: str, score_limit: float = 0.88
+    ) -> Optional[int]:
+        """Compatibility helper to fetch a single bloque suggestion."""
+        if not direccion:
+            return None
+
+        suggestions = await self.get_bloque_suggestions(
+            [{"index": 0, "direccion": direccion}], score_limit
+        )
+
+        if not suggestions:
+            return None
+
+        suggestion = suggestions[0]
+        return suggestion.get("suggested_bloque_id")
+
     async def create_record(
         self,
         table: str,
