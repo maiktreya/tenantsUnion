@@ -93,11 +93,11 @@ scored AS (
         similarity(np.normalized_direccion, nb.normalized_direccion) AS score,
         ROW_NUMBER() OVER (
             PARTITION BY np.piso_id
-            ORDER BY similarity(np.normalized_direccion, nb.normalized_direccion) DESC
+            ORDER BY (np.normalized_direccion <-> nb.normalized_direccion) ASC
         ) AS rn
     FROM normalized_pisos np
     JOIN normalized_bloques nb
-        ON similarity(np.normalized_direccion, nb.normalized_direccion) > 0
+        ON (np.normalized_direccion % nb.normalized_direccion)
 )
 SELECT
     piso_id,
@@ -126,6 +126,7 @@ SECURITY DEFINER
 SET search_path = sindicato_inq, public
 AS $$
 BEGIN
+    PERFORM set_limit(p_score_limit);
     IF p_addresses IS NULL THEN
         RETURN QUERY
         SELECT
@@ -177,11 +178,11 @@ BEGIN
                 similarity(ni.normalized, nb.normalized) AS score,
                 ROW_NUMBER() OVER (
                     PARTITION BY ni.idx
-                    ORDER BY similarity(ni.normalized, nb.normalized) DESC
+                    ORDER BY (ni.normalized <-> nb.normalized) ASC
                 ) AS rn
             FROM normalized_inputs ni
             JOIN normalized_bloques nb
-                ON similarity(ni.normalized, nb.normalized) > 0
+                ON (ni.normalized % nb.normalized)
         ),
         ranked AS (
             SELECT
@@ -205,6 +206,11 @@ BEGIN
     END IF;
 END;
 $$;
+
+-- Trigram index to accelerate normalized comparison
+CREATE INDEX IF NOT EXISTS idx_bloques_normalized_trgm ON sindicato_inq.bloques USING gin (
+    (trim(split_part(direccion, ',', 1)) || ', ' || trim(split_part(direccion, ',', 2))) gin_trgm_ops
+);
 
 -- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
 -- This procedure assigns nodo_id to bloques based on the most common nodo_id among their pisos' CPs

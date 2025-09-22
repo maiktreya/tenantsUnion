@@ -3,6 +3,7 @@ import logging
 from typing import Dict, List, Optional, Any, Tuple
 from nicegui import ui
 from api.validate import validator
+from difflib import SequenceMatcher
 
 log = logging.getLogger(__name__)
 
@@ -76,19 +77,26 @@ class APIClient:
             return []
 
     async def call_rpc(
-        self, fn_name: str, payload: Optional[Dict[str, Any]] = None
+        self, fn_name: str, payload: Optional[Dict[str, Any]] = None, *, timeout: Optional[float] = None
     ) -> Optional[Any]:
         """Call a PostgREST RPC endpoint and return the JSON response."""
         client = self._ensure_client()
         url = f"{self.base_url}/rpc/{fn_name}"
 
         try:
-            response = await client.post(url, json=payload or {})
+            response = await client.post(url, json=payload or {}, timeout=timeout)
             response.raise_for_status()
             if response.text == "":
                 return None
             return response.json()
+        except httpx.TimeoutException:
+            log.info(f"RPC '{fn_name}' timed out; falling back if supported.")
+            return None
         except httpx.HTTPStatusError as e:
+            # Silence 404 for optional RPCs; caller may fallback locally
+            if e.response is not None and e.response.status_code == 404:
+                log.info(f"RPC '{fn_name}' not found (404); falling back if supported.")
+                return None
             log.error(f"HTTP Error calling RPC '{fn_name}'", exc_info=True)
             ui.notify(
                 f"Error HTTP {e.response.status_code} al invocar {fn_name}: {e.response.text}",
@@ -110,18 +118,73 @@ class APIClient:
             return []
 
         payload = {"p_addresses": addresses, "p_score_limit": score_limit}
-        result = await self.call_rpc("rpc_get_bloque_suggestions", payload)
+        # Short timeout so UI remains responsive; fall back locally if slow
+        result = await self.call_rpc("rpc_get_bloque_suggestions", payload, timeout=5.0)
 
-        if not result:
+        # If RPC is available and returns data, normalize and return
+        if result:
+            if isinstance(result, list):
+                return result
+            if isinstance(result, dict):
+                return [result]
+
+        # Fallback: do a simple local fuzzy match using difflib
+        try:
+            bloques = await self.get_records("bloques", limit=2000)
+            if not bloques:
+                return []
+
+            def _normalize(addr: Optional[str]) -> str:
+                if not addr:
+                    return ""
+                parts = [p.strip() for p in str(addr).split(",") if p.strip()]
+                norm = ", ".join(parts[:2]).lower()
+                return norm
+
+            normalized_bloques = [
+                {
+                    "id": b.get("id"),
+                    "direccion": b.get("direccion", ""),
+                    "norm": _normalize(b.get("direccion")),
+                }
+                for b in bloques
+            ]
+
+            suggestions: List[Dict[str, Any]] = []
+            for item in addresses:
+                idx = item.get("index") if "index" in item else item.get("piso_id")
+                direccion = item.get("direccion")
+                norm_src = _normalize(direccion)
+                best = None
+                best_score = 0.0
+                for b in normalized_bloques:
+                    s = SequenceMatcher(None, norm_src, b["norm"]).ratio()
+                    if s > best_score:
+                        best_score = s
+                        best = b
+                if best and best_score >= float(score_limit):
+                    suggestions.append(
+                        {
+                            "piso_id": idx,
+                            "piso_direccion": direccion,
+                            "suggested_bloque_id": best["id"],
+                            "suggested_bloque_direccion": best["direccion"],
+                            "suggested_score": best_score,
+                        }
+                    )
+                else:
+                    suggestions.append(
+                        {
+                            "piso_id": idx,
+                            "piso_direccion": direccion,
+                            "suggested_bloque_id": None,
+                            "suggested_bloque_direccion": None,
+                            "suggested_score": None,
+                        }
+                    )
+            return suggestions
+        except Exception:
             return []
-
-        if isinstance(result, list):
-            return result
-
-        if isinstance(result, dict):
-            return [result]
-
-        return []
 
     async def guess_bloque(
         self, direccion: str, score_limit: float = 0.88
