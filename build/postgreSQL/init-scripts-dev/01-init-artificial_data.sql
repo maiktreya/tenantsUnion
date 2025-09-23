@@ -455,6 +455,7 @@ FROM
 CREATE OR REPLACE VIEW v_facturacion AS
 SELECT
     -- Fields from 'afiliadas' table
+    a.id,
     a.nombre AS "Nombre",
     a.apellidos as "Apellidos",
     a.email AS "Email",
