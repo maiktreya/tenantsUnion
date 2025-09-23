@@ -80,7 +80,6 @@ FROM sindicato_inq.conflictos c
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
     LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id;
 
--- VISTA 4: AFILIADAS (ESTA VISTA YA ERA CORRECTA)
 -- VISTA 4: AFILIADAS (CORRECTED ALIASES)
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
@@ -140,6 +139,32 @@ GROUP BY
     e.nombre,
     n.nombre
 ORDER BY "Afiliadas en el bloque" DESC;
+
+-- VISTA 6: VISTA CON INFORMACIÓN DE FACTURACIÓN EXTENDIDA
+CREATE OR REPLACE VIEW v_facturacion AS
+SELECT
+    -- Fields from 'afiliadas' table
+    a.nombre AS "Nombre",
+    a.apellidos as "Apellidos",
+    a.email AS "Email",
+    a.cif AS "NIF",
+    p.direccion AS "Direccion",
+    p.municipio AS "Municipio",
+    p.cp AS "Codigo Postal",
+    'España' AS "Pais (siempre es España)",
+    a.telefono AS "Teléfono",
+    f.iban AS "IBAN",
+    f.cuota AS "Cuota",
+    f.periodicidad AS "Periodicidad",
+    f.forma_pago AS "Forma de pago"
+FROM
+    afiliadas AS a
+LEFT JOIN
+    facturacion AS f ON a.id = f.afiliada_id
+LEFT JOIN
+	pisos as p on a.piso_id = p.id
+ORDER BY
+    a.apellidos;
 -- =====================================================================
 -- VISTAS INTERNAS VISTA CONFLICTOS (NO DISPONIBLE EN LA INTERFAZ NI EN CONFIG.PY)
 -- =====================================================================

@@ -451,6 +451,31 @@ FROM
     LEFT JOIN sindicato_inq.nodos n1 ON b.nodo_id = n1.id
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
     LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id;
+
+CREATE OR REPLACE VIEW v_facturacion AS
+SELECT
+    -- Fields from 'afiliadas' table
+    a.nombre AS "Nombre",
+    a.apellidos as "Apellidos",
+    a.email AS "Email",
+    a.cif AS "NIF",
+    p.direccion AS "Direccion",
+    p.municipio AS "Municipio",
+    p.cp AS "Codigo Postal",
+    'España' AS "Pais (siempre es España)",
+    a.telefono AS "Teléfono",
+    f.iban AS "IBAN",
+    f.cuota AS "Cuota",
+    f.periodicidad AS "Periodicidad",
+    f.forma_pago AS "Forma de pago"
+FROM
+    afiliadas AS a
+LEFT JOIN
+    facturacion AS f ON a.id = f.afiliada_id
+LEFT JOIN
+	pisos as p on a.piso_id = p.id
+ORDER BY
+    a.apellidos;
 -- =====================================================================
 -- PASO 4: LIMPIEZA Y POBLACIÓN DE DATOS ARTIFICIALES
 -- =====================================================================
