@@ -452,10 +452,14 @@ FROM
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
     LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id;
 
+
+
+
+-- VISTA 6: VISTA CON INFORMACIÓN DE FACTURACIÓN EXTENDIDA
 CREATE OR REPLACE VIEW v_facturacion AS
 SELECT
     -- Fields from 'afiliadas' table
-    a.id,
+    a.id AS "id",
     a.nombre AS "Nombre",
     a.apellidos as "Apellidos",
     a.email AS "Email",
@@ -477,6 +481,7 @@ LEFT JOIN
 	pisos as p on a.piso_id = p.id
 ORDER BY
     a.apellidos;
+
 -- =====================================================================
 -- PASO 4: LIMPIEZA Y POBLACIÓN DE DATOS ARTIFICIALES
 -- =====================================================================
