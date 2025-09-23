@@ -3,8 +3,6 @@ from config import TABLE_INFO
 from datetime import datetime
 import re
 from typing import Dict, Any, List, Tuple
-validator = TableValidator()
-# /build/niceGUI/api/validate.py
 
 
 class TableValidator:
@@ -78,8 +76,7 @@ class TableValidator:
                 # Avoid re-validating if a pattern already exists for this field
                 if not config.get("field_patterns", {}).get(field):
                     if not re.match(r"^[^@]+@[^@]+\.[^@]+$", str(value)):
-                        errors.append(
-                            f"Formato de email inválido para '{field}'")
+                        errors.append(f"Formato de email inválido para '{field}'")
 
             # Date validation
             if any(date_word in field.lower() for date_word in ["fecha", "date"]):
@@ -93,8 +90,7 @@ class TableValidator:
                 try:
                     int(value)
                 except (ValueError, TypeError):
-                    errors.append(
-                        f"El formato del ID para '{field}' debe ser numérico")
+                    errors.append(f"El formato del ID para '{field}' debe ser numérico")
 
         return errors
 
@@ -143,3 +139,6 @@ class TableValidator:
             constraints["relationship"] = config["relations"][field]
 
         return constraints
+
+
+validator = TableValidator()
