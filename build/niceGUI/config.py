@@ -341,6 +341,7 @@ VIEW_INFO = {
     "v_facturacion": {
         "display_name": "Vista extendida de facturación",
         "base_table": "afiliadas",
+        "hidden_fields": “id“,
     },
 }
 
