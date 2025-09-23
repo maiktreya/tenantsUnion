@@ -106,18 +106,37 @@ class FilterPanel:
 
                 # ** 2. Standard Column Filters **
                 for column in standard_columns:
-                    # Your original logic to decide if a dropdown is appropriate
-                    if (
-                        1
-                        < len(
-                            set(
-                                r.get(column)
-                                for r in self.records
-                                if r.get(column) is not None
+                    unique_values = [
+                        r.get(column) for r in self.records if r.get(column) is not None
+                    ]
+                    unique_count = len(set(unique_values))
+
+                    # Special handling for 'cuota' (supports custom option: greater than 0)
+                    if column.lower() == "cuota":
+                        # Build options as a mapping {value: label} to avoid [object Object]
+                        options: Dict[Any, str] = {"__GT_ZERO__": "Mayor que 0"}
+                        # Only append explicit numeric values if the set is small
+                        if unique_count <= 16:
+                            for v in self._get_sorted_unique_values(column):
+                                options[v] = str(v)
+
+                        self.inputs[column] = (
+                            ui.select(
+                                options=options,
+                                label=f"Filtrar {column}",
+                                multiple=True,
+                                clearable=True,
+                                on_change=lambda e, col=column: self.on_filter_change(
+                                    col, e.value
+                                ),
                             )
+                            .props("dense outlined")
+                            .classes("w-64")
                         )
-                        <= 16
-                    ):
+                        continue
+
+                    # Default logic: only show dropdowns for columns with a small set of values
+                    if 1 < unique_count <= 16:
                         self.inputs[column] = (
                             ui.select(
                                 options=self._get_sorted_unique_values(column),

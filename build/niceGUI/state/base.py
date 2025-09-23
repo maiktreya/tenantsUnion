@@ -122,7 +122,7 @@ class BaseTableState:
 
                 filtered = [r for r in filtered if date_matches(r)]
 
-            elif column == "cuota" and isinstance(filter_value, list):
+            elif isinstance(filter_value, list) and str(column).lower() == "cuota":
                 has_gt_zero_filter = "__GT_ZERO__" in filter_value
                 numeric_values = [v for v in filter_value if v != "__GT_ZERO__"]
                 filtered = [
