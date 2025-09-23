@@ -7,7 +7,7 @@ from typing import Optional
 from nicegui import ui, app
 
 from logging_config import setup_logging
-
+from config import config
 setup_logging()
 
 from fastapi import Request
@@ -15,7 +15,7 @@ from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.client import APIClient
-from config import config
+
 from state.app_state import AppState
 
 from views.home import HomeView
