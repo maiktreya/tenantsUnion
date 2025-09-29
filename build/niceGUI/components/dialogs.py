@@ -197,7 +197,10 @@ class EnhancedRecordDialog:
                         def get_disp(r):
                             return str(r.get(display_field, f"ID: {r.get('id')}"))
 
-                    options = {r["id"]: get_disp(r) for r in options_records}
+                    # FIX: Ensure the dictionary keys are strings to match potential integer
+                    # values from the record, which ui.select treats as strings.
+                    # The `value` from self.record.get(field) might be an int, but select options are string-keyed.
+                    options = {str(r["id"]): get_disp(r) for r in options_records}
                 except Exception as e:
                     ui.notify(
                         f"Error loading options for {field}: {e}", type="negative"
@@ -205,7 +208,10 @@ class EnhancedRecordDialog:
                     options = {}
 
                 current_value = value if value in options else None
-
+                # If value is an int, it won't be found in string-keyed options.
+                # Let's try converting it to a string for the lookup.
+                if current_value is None and value is not None:
+                    current_value = str(value) if str(value) in options else None
                 if field in ["conflicto_id", "usuario_id"] and self.mode == "create":
                     self.inputs[field] = ui.input(value=current_value).style(
                         "display: none"
