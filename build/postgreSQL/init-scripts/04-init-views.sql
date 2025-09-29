@@ -145,8 +145,7 @@ CREATE OR REPLACE VIEW v_facturacion AS
 SELECT
     -- Fields from 'afiliadas' table
     a.id AS "id",
-    a.nombre AS "Nombre",
-    a.apellidos as "Apellidos",
+    CONCAT(a.apellidos, ', ', a.nombre) as afiliada_nombre_completo,
     a.email AS "Email",
     a.cif AS "NIF",
     p.direccion AS "Direccion",
@@ -156,8 +155,16 @@ SELECT
     a.telefono AS "Teléfono",
     f.iban AS "IBAN",
     f.cuota AS "Cuota",
-    f.periodicidad AS "Periodicidad",
-    f.forma_pago AS "Forma de pago"
+    CASE f.periodicidad
+        WHEN 1 THEN 'Anual'
+        WHEN 12 THEN 'Mensual'
+        WHEN 3 THEN 'Trimestral' -- Added for completeness
+        ELSE 'Otra'
+    END AS "Periodicidad",
+    f.forma_pago AS "Forma de pago",
+    a.estado as "Estado",
+    a.fecha_alta as "Fecha Alta",
+    a.fecha_baja as "Fecha Baja"
 FROM
     afiliadas AS a
 LEFT JOIN

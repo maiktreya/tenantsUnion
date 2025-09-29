@@ -36,7 +36,7 @@ class HomeView(BaseView):  # MODIFIED: Inherit from BaseView
 
             with ui.row().classes("gap-8 flex-wrap justify-center"):
                 # Admin card - only for admin/sistemas roles
-                if self.has_role("admin", "sistemas"):
+                if self.has_role("admin"):
                     self._create_card(
                         icon="storage",
                         title="Administración de Tablas",
@@ -44,14 +44,15 @@ class HomeView(BaseView):  # MODIFIED: Inherit from BaseView
                         on_click=lambda: self.navigate("admin"),
                         color="text-orange-600",
                     )
+                    # Conflicts card - for admin/gestor/actas roles
+                if self.has_role("admin", "gestor", "actas"):
                     self._create_card(
-                        icon="people",
-                        title="Gestión de Usuarios",
-                        description="Crear usuarios del sistema y administrar sus roles de acceso.",
-                        on_click=lambda: self.navigate("user_management"),
+                        icon="gavel",
+                        title="Gestor de Conflictos",
+                        description="Añadir notas y seguir el historial detallado de los conflictos.",
+                        on_click=lambda: self.navigate("conflicts"),
                         color="text-orange-600",
                     )
-
                 # Views and Importer cards - for admin/gestor roles
                 if self.has_role("admin", "gestor"):
                     self._create_card(
@@ -69,17 +70,14 @@ class HomeView(BaseView):  # MODIFIED: Inherit from BaseView
                         on_click=lambda: self.navigate("afiliadas_importer"),
                         color="text-orange-600",
                     )
-
-                # Conflicts card - for admin/gestor/actas roles
-                if self.has_role("admin", "gestor", "actas"):
+                if self.has_role("admin"):
                     self._create_card(
-                        icon="gavel",
-                        title="Gestor de Conflictos",
-                        description="Añadir notas y seguir el historial detallado de los conflictos.",
-                        on_click=lambda: self.navigate("conflicts"),
+                        icon="people",
+                        title="Gestión de Usuarios",
+                        description="Crear usuarios del sistema y administrar sus roles de acceso.",
+                        on_click=lambda: self.navigate("user_management"),
                         color="text-orange-600",
                     )
-
                 # User Profile - available to all authenticated users
                 self._create_card(
                     icon="account_circle",

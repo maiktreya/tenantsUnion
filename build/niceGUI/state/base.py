@@ -139,12 +139,17 @@ class BaseTableState:
                 ]
 
             elif column == "global_search":
-                search_term = str(filter_value).lower()
-                filtered = [
-                    r
-                    for r in filtered
-                    if any(search_term in str(v).lower() for v in r.values())
-                ]
+                # Use the existing normalization helper to make search accent-insensitive
+                search_term = _normalize_for_sorting(filter_value)
+                if search_term:
+                    filtered = [
+                        r
+                        for r in filtered
+                        if any(
+                            _normalize_for_sorting(v).find(search_term) != -1
+                            for v in r.values()
+                        )
+                    ]
 
             elif isinstance(filter_value, list):
                 if filter_value:
