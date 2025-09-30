@@ -150,8 +150,8 @@ class AfiliadasImporterView:
         """Sorts the records based on a selected column and re-renders the UI."""
         # Check if the current sort is on the same column to determine direction
         if self.state.sort_criteria and self.state.sort_criteria[0][0] == column:
-            # If so, reverse the direction
-            is_reverse = not self.state.sort_criteria[0][1]
+            # Stored flag tracks ascending; using it for `reverse` toggles the order
+            is_reverse = self.state.sort_criteria[0][1]
         else:
             # Otherwise, start with ascending sort (not reversed)
             is_reverse = False
