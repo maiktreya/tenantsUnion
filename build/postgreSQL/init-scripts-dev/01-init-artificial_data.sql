@@ -238,6 +238,31 @@ BEGIN
 END;
 $$;
 
+-- This function extracts a 5-digit postal code from the 'direccion' string.
+CREATE OR REPLACE FUNCTION extract_cp_from_direccion()
+RETURNS TRIGGER AS $$
+DECLARE
+    matches TEXT[];
+BEGIN
+    -- Only run if 'direccion' is new or has changed.
+    IF (TG_OP = 'INSERT' OR NEW.direccion IS DISTINCT FROM OLD.direccion) THEN
+        -- Find the first 5-digit number in the direccion string.
+        matches := regexp_matches(NEW.direccion, '\m([0-9]{5})\M');
+        IF array_length(matches, 1) > 0 THEN
+            NEW.cp := matches[1]::INTEGER;
+        END IF;
+    END IF;
+    -- Return the (potentially modified) new row to be inserted/updated.
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- This trigger executes the function BEFORE any insert or update on the 'pisos' table.
+-- It runs before 'trigger_sync_bloque_nodo' because BEFORE triggers execute before AFTER triggers.
+CREATE TRIGGER trigger_a_extract_cp
+BEFORE INSERT OR UPDATE ON sindicato_inq.pisos
+FOR EACH ROW EXECUTE FUNCTION extract_cp_from_direccion();
+
 -- =====================================================================
 -- PASO 3: VISTAS PARA PRESENTACIÓN DE DATOS (REVISADAS)
 -- =====================================================================

@@ -166,7 +166,7 @@ class AdminView(BaseView):
             api=self.api,
             table=self.state.selected_entity_name.value,
             mode="create",
-            on_success=lambda: ui.timer(0.1, self._refresh_data, once=True),
+            on_success=self._refresh_data,
             calling_view="admin",
         )
         await dialog.open()
@@ -177,7 +177,7 @@ class AdminView(BaseView):
             table=self.state.selected_entity_name.value,
             record=record,
             mode="edit",
-            on_success=lambda: ui.timer(0.1, self._refresh_data, once=True),
+            on_success=self._refresh_data,
             calling_view="admin",
         )
         await dialog.open()
