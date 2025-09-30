@@ -264,11 +264,6 @@ CREATE TRIGGER trigger_sync_bloque_nodo
 AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
 FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
 
-
-
-
-
-
 -- =====================================================================
 -- NEW: Function and Trigger to auto-populate 'cp' from 'direccion'
 -- =====================================================================
