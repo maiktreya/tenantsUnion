@@ -2,37 +2,43 @@
 
 name: Continuous Integration
 
-# Controls when the workflow will run
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  test:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+    test:
+        runs-on: ubuntu-latest
 
-    steps:
-      # Step 1: Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - name: Checkout repository
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-      # Step 2: Set up Python environment
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11' # Matches the Python version in your Dockerfile
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
 
-      # Step 3: Install Python dependencies for the test suite
-      - name: Install test dependencies
-        run: pip install -r tests/requirements.txt #
+            - name: Install test dependencies
+              run: pip install -r tests/requirements.txt
 
-      # Step 4: Run the test suite using the provided script
-      # The script handles starting Docker, running pytest, and cleaning up.
-      - name: Run test suite
-        run: |
-          chmod +x tests/run_tests.sh
-          ./tests/run_tests.sh #
+            - name: Start Docker services
+              run: |
+                  docker compose -f docker-compose.yaml -f docker-compose-dev.yaml --profile Frontend up -d
 
+            - name: Wait for services to be healthy
+              run: |
+                  echo "Waiting for containers to be healthy..."
+                  sleep 15 # A simple wait, as in the original script
+
+            - name: Run pytest
+              env:
+                  PYTHONPATH: ${{ github.workspace }}
+              run: pytest
+
+            - name: Stop Docker services
+              if: always() # This ensures cleanup runs even if tests fail
+              run: |
+                  docker compose -f docker-compose.yaml -f docker-compose-dev.yaml down --remove-orphans
