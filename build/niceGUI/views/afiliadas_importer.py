@@ -6,7 +6,7 @@ import asyncio
 import logging
 import unicodedata
 import re
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 from nicegui import ui, events
 from api.client import APIClient

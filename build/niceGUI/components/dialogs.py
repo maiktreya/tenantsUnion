@@ -87,6 +87,7 @@ class EnhancedRecordDialog:
     async def open(self):
         """Open the dialog asynchronously."""
         self.dialog = ui.dialog()
+        self.dialog.props("persistent no-esc-dismiss")
 
         with self.dialog, ui.card().classes("w-96"):
             title = (
@@ -94,7 +95,14 @@ class EnhancedRecordDialog:
                 if self.mode == "create"
                 else f'Editar registro #{self.record.get("id")} de {self.table}'
             )
-            ui.label(title).classes("text-h6")
+
+            with ui.row().classes("items-center justify-between w-full"):
+                ui.label(title).classes("text-h6")
+                (
+                    ui.button(icon="close", on_click=self.dialog.close)
+                    .props("flat round dense")
+                    .props('aria-label="Cerrar dialogo"')
+                )
 
             await self._create_inputs()
 

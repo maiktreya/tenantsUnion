@@ -6,9 +6,9 @@ Most business apps are just structured data with CRUD operations. Yet we often b
 
 This manifesto proposes a **pragmatic, database-first stack**:
 
-* **PostgreSQL** → the application’s computational core
-* **PostgREST** → instant, zero-boilerplate API from the schema
-* **NiceGUI (+ FastAPI)** → Python-native UI, with FastAPI as an escape hatch
+- **PostgreSQL** → the application’s computational core
+- **PostgREST** → instant, zero-boilerplate API from the schema
+- **NiceGUI (+ FastAPI)** → Python-native UI, with FastAPI as an escape hatch
 
 The result: faster delivery, fewer moving parts, and stronger guarantees.
 
@@ -18,33 +18,34 @@ The result: faster delivery, fewer moving parts, and stronger guarantees.
 
 ### 1. Database = The Heart ❤️
 
-* Schema is the single source of truth.
-* Constraints, triggers, and functions enforce integrity at the deepest layer.
-* Business logic runs next to the data for performance and reliability.
+- Schema is the single source of truth.
+- Constraints, triggers, and functions enforce integrity at the deepest layer.
+- Business logic runs next to the data for performance and reliability.
 
 ### 2. Zero-Boilerplate API 🚀
 
-* CRUD endpoints generated automatically.
-* Add a column → it’s in the API.
-* Add a view → instant read-only endpoint.
-* Devs focus on real business value, not plumbing.
+- CRUD endpoints generated automatically.
+- Add a column → it’s in the API.
+- Add a view → instant read-only endpoint.
+- Devs focus on real business value, not plumbing.
 
 ### 3. Simplicity as Robustness ⚙️
 
-* **Fewer layers** = less code, less overhead, less debugging.
-* Database as backend: just a **stateless PostgREST** server.
-* **Config-driven** validation through metadata **schema mapping** = forget object-relational impedance!
-* Minimal **full CRUD API** client with flexible generics & **integrated validation logic**.
-* **Singletons** everywhere: **async API** & **reactive UI** state fully centralized.
+- **Fewer layers** = less code, less overhead, less debugging.
+- Database as backend: just a **stateless PostgREST** server.
+- **Config-driven** validation through metadata **schema mapping** = forget object-relational impedance!
+- Minimal **full CRUD API** client with flexible generics & **integrated validation logic**.
+- **Singletons** everywhere: **async API** & **reactive UI** state fully centralized.
+
 ---
 
 ## Escape Hatch Pragmatism 🛠️
 
 Not all problems are CRUD. For integrations, workflows, or heavy computations:
 
-* **NiceGUI** delivers rapid UI in Python.
-* **FastAPI** is always there for custom endpoints, advanced auth, or third-party APIs.
-* Hybrid model: 80% handled by Postgres + PostgREST, 20% by FastAPI when needed.
+- **NiceGUI** delivers rapid UI in Python.
+- **FastAPI** is always there for custom endpoints, advanced auth, or third-party APIs.
+- Hybrid model: 80% handled by Postgres + PostgREST, 20% by FastAPI when needed.
 
 ---
 
@@ -74,8 +75,8 @@ services:
 
 ⚠️ Risky for:
 
-* Large enterprises with rigid separation of concerns
-* Teams who avoid SQL and prefer frontend-first workflows
+- Large enterprises with rigid separation of concerns
+- Teams who avoid SQL and prefer frontend-first workflows
 
 ---
 
@@ -83,10 +84,10 @@ services:
 
 Instead of asking:
 
-> *Which ORM should we use?*
+> _Which ORM should we use?_
 
 Ask instead:
 
-> *How much can Postgres do for us—and what’s the simplest way to handle the rest?*
+> _How much can Postgres do for us—and what’s the simplest way to handle the rest?_
 
 ---
