@@ -4,8 +4,6 @@ import pandas as pd
 import io
 import asyncio
 import logging
-import unicodedata
-import re
 import copy
 from typing import Dict, Any, Optional, List, Tuple
 
@@ -16,6 +14,11 @@ from state.app_state import GenericViewState
 from components.importer_utils import transform_and_validate_row, short_address
 from components.importer_panels import render_preview_tabs
 from components.exporter import export_to_csv
+from components.importer_normalization import (
+    normalize_address_key,
+    normalize_for_sorting,
+)
+from components.importer_record_status import ImporterRecordStatusService
 
 log = logging.getLogger(__name__)
 
@@ -73,12 +76,11 @@ class AfiliadasImporterView:
         self.bloque_score_limit: float = 0.88
         self._suggestion_task: Optional[asyncio.Task] = None
         self._bloque_details_cache: Dict[int, Dict[str, Any]] = {}
-        self._existing_afiliada_cifs: Dict[str, bool] = {}
-        self._existing_piso_addresses: Dict[str, Optional[bool]] = {}
         self._failed_records: List[Dict[str, Any]] = []
         self._failed_preview_dialog: Optional[ui.dialog] = None
         self._failed_preview_container: Optional[ui.column] = None
         self._last_import_log: List[str] = []
+        self.status_service = ImporterRecordStatusService(api_client)
 
     def create(self) -> ui.column:
         """Create the main UI for the CSV importer view."""
@@ -137,8 +139,7 @@ class AfiliadasImporterView:
     async def _handle_upload(self, e: events.UploadEventArguments):
         """Handle the file upload, parse the data, fetch suggestions, and render the UI."""
         self._failed_records = []
-        self._existing_afiliada_cifs.clear()
-        self._existing_piso_addresses.clear()
+        self.status_service.reset()
         try:
             content = e.content.read().decode("utf-8-sig")
             df = pd.read_csv(io.StringIO(content), header=None, dtype=str).fillna("")
@@ -151,8 +152,7 @@ class AfiliadasImporterView:
 
             self._bloque_details_cache.clear()
             self.state.set_records(records)
-            await self._mark_existing_afiliadas()
-            await self._mark_existing_pisos()
+            await self._preload_record_status()
             await self._apply_batch_bloque_suggestions()
             self._render_all_panels()
             ui.notify(
@@ -182,37 +182,41 @@ class AfiliadasImporterView:
         )
         self._update_import_button_state()
 
+    async def _preload_record_status(self):
+        """Prime duplicate/existence caches and update record metadata."""
+        records = self.state.records or []
+        if not records:
+            return
+
+        await self.status_service.preload_afiliada_cifs(records)
+        await self.status_service.preload_piso_addresses(records)
+
+        for record in records:
+            self._sync_metadata_from_status_cache(record, trigger_ui=False)
+
+    def _sync_metadata_from_status_cache(
+        self, record: Dict[str, Any], *, trigger_ui: bool
+    ) -> None:
+        """Mirror cached record status into metadata fields."""
+        afiliada_cif = (
+            str(record.get("afiliada", {}).get("cif", "")).strip().upper()
+            if record.get("afiliada")
+            else ""
+        )
+        exists_afiliada = bool(
+            afiliada_cif and self.status_service.existing_afiliada_cifs.get(afiliada_cif)
+        )
+        self._apply_duplicate_status(record, exists_afiliada, trigger_ui=trigger_ui)
+
+        direccion = (record.get("piso", {}).get("direccion") or "").strip()
+        key = normalize_address_key(direccion)
+        exists_piso = bool(self.status_service.existing_piso_addresses.get(key))
+        self._apply_piso_existing_status(record, exists_piso, trigger_ui=trigger_ui)
+
     def _update_import_button_state(self):
         """Enables or disables the import button based on data validity."""
         if self.import_button:
             self.import_button.set_enabled(self.all_records_valid)
-
-    def _normalize_for_sorting(self, value: Any) -> str:
-        """Return a normalized string key for consistent sorting across types."""
-        if value is None:
-            return ""
-        # Handle booleans explicitly to avoid mixing with strings
-        if isinstance(value, bool):
-            return "1" if value else "0"
-        s = str(value).strip()
-        # Numeric normalization: sort numerically while returning a string key
-        if re.match(r"^-?(?:\d+\.?\d*|\.\d+)$", s):
-            try:
-                num = float(s)
-                return f"{num:020.6f}"
-            except (ValueError, TypeError):
-                pass
-        # Accent-insensitive, case-insensitive normalization for text
-        normalized = unicodedata.normalize("NFD", s.lower())
-        return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
-
-    def _normalize_address_key(self, address: Optional[str]) -> str:
-        """Create a case-insensitive key for piso addresses."""
-        if not address:
-            return ""
-        normalized = unicodedata.normalize("NFD", address.strip().lower())
-        collapsed = re.sub(r"\s+", " ", normalized)
-        return "".join(c for c in collapsed if unicodedata.category(c) != "Mn")
 
     def _sort_by_column(self, column: str):
         """Sorts the records based on a selected column and re-renders the UI."""
@@ -225,7 +229,7 @@ class AfiliadasImporterView:
             is_reverse = False
 
         self.state.records.sort(
-            key=lambda r: self._normalize_for_sorting(
+            key=lambda r: normalize_for_sorting(
                 r["validation"]["is_valid"]
                 if column == "is_valid"
                 else next(
@@ -282,8 +286,9 @@ class AfiliadasImporterView:
         )
 
         if cif_value:
-            cached_status = self._existing_afiliada_cifs.get(cif_value)
+            cached_status = self.status_service.existing_afiliada_cifs.get(cif_value)
             if cached_status is None:
+                self.status_service.mark_unknown_cif(cif_value)
                 self._apply_duplicate_status(record, False, trigger_ui=False)
                 asyncio.create_task(self._refresh_duplicate_status(record))
             else:
@@ -295,19 +300,16 @@ class AfiliadasImporterView:
 
         direccion_value = (record.get("piso", {}).get("direccion") or "").strip()
         if direccion_value:
-            key = self._normalize_address_key(direccion_value)
-            if key not in self._existing_piso_addresses:
-                self._existing_piso_addresses[key] = None
+            key = normalize_address_key(direccion_value)
+            cached_piso = self.status_service.existing_piso_addresses.get(key)
+            if cached_piso is None:
+                self.status_service.mark_unknown_address(direccion_value)
                 self._apply_piso_existing_status(record, False, trigger_ui=False)
                 asyncio.create_task(self._refresh_piso_status(record))
             else:
-                cached_piso = self._existing_piso_addresses.get(key)
-                if cached_piso is None:
-                    self._apply_piso_existing_status(record, False, trigger_ui=False)
-                else:
-                    self._apply_piso_existing_status(
-                        record, bool(cached_piso), trigger_ui=False
-                    )
+                self._apply_piso_existing_status(
+                    record, bool(cached_piso), trigger_ui=False
+                )
         else:
             self._apply_piso_existing_status(record, False, trigger_ui=False)
 
@@ -333,101 +335,6 @@ class AfiliadasImporterView:
         finally:
             self._render_all_panels()
 
-    def _chunk_list(self, values: List[str], chunk_size: int = 30) -> List[List[str]]:
-        """Yield chunks of a list of values to keep query strings manageable."""
-        return [values[i : i + chunk_size] for i in range(0, len(values), chunk_size)]
-
-    def _format_in_filter_value(self, value: str) -> str:
-        """Return a PostgREST-safe literal for use inside an in() filter."""
-        escaped = value.replace('"', '""')
-        return f'"{escaped}"'
-
-    async def _mark_existing_afiliadas(self):
-        """Fetch existing afiliadas by CIF/NIF and mark records with a warning."""
-        records = self.state.records or []
-        if not records:
-            return
-
-        cifs = sorted(
-            {
-                str(record.get("afiliada", {}).get("cif", "")).strip().upper()
-                for record in records
-                if record.get("afiliada", {}).get("cif")
-            }
-        )
-
-        if not cifs:
-            for record in records:
-                self._apply_duplicate_status(record, False, trigger_ui=False)
-            return
-
-        self._existing_afiliada_cifs = {cif: False for cif in cifs}
-
-        for chunk in self._chunk_list(cifs):
-            filter_value = ",".join(chunk)
-            try:
-                matches = await self.api.get_records(
-                    "afiliadas", {"cif": f"in.({filter_value})"}
-                )
-            except Exception:
-                matches = []
-
-            for item in matches or []:
-                cif_value = str(item.get("cif", "")).strip().upper()
-                if cif_value:
-                    self._existing_afiliada_cifs[cif_value] = True
-
-        for record in records:
-            cif = str(record.get("afiliada", {}).get("cif", "")).strip().upper()
-            exists = bool(cif and self._existing_afiliada_cifs.get(cif))
-            self._apply_duplicate_status(record, exists, trigger_ui=False)
-
-    async def _mark_existing_pisos(self):
-        """Fetch existing pisos by address and flag matching records."""
-        records = self.state.records or []
-        if not records:
-            return
-
-        address_map: Dict[str, str] = {}
-        for record in records:
-            direccion = (record.get("piso", {}).get("direccion") or "").strip()
-            if not direccion:
-                continue
-            key = self._normalize_address_key(direccion)
-            if key and key not in address_map:
-                address_map[key] = direccion
-
-        if not address_map:
-            for record in records:
-                self._apply_piso_existing_status(record, False, trigger_ui=False)
-            return
-
-        self._existing_piso_addresses = {key: False for key in address_map}
-
-        address_values = list(address_map.values())
-        for chunk in self._chunk_list(address_values):
-            filter_value = ",".join(self._format_in_filter_value(val) for val in chunk)
-            try:
-                matches = await self.api.get_records(
-                    "pisos", {"direccion": f"in.({filter_value})"}
-                )
-            except Exception:
-                matches = []
-
-            for item in matches or []:
-                key = self._normalize_address_key(item.get("direccion"))
-                if key:
-                    self._existing_piso_addresses[key] = True
-
-        for record in records:
-            direccion = (record.get("piso", {}).get("direccion") or "").strip()
-            if not direccion:
-                self._apply_piso_existing_status(record, False, trigger_ui=False)
-                continue
-            key = self._normalize_address_key(direccion)
-            exists = bool(self._existing_piso_addresses.get(key))
-            self._apply_piso_existing_status(record, exists, trigger_ui=False)
-
     async def _refresh_duplicate_status(self, record: Dict[str, Any]):
         """Check (or reuse cached) duplicate status for a single record after edits."""
         cif = str(record.get("afiliada", {}).get("cif", "")).strip().upper()
@@ -435,16 +342,8 @@ class AfiliadasImporterView:
             self._apply_duplicate_status(record, False)
             return
 
-        cached = self._existing_afiliada_cifs.get(cif)
-        if cached is None:
-            try:
-                matches = await self.api.get_records("afiliadas", {"cif": f"eq.{cif}"})
-                cached = bool(matches)
-            except Exception:
-                cached = False
-            self._existing_afiliada_cifs[cif] = cached
-
-        self._apply_duplicate_status(record, bool(cached))
+        exists = await self.status_service.ensure_afiliada_status(cif)
+        self._apply_duplicate_status(record, exists)
 
     async def _refresh_piso_status(self, record: Dict[str, Any]):
         """Check whether a piso address already exists after user edits."""
@@ -453,20 +352,8 @@ class AfiliadasImporterView:
             self._apply_piso_existing_status(record, False)
             return
 
-        key = self._normalize_address_key(direccion)
-        cached = self._existing_piso_addresses.get(key)
-
-        if cached is None:
-            try:
-                matches = await self.api.get_records(
-                    "pisos", {"direccion": f"eq.{direccion}"}
-                )
-                cached = bool(matches)
-            except Exception:
-                cached = False
-            self._existing_piso_addresses[key] = cached
-
-        self._apply_piso_existing_status(record, bool(cached))
+        exists = await self.status_service.ensure_piso_status(direccion)
+        self._apply_piso_existing_status(record, exists)
 
     def _apply_duplicate_status(
         self, record: Dict[str, Any], exists: bool, *, trigger_ui: bool = True
@@ -990,5 +877,5 @@ class AfiliadasImporterView:
         summary_dialog.open()
 
         self.state.set_records([])
-        self._existing_afiliada_cifs.clear()
+        self.status_service.reset()
         self._render_all_panels()

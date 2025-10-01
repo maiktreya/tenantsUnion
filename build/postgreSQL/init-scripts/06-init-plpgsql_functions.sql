@@ -5,6 +5,49 @@
 -- If you haven't enabled it yet, run the following command as a superuser on your database:
 SET search_path TO sindicato_inq, public;
 
+-- Normalization helper to keep address comparison consistent with UI logic
+CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+DECLARE
+    parts TEXT[];
+    first_part TEXT;
+    token TEXT;
+    cleaned TEXT;
+BEGIN
+    IF address_text IS NULL OR btrim(address_text) = '' THEN
+        RETURN '';
+    END IF;
+
+    parts := regexp_split_to_array(address_text, ',');
+    IF array_length(parts, 1) IS NULL OR array_length(parts, 1) = 0 THEN
+        cleaned := btrim(address_text);
+    ELSE
+        first_part := btrim(parts[1]);
+
+        IF first_part ~ '[0-9]' THEN
+            cleaned := first_part;
+        ELSE
+            cleaned := first_part;
+            IF array_length(parts, 1) > 1 THEN
+                FOR token IN ARRAY parts[2:array_length(parts, 1)] LOOP
+                    token := btrim(token);
+                    IF token ~ '^[0-9]+[A-Za-z]?$' THEN
+                        cleaned := cleaned || ' ' || token;
+                        EXIT;
+                    END IF;
+                END LOOP;
+            END IF;
+        END IF;
+    END IF;
+
+    cleaned := lower(regexp_replace(cleaned, '\s+', ' ', 'g'));
+    RETURN cleaned;
+END;
+$$;
+
 -- FUNCTION DEFINITION
 -- This function takes a 'direccion' from the 'pisos' table and returns the 'id' of the
 -- most similar 'bloque' if the similarity is above a certain threshold (80%).
@@ -23,7 +66,7 @@ BEGIN
     -- We extract the most significant parts: the street name and number.
     -- This is done by splitting the string by the comma and taking the first two parts.
     -- Example: "Avenida Cerro de los Ángeles, 11, Bajo A..." -> "Avenida Cerro de los Ángeles, 11"
-    normalized_piso_address := trim(split_part(piso_direccion, ',', 1)) || ', ' || trim(split_part(piso_direccion, ',', 2));
+    normalized_piso_address := normalize_address_for_match(piso_direccion);
 
     -- STEP 2: Find the best match in the 'bloques' table.
     -- This query compares the normalized 'piso' address with the normalized version
@@ -35,14 +78,13 @@ BEGIN
     -- We only consider matches that meet or exceed our similarity threshold.
     WHERE
         similarity(
-            -- Normalize the 'bloques.direccion' in the same way.
-            trim(split_part(b.direccion, ',', 1)) || ', ' || trim(split_part(b.direccion, ',', 2)),
+            normalize_address_for_match(b.direccion),
             normalized_piso_address
         ) >= similarity_threshold
     -- Order the results by similarity score in descending order to find the best match first.
     ORDER BY
         similarity(
-            trim(split_part(b.direccion, ',', 1)) || ', ' || trim(split_part(b.direccion, ',', 2)),
+            normalize_address_for_match(b.direccion),
             normalized_piso_address
         ) DESC
     -- We only want the top result.
@@ -72,17 +114,21 @@ WITH normalized_pisos AS (
     SELECT
         p.id AS piso_id,
         p.direccion AS piso_direccion,
-        trim(split_part(p.direccion, ',', 1)) || ', ' || trim(split_part(p.direccion, ',', 2)) AS normalized_direccion
+        normalize_address_for_match(p.direccion) AS normalized_direccion
     FROM sindicato_inq.pisos p
-    WHERE p.direccion IS NOT NULL AND btrim(p.direccion) <> ''
+    WHERE p.direccion IS NOT NULL
+      AND btrim(p.direccion) <> ''
+      AND normalize_address_for_match(p.direccion) <> ''
 ),
 normalized_bloques AS (
     SELECT
         b.id AS bloque_id,
         b.direccion AS bloque_direccion,
-        trim(split_part(b.direccion, ',', 1)) || ', ' || trim(split_part(b.direccion, ',', 2)) AS normalized_direccion
+        normalize_address_for_match(b.direccion) AS normalized_direccion
     FROM sindicato_inq.bloques b
-    WHERE b.direccion IS NOT NULL AND btrim(b.direccion) <> ''
+    WHERE b.direccion IS NOT NULL
+      AND btrim(b.direccion) <> ''
+      AND normalize_address_for_match(b.direccion) <> ''
 ),
 scored AS (
     SELECT
@@ -157,17 +203,20 @@ BEGIN
             SELECT
                 idx,
                 direccion,
-                trim(split_part(direccion, ',', 1)) || ', ' || trim(split_part(direccion, ',', 2)) AS normalized
+                normalize_address_for_match(direccion) AS normalized
             FROM input_rows
             WHERE direccion IS NOT NULL
+              AND normalize_address_for_match(direccion) <> ''
         ),
         normalized_bloques AS (
             SELECT
                 b.id,
                 b.direccion,
-                trim(split_part(b.direccion, ',', 1)) || ', ' || trim(split_part(b.direccion, ',', 2)) AS normalized
+                normalize_address_for_match(b.direccion) AS normalized
             FROM sindicato_inq.bloques b
-            WHERE b.direccion IS NOT NULL AND btrim(b.direccion) <> ''
+            WHERE b.direccion IS NOT NULL
+              AND btrim(b.direccion) <> ''
+              AND normalize_address_for_match(b.direccion) <> ''
         ),
         scored AS (
             SELECT
@@ -209,7 +258,7 @@ $$;
 
 -- Trigram index to accelerate normalized comparison
 CREATE INDEX IF NOT EXISTS idx_bloques_normalized_trgm ON sindicato_inq.bloques USING gin (
-    (trim(split_part(direccion, ',', 1)) || ', ' || trim(split_part(direccion, ',', 2))) gin_trgm_ops
+    normalize_address_for_match(direccion) gin_trgm_ops
 );
 
 -- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
