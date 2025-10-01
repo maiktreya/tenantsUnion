@@ -88,7 +88,7 @@ def transform_and_validate_row(row: pd.Series) -> Optional[Dict[str, Any]]:
                 "apellidos": f"{get_val(2)} {get_val(3)}".strip(),
                 "genero": get_val(4),
                 "fecha_nac": parse_date(get_val(5)),
-                "cif": get_val(6),
+                "cif": get_val(6).upper(),
                 "telefono": get_val(7),
                 "email": get_val(8),
                 "fecha_alta": date.today().isoformat(),
@@ -121,7 +121,7 @@ def transform_and_validate_row(row: pd.Series) -> Optional[Dict[str, Any]]:
                 "iban": iban_raw.upper() if iban_raw else None,
                 "afiliada_id": None,
             },
-            "meta": {"bloque": None, "bloque_manual": None},
+            "meta": {"bloque": None, "bloque_manual": None, "nif_exists": False},
         }
 
         # --- Validation ---
@@ -142,6 +142,7 @@ def transform_and_validate_row(row: pd.Series) -> Optional[Dict[str, Any]]:
             and is_valid_bloque
             and is_valid_facturacion,
             "errors": err_afiliada + err_piso + err_bloque + err_facturacion,
+            "warnings": [],
         }
         return record
 

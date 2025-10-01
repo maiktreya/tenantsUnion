@@ -4,6 +4,36 @@ from typing import List, Dict, Any, Callable, Awaitable
 from config import IMPORTER_HEADER_MAP
 
 
+def _is_duplicate(record: Dict[str, Any]) -> bool:
+    """Return True if the record has a duplicate NIF warning."""
+    return bool(record.get("meta", {}).get("nif_exists"))
+
+
+def _row_background_class(record: Dict[str, Any]) -> str:
+    """Determine row background class based on validation state."""
+    if _is_duplicate(record):
+        return "bg-yellow-100"
+    if record.get("validation", {}).get("is_valid"):
+        return "bg-green-50"
+    return "bg-red-100"
+
+
+def _status_icon_config(record: Dict[str, Any]) -> Dict[str, str]:
+    """Return icon name and color classes for the validation badge."""
+    if _is_duplicate(record):
+        return {"name": "warning", "classes": "text-yellow-500"}
+    if record.get("validation", {}).get("is_valid"):
+        return {"name": "check_circle", "classes": "text-green-500"}
+    return {"name": "cancel", "classes": "text-red-500"}
+
+
+def _tooltip_text(record: Dict[str, Any]) -> str:
+    """Compose tooltip text mixing errors and warnings."""
+    validation = record.get("validation", {})
+    messages = validation.get("errors", []) + validation.get("warnings", [])
+    return "\n".join(messages) if messages else "Válido"
+
+
 def render_preview_tabs(
     state: Any,
     panels: Dict[str, ui.column],
@@ -113,16 +143,13 @@ def _render_standard_panel(
             with ui.row().classes(
                 "w-full items-center gap-2 p-2 border-t no-wrap"
             ) as row:
-                record.setdefault("ui_updaters", {})[data_key] = (
-                    lambda r=row, rec=record: r.classes(
-                        remove="bg-red-100 bg-green-50",
-                        add=(
-                            "bg-green-50"
-                            if rec["validation"]["is_valid"]
-                            else "bg-red-100"
-                        ),
-                    ).tooltip("\n".join(rec["validation"]["errors"]) or "Válido")
-                )
+                def _update_row(r=row, rec=record):
+                    r.classes(
+                        remove="bg-red-100 bg-green-50 bg-yellow-100",
+                        add=_row_background_class(rec),
+                    ).tooltip(_tooltip_text(rec))
+
+                record.setdefault("ui_updaters", {})[data_key] = _update_row
 
                 with ui.column().classes("w-16 min-w-[4rem] items-center"):
                     ui.button(
@@ -130,28 +157,15 @@ def _render_standard_panel(
                     ).props("size=sm flat dense color=negative")
 
                 with ui.column().classes("w-24 min-w-[6rem] items-center"):
-                    icon = ui.icon(
-                        "check_circle" if record["validation"]["is_valid"] else "cancel"
-                    )
-                    icon.classes(
-                        "text-green-500"
-                        if record["validation"]["is_valid"]
-                        else "text-red-500"
-                    )
+                    status_cfg = _status_icon_config(record)
+                    icon = ui.icon(status_cfg["name"]).classes(status_cfg["classes"])
 
                     def _update_status_icon(ic=icon, rec=record):
-                        ic.set_name(
-                            "check_circle"
-                            if rec["validation"]["is_valid"]
-                            else "cancel"
-                        )
+                        cfg = _status_icon_config(rec)
+                        ic.set_name(cfg["name"])
                         ic.classes(
-                            remove="text-green-500 text-red-500",
-                            add=(
-                                "text-green-500"
-                                if rec["validation"]["is_valid"]
-                                else "text-red-500"
-                            ),
+                            remove="text-green-500 text-red-500 text-yellow-500",
+                            add=cfg["classes"],
                         )
 
                     record["ui_updaters"][
@@ -253,43 +267,28 @@ def _render_bloques_panel(
             with ui.row().classes(
                 "w-full items-start gap-2 p-2 border-t no-wrap"
             ) as row:
-                record.setdefault("ui_updaters", {})["bloques_row"] = (
-                    lambda r=row, rec=record: r.classes(
-                        remove="bg-red-100 bg-green-50",
-                        add=(
-                            "bg-green-50"
-                            if rec["validation"]["is_valid"]
-                            else "bg-red-100"
-                        ),
-                    ).tooltip("\n".join(rec["validation"]["errors"]) or "Válido")
-                )
+                def _update_bloques_row(r=row, rec=record):
+                    r.classes(
+                        remove="bg-red-100 bg-green-50 bg-yellow-100",
+                        add=_row_background_class(rec),
+                    ).tooltip(_tooltip_text(rec))
+
+                record.setdefault("ui_updaters", {})["bloques_row"] = _update_bloques_row
 
                 ui.button(icon="delete", on_click=lambda r=record: on_drop(r)).props(
                     "size=sm flat dense color=negative"
                 ).classes("w-16")
 
                 with ui.column().classes("w-24 items-center"):
-                    icon = ui.icon(
-                        "check_circle" if record["validation"]["is_valid"] else "cancel"
-                    ).classes(
-                        "text-green-500"
-                        if record["validation"]["is_valid"]
-                        else "text-red-500"
-                    )
+                    status_cfg = _status_icon_config(record)
+                    icon = ui.icon(status_cfg["name"]).classes(status_cfg["classes"])
 
                     def _update_bloques_status_icon(ic=icon, rec=record):
-                        ic.set_name(
-                            "check_circle"
-                            if rec["validation"]["is_valid"]
-                            else "cancel"
-                        )
+                        cfg = _status_icon_config(rec)
+                        ic.set_name(cfg["name"])
                         ic.classes(
-                            remove="text-green-500 text-red-500",
-                            add=(
-                                "text-green-500"
-                                if rec["validation"]["is_valid"]
-                                else "text-red-500"
-                            ),
+                            remove="text-green-500 text-red-500 text-yellow-500",
+                            add=cfg["classes"],
                         )
 
                     record["ui_updaters"][

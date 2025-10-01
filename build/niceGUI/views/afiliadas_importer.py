@@ -6,7 +6,8 @@ import asyncio
 import logging
 import unicodedata
 import re
-from typing import Dict, Any, Optional
+import copy
+from typing import Dict, Any, Optional, List
 
 from nicegui import ui, events
 from api.client import APIClient
@@ -14,8 +15,11 @@ from api.validate import validator
 from state.app_state import GenericViewState
 from components.importer_utils import transform_and_validate_row, short_address
 from components.importer_panels import render_preview_tabs
+from components.exporter import export_to_csv
 
 log = logging.getLogger(__name__)
+
+DUPLICATE_NIF_WARNING = "La afiliada con este NIF ya existe en el sistema."
 
 
 class AfiliadasImporterView:
@@ -37,6 +41,10 @@ class AfiliadasImporterView:
         self.bloque_score_limit: float = 0.88
         self._suggestion_task: Optional[asyncio.Task] = None
         self._bloque_details_cache: Dict[int, Dict[str, Any]] = {}
+        self._existing_afiliada_cifs: Dict[str, bool] = {}
+        self._failed_records: List[Dict[str, Any]] = []
+        self._failed_preview_dialog: Optional[ui.dialog] = None
+        self._failed_preview_container: Optional[ui.column] = None
 
     def create(self) -> ui.column:
         """Create the main UI for the CSV importer view."""
@@ -68,6 +76,19 @@ class AfiliadasImporterView:
                 for key in self.panels:
                     with ui.tab_panel(key):
                         self.panels[key] = ui.column().classes("w-full")
+
+            if not self._failed_preview_dialog:
+                self._failed_preview_dialog = ui.dialog()
+                with self._failed_preview_dialog, ui.card().classes(
+                    "w-[90vw] max-w-[1200px]"
+                ):
+                    ui.label("Registros fallidos").classes("text-h6")
+                    self._failed_preview_container = ui.column().classes(
+                        "w-full gap-2"
+                    )
+                    ui.button(
+                        "Cerrar", on_click=self._failed_preview_dialog.close
+                    ).classes("self-end mt-2")
         return container
 
     @property
@@ -81,6 +102,8 @@ class AfiliadasImporterView:
 
     async def _handle_upload(self, e: events.UploadEventArguments):
         """Handle the file upload, parse the data, fetch suggestions, and render the UI."""
+        self._failed_records = []
+        self._existing_afiliada_cifs.clear()
         try:
             content = e.content.read().decode("utf-8-sig")
             df = pd.read_csv(io.StringIO(content), header=None, dtype=str).fillna("")
@@ -93,6 +116,7 @@ class AfiliadasImporterView:
 
             self._bloque_details_cache.clear()
             self.state.set_records(records)
+            await self._mark_existing_afiliadas()
             await self._apply_batch_bloque_suggestions()
             self._render_all_panels()
             ui.notify(
@@ -183,6 +207,12 @@ class AfiliadasImporterView:
 
     def _revalidate_record(self, record: Dict):
         """Re-validates a single record after an edit, and updates its UI elements."""
+        afiliada_data = record.setdefault("afiliada", {})
+        cif_value = afiliada_data.get("cif")
+        if cif_value is not None:
+            afiliada_data["cif"] = str(cif_value).strip().upper()
+            cif_value = afiliada_data["cif"]
+
         is_valid_afiliada, err_afiliada = validator.validate_record(
             "afiliadas", record["afiliada"], "create"
         )
@@ -196,6 +226,7 @@ class AfiliadasImporterView:
             "facturacion", record["facturacion"], "create"
         )
 
+        record.setdefault("validation", {}).setdefault("warnings", [])
         record["validation"].update(
             {
                 "is_valid": is_valid_afiliada
@@ -205,6 +236,18 @@ class AfiliadasImporterView:
                 "errors": err_afiliada + err_piso + err_bloque + err_facturacion,
             }
         )
+
+        if cif_value:
+            cached_status = self._existing_afiliada_cifs.get(cif_value)
+            if cached_status is None:
+                self._apply_duplicate_status(record, False, trigger_ui=False)
+                asyncio.create_task(self._refresh_duplicate_status(record))
+            else:
+                self._apply_duplicate_status(
+                    record, bool(cached_status), trigger_ui=False
+                )
+        else:
+            self._apply_duplicate_status(record, False, trigger_ui=False)
 
         for updater in record.get("ui_updaters", {}).values():
             updater()
@@ -227,6 +270,90 @@ class AfiliadasImporterView:
             await self._suggestion_task
         finally:
             self._render_all_panels()
+
+    def _chunk_list(self, values: List[str], chunk_size: int = 30) -> List[List[str]]:
+        """Yield chunks of a list of values to keep query strings manageable."""
+        return [values[i : i + chunk_size] for i in range(0, len(values), chunk_size)]
+
+    async def _mark_existing_afiliadas(self):
+        """Fetch existing afiliadas by CIF/NIF and mark records with a warning."""
+        records = self.state.records or []
+        if not records:
+            return
+
+        cifs = sorted(
+            {
+                str(record.get("afiliada", {}).get("cif", "")).strip().upper()
+                for record in records
+                if record.get("afiliada", {}).get("cif")
+            }
+        )
+
+        if not cifs:
+            for record in records:
+                self._apply_duplicate_status(record, False, trigger_ui=False)
+            return
+
+        self._existing_afiliada_cifs = {cif: False for cif in cifs}
+
+        for chunk in self._chunk_list(cifs):
+            filter_value = ",".join(chunk)
+            try:
+                matches = await self.api.get_records(
+                    "afiliadas", {"cif": f"in.({filter_value})"}
+                )
+            except Exception:
+                matches = []
+
+            for item in matches or []:
+                cif_value = str(item.get("cif", "")).strip().upper()
+                if cif_value:
+                    self._existing_afiliada_cifs[cif_value] = True
+
+        for record in records:
+            cif = str(record.get("afiliada", {}).get("cif", "")).strip().upper()
+            exists = bool(cif and self._existing_afiliada_cifs.get(cif))
+            self._apply_duplicate_status(record, exists, trigger_ui=False)
+
+    async def _refresh_duplicate_status(self, record: Dict[str, Any]):
+        """Check (or reuse cached) duplicate status for a single record after edits."""
+        cif = str(record.get("afiliada", {}).get("cif", "")).strip().upper()
+        if not cif:
+            self._apply_duplicate_status(record, False)
+            return
+
+        cached = self._existing_afiliada_cifs.get(cif)
+        if cached is None:
+            try:
+                matches = await self.api.get_records("afiliadas", {"cif": f"eq.{cif}"})
+                cached = bool(matches)
+            except Exception:
+                cached = False
+            self._existing_afiliada_cifs[cif] = cached
+
+        self._apply_duplicate_status(record, bool(cached))
+
+    def _apply_duplicate_status(
+        self, record: Dict[str, Any], exists: bool, *, trigger_ui: bool = True
+    ):
+        """Update a record with duplicate warning metadata and optionally refresh UI."""
+        meta = record.setdefault("meta", {})
+        meta["nif_exists"] = exists
+
+        validation = record.setdefault("validation", {"is_valid": False, "errors": []})
+        warnings = validation.setdefault("warnings", [])
+
+        if exists and DUPLICATE_NIF_WARNING not in warnings:
+            warnings.append(DUPLICATE_NIF_WARNING)
+        if not exists and DUPLICATE_NIF_WARNING in warnings:
+            warnings.remove(DUPLICATE_NIF_WARNING)
+
+        if trigger_ui:
+            for updater in record.get("ui_updaters", {}).values():
+                try:
+                    updater()
+                except Exception:
+                    pass
 
     async def _apply_batch_bloque_suggestions(self):
         """Fetches bloque suggestions from the API and updates the records' state."""
