@@ -278,3 +278,21 @@ SELECT
 FROM pisos p
     LEFT JOIN bloques b ON p.bloque_id = b.id
 ORDER BY linked DESC, score DESC;
+
+CREATE OR REPLACE VIEW v_consolidar_pisos_bloques AS
+SELECT
+    p.id,
+    p.bloque_id,
+    b.empresa_id,
+    p.direccion AS "Dirección Piso",
+    b.direccion AS "Dirección Bloque",
+    p.propiedad AS "Propiedad Piso",
+    e.nombre AS "Empresa Propietaria",
+    CASE
+        WHEN COALESCE(NULLIF(LOWER(TRIM(p.propiedad)), ''), '') = COALESCE(NULLIF(LOWER(TRIM(e.nombre)), ''), '') THEN ''
+        ELSE 'Inconsistente'
+    END AS "Consistencia Propiedad"
+FROM
+    pisos p
+    LEFT JOIN bloques b ON p.bloque_id = b.id
+    LEFT JOIN empresas e ON b.empresa_id = e.id;

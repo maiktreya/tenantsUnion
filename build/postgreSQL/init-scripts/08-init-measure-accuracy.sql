@@ -82,3 +82,6 @@ SELECT
 FROM pisos
 WHERE
     bloque_id IS NULL;
+
+# drop temporal column for matching missing records
+ALTER TABLE sindicato_inq.pisos DROP COLUMN empresa_nobloque_id;

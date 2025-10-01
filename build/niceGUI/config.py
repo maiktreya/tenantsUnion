@@ -79,19 +79,18 @@ TABLE_INFO = {
         "hidden_fields": [
             "id",
             "por_habitaciones",
-            "empresa_nobloque_id",
             "inmobiliaria",
             "bloque_id",
             "vpo",
             "vpo_date",
+            "prop_vertical",
+            "n_personas",
+            "fecha_firma",
         ],
         "fields": [
             "direccion",
             "municipio",
             "cp",
-            "prop_vertical",
-            "n_personas",
-            "fecha_firma",
         ],
         "relations": {
             "bloque_id": {
@@ -100,8 +99,7 @@ TABLE_INFO = {
                 "relations": {
                     "empresa_id": {"view": "empresas", "display_field": "nombre"}
                 },
-            },
-            "empresa_nobloque_id": {"view": "empresas", "display_field": "nombre"},
+            }
         },
         "child_relations": [
             {"table": "afiliadas", "foreign_key": "piso_id"},
@@ -341,6 +339,11 @@ VIEW_INFO = {
     "v_facturacion": {
         "display_name": "Vista extendida de facturación",
         "base_table": "afiliadas",
+        "hidden_fields": ["id"],
+    },
+    "v_consolidar_pisos_bloques": {
+        "display_name": "Vista consolidada de Pisos-Bloques",
+        "base_table": "pisos",
         "hidden_fields": ["id"],
     },
 }
