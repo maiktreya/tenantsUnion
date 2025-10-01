@@ -30,48 +30,8 @@ jobs:
 
             - name: Wait for services to be healthy
               run: |
-                  echo "Waiting for services to become healthy..."
-                  TIMEOUT=120
-                  INTERVAL=5
-                  ELAPSED=0
-
-                  # Dynamically get the container ID for the database service
-                  DB_CONTAINER_ID=$(docker compose ps -q db)
-
-                  while [ $ELAPSED -lt $TIMEOUT ]; do
-                    # 1. Check the explicit health status of the database container
-                    HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$DB_CONTAINER_ID")
-
-                    if [ "$HEALTH_STATUS" = "healthy" ]; then
-                      echo "✅ Database is healthy."
-
-                      # 2. Check if PostgREST API is responsive
-                      if curl --fail --silent --output /dev/null http://localhost:3001/; then
-                        echo "✅ PostgREST API is responsive."
-
-                        # 3. Check if NiceGUI frontend is responsive
-                        if curl --fail --silent --output /dev/null http://localhost:8081/; then
-                          echo "✅ NiceGUI frontend is responsive."
-                          echo "All services are up. Proceeding with tests."
-                          exit 0
-                        else
-                          echo "⏳ Waiting for NiceGUI frontend..."
-                        fi
-                      else
-                        echo "⏳ Waiting for PostgREST API..."
-                      fi
-                    else
-                      echo "⏳ Waiting for database (current status: $HEALTH_STATUS)..."
-                    fi
-
-                    sleep $INTERVAL
-                    ELAPSED=$((ELAPSED + INTERVAL))
-                  done
-
-                  echo "❌ Timeout of $TIMEOUT seconds reached waiting for services."
-                  echo "Displaying container logs for debugging:"
-                  docker compose logs
-                  exit 1
+                  echo "Waiting for containers to be healthy..."
+                  sleep 15 # A simple wait, as in the original script
 
             - name: Run pytest
               env:
