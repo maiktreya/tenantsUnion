@@ -7,7 +7,7 @@ import logging
 import unicodedata
 import re
 import copy
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from nicegui import ui, events
 from api.client import APIClient
@@ -20,6 +20,38 @@ from components.exporter import export_to_csv
 log = logging.getLogger(__name__)
 
 DUPLICATE_NIF_WARNING = "La afiliada con este NIF ya existe en el sistema."
+
+FAILED_EXPORT_FIELD_MAP = {
+    "afiliada": [
+        "nombre",
+        "apellidos",
+        "cif",
+        "telefono",
+        "email",
+        "fecha_nac",
+        "regimen",
+    ],
+    "piso": [
+        "direccion",
+        "municipio",
+        "cp",
+        "bloque_id",
+        "n_personas",
+        "inmobiliaria",
+        "propiedad",
+        "prop_vertical",
+        "fecha_firma",
+    ],
+    "bloque": [
+        "direccion",
+    ],
+    "facturacion": [
+        "cuota",
+        "periodicidad",
+        "forma_pago",
+        "iban",
+    ],
+}
 
 
 class AfiliadasImporterView:
@@ -355,6 +387,132 @@ class AfiliadasImporterView:
                 except Exception:
                     pass
 
+    def _snapshot_failed_record(self, record: Dict[str, Any], error_message: str) -> Dict[str, Any]:
+        """Create a serializable snapshot of a record that failed to import."""
+        snapshot = {
+            "afiliada": copy.deepcopy(record.get("afiliada", {})),
+            "piso": copy.deepcopy(record.get("piso", {})),
+            "bloque": copy.deepcopy(record.get("bloque", {})),
+            "facturacion": copy.deepcopy(record.get("facturacion", {})),
+            "meta": {
+                "nif_exists": record.get("meta", {}).get("nif_exists"),
+            },
+            "validation": {
+                "errors": list(record.get("validation", {}).get("errors", [])),
+                "warnings": list(record.get("validation", {}).get("warnings", [])),
+            },
+            "error": error_message,
+        }
+        return snapshot
+
+    def _prepare_failed_records_export(self) -> List[Dict[str, Any]]:
+        """Flatten failed record snapshots into CSV-friendly dictionaries."""
+        export_rows: List[Dict[str, Any]] = []
+        for idx, snapshot in enumerate(self._failed_records, start=1):
+            row: Dict[str, Any] = {"__index": idx}
+            for section, fields in FAILED_EXPORT_FIELD_MAP.items():
+                section_data = snapshot.get(section, {}) or {}
+                for field in fields:
+                    key = f"{section}_{field}"
+                    value = section_data.get(field)
+                    row[key] = "" if value is None else value
+
+            meta_info = snapshot.get("meta", {}) or {}
+            row["meta_nif_exists"] = "Sí" if meta_info.get("nif_exists") else "No"
+
+            validation = snapshot.get("validation", {}) or {}
+            row["validation_errors"] = "; ".join(validation.get("errors", []))
+            row["warnings"] = "; ".join(validation.get("warnings", []))
+            row["error"] = snapshot.get("error", "")
+            export_rows.append(row)
+        return export_rows
+
+    def _get_failed_records_table_data(
+        self,
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Return columns and rows for the failed records preview table."""
+        rows = self._prepare_failed_records_export()
+        if not rows:
+            return [], []
+
+        columns: List[Dict[str, Any]] = [
+            {"name": "__index", "label": "#", "field": "__index", "align": "left"}
+        ]
+
+        for section, fields in FAILED_EXPORT_FIELD_MAP.items():
+            for field in fields:
+                name = f"{section}_{field}"
+                label = f"{section.title()} - {field.replace('_', ' ').title()}"
+                columns.append({"name": name, "label": label, "field": name})
+
+        columns.extend(
+            [
+                {
+                    "name": "meta_nif_exists",
+                    "label": "NIF Duplicado",
+                    "field": "meta_nif_exists",
+                },
+                {
+                    "name": "warnings",
+                    "label": "Avisos",
+                    "field": "warnings",
+                },
+                {
+                    "name": "validation_errors",
+                    "label": "Errores de Validación",
+                    "field": "validation_errors",
+                },
+                {
+                    "name": "error",
+                    "label": "Error Importación",
+                    "field": "error",
+                },
+            ]
+        )
+
+        normalized_rows = [
+            {col["name"]: row.get(col["name"], "") for col in columns}
+            for row in rows
+        ]
+        return columns, normalized_rows
+
+    def _open_failed_records_preview(self):
+        """Show a dialog with a table preview of failed imports."""
+        if not self._failed_records:
+            ui.notify("No hay registros fallidos para mostrar.", type="warning")
+            return
+        if not self._failed_preview_dialog or not self._failed_preview_container:
+            ui.notify(
+                "La vista de registros fallidos no está disponible en este momento.",
+                type="negative",
+            )
+            return
+
+        columns, rows = self._get_failed_records_table_data()
+        if not rows:
+            ui.notify("No hay registros fallidos para mostrar.", type="warning")
+            return
+
+        self._failed_preview_container.clear()
+        with self._failed_preview_container:
+            ui.label("Registros que no se importaron").classes("text-subtitle1")
+            with ui.scroll_area().classes("w-full max-h-[60vh] border rounded"):
+                ui.table(
+                    columns=columns,
+                    rows=rows,
+                    row_key="__index",
+                ).classes("w-full").props("dense")
+
+        self._failed_preview_dialog.open()
+
+    def _export_failed_records_csv(self):
+        """Trigger a CSV download with the failed import records."""
+        rows = self._prepare_failed_records_export()
+        if not rows:
+            ui.notify("No hay registros fallidos para exportar.", type="warning")
+            return
+        export_to_csv(rows, "afiliadas_import_fallidos.csv")
+
     async def _apply_batch_bloque_suggestions(self):
         """Fetches bloque suggestions from the API and updates the records' state."""
         if not self.state.records:
@@ -495,6 +653,7 @@ class AfiliadasImporterView:
         failed_imports = []
         full_log = []
         newly_created_afiliadas = []
+        self._failed_records = []
 
         with ui.dialog() as progress_dialog, ui.card().classes("min-w-[700px]"):
             ui.label("Proceso de Importación").classes("text-h6")
@@ -596,8 +755,12 @@ class AfiliadasImporterView:
                 success_count += 1
             except Exception as e:
                 log.error(f"Failed to import record for {name}", exc_info=True)
-                failed_imports.append({"afiliada": name, "error": str(e)})
-                log_message(f"❌ ERROR al importar a {name}: {e}")
+                error_message = str(e)
+                failed_imports.append({"afiliada": name, "error": error_message})
+                self._failed_records.append(
+                    self._snapshot_failed_record(record, error_message)
+                )
+                log_message(f"❌ ERROR al importar a {name}: {error_message}")
 
             progress.value = (i + 1) / total
             await asyncio.sleep(0.05)
@@ -647,9 +810,21 @@ class AfiliadasImporterView:
                         "readonly outlined"
                     ).classes("w-full h-[40vh]")
 
+            if self._failed_records:
+                with ui.row().classes("w-full justify-end gap-2"):
+                    ui.button(
+                        "Ver registros fallidos",
+                        on_click=self._open_failed_records_preview,
+                    ).props("color=warning")
+                    ui.button(
+                        "Exportar CSV fallidos",
+                        on_click=self._export_failed_records_csv,
+                    ).props("color=primary")
+
             ui.button("Cerrar", on_click=summary_dialog.close).classes("mt-4 self-end")
 
         summary_dialog.open()
 
         self.state.set_records([])
+        self._existing_afiliada_cifs.clear()
         self._render_all_panels()
