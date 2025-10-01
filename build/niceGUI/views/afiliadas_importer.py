@@ -74,9 +74,11 @@ class AfiliadasImporterView:
         self._suggestion_task: Optional[asyncio.Task] = None
         self._bloque_details_cache: Dict[int, Dict[str, Any]] = {}
         self._existing_afiliada_cifs: Dict[str, bool] = {}
+        self._existing_piso_addresses: Dict[str, Optional[bool]] = {}
         self._failed_records: List[Dict[str, Any]] = []
         self._failed_preview_dialog: Optional[ui.dialog] = None
         self._failed_preview_container: Optional[ui.column] = None
+        self._last_import_log: List[str] = []
 
     def create(self) -> ui.column:
         """Create the main UI for the CSV importer view."""
@@ -136,6 +138,7 @@ class AfiliadasImporterView:
         """Handle the file upload, parse the data, fetch suggestions, and render the UI."""
         self._failed_records = []
         self._existing_afiliada_cifs.clear()
+        self._existing_piso_addresses.clear()
         try:
             content = e.content.read().decode("utf-8-sig")
             df = pd.read_csv(io.StringIO(content), header=None, dtype=str).fillna("")
@@ -149,6 +152,7 @@ class AfiliadasImporterView:
             self._bloque_details_cache.clear()
             self.state.set_records(records)
             await self._mark_existing_afiliadas()
+            await self._mark_existing_pisos()
             await self._apply_batch_bloque_suggestions()
             self._render_all_panels()
             ui.notify(
@@ -201,6 +205,14 @@ class AfiliadasImporterView:
         # Accent-insensitive, case-insensitive normalization for text
         normalized = unicodedata.normalize("NFD", s.lower())
         return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+
+    def _normalize_address_key(self, address: Optional[str]) -> str:
+        """Create a case-insensitive key for piso addresses."""
+        if not address:
+            return ""
+        normalized = unicodedata.normalize("NFD", address.strip().lower())
+        collapsed = re.sub(r"\s+", " ", normalized)
+        return "".join(c for c in collapsed if unicodedata.category(c) != "Mn")
 
     def _sort_by_column(self, column: str):
         """Sorts the records based on a selected column and re-renders the UI."""
@@ -281,6 +293,24 @@ class AfiliadasImporterView:
         else:
             self._apply_duplicate_status(record, False, trigger_ui=False)
 
+        direccion_value = (record.get("piso", {}).get("direccion") or "").strip()
+        if direccion_value:
+            key = self._normalize_address_key(direccion_value)
+            if key not in self._existing_piso_addresses:
+                self._existing_piso_addresses[key] = None
+                self._apply_piso_existing_status(record, False, trigger_ui=False)
+                asyncio.create_task(self._refresh_piso_status(record))
+            else:
+                cached_piso = self._existing_piso_addresses.get(key)
+                if cached_piso is None:
+                    self._apply_piso_existing_status(record, False, trigger_ui=False)
+                else:
+                    self._apply_piso_existing_status(
+                        record, bool(cached_piso), trigger_ui=False
+                    )
+        else:
+            self._apply_piso_existing_status(record, False, trigger_ui=False)
+
         for updater in record.get("ui_updaters", {}).values():
             updater()
         self._update_import_button_state()
@@ -306,6 +336,11 @@ class AfiliadasImporterView:
     def _chunk_list(self, values: List[str], chunk_size: int = 30) -> List[List[str]]:
         """Yield chunks of a list of values to keep query strings manageable."""
         return [values[i : i + chunk_size] for i in range(0, len(values), chunk_size)]
+
+    def _format_in_filter_value(self, value: str) -> str:
+        """Return a PostgREST-safe literal for use inside an in() filter."""
+        escaped = value.replace('"', '""')
+        return f'"{escaped}"'
 
     async def _mark_existing_afiliadas(self):
         """Fetch existing afiliadas by CIF/NIF and mark records with a warning."""
@@ -347,6 +382,52 @@ class AfiliadasImporterView:
             exists = bool(cif and self._existing_afiliada_cifs.get(cif))
             self._apply_duplicate_status(record, exists, trigger_ui=False)
 
+    async def _mark_existing_pisos(self):
+        """Fetch existing pisos by address and flag matching records."""
+        records = self.state.records or []
+        if not records:
+            return
+
+        address_map: Dict[str, str] = {}
+        for record in records:
+            direccion = (record.get("piso", {}).get("direccion") or "").strip()
+            if not direccion:
+                continue
+            key = self._normalize_address_key(direccion)
+            if key and key not in address_map:
+                address_map[key] = direccion
+
+        if not address_map:
+            for record in records:
+                self._apply_piso_existing_status(record, False, trigger_ui=False)
+            return
+
+        self._existing_piso_addresses = {key: False for key in address_map}
+
+        address_values = list(address_map.values())
+        for chunk in self._chunk_list(address_values):
+            filter_value = ",".join(self._format_in_filter_value(val) for val in chunk)
+            try:
+                matches = await self.api.get_records(
+                    "pisos", {"direccion": f"in.({filter_value})"}
+                )
+            except Exception:
+                matches = []
+
+            for item in matches or []:
+                key = self._normalize_address_key(item.get("direccion"))
+                if key:
+                    self._existing_piso_addresses[key] = True
+
+        for record in records:
+            direccion = (record.get("piso", {}).get("direccion") or "").strip()
+            if not direccion:
+                self._apply_piso_existing_status(record, False, trigger_ui=False)
+                continue
+            key = self._normalize_address_key(direccion)
+            exists = bool(self._existing_piso_addresses.get(key))
+            self._apply_piso_existing_status(record, exists, trigger_ui=False)
+
     async def _refresh_duplicate_status(self, record: Dict[str, Any]):
         """Check (or reuse cached) duplicate status for a single record after edits."""
         cif = str(record.get("afiliada", {}).get("cif", "")).strip().upper()
@@ -365,6 +446,28 @@ class AfiliadasImporterView:
 
         self._apply_duplicate_status(record, bool(cached))
 
+    async def _refresh_piso_status(self, record: Dict[str, Any]):
+        """Check whether a piso address already exists after user edits."""
+        direccion = (record.get("piso", {}).get("direccion") or "").strip()
+        if not direccion:
+            self._apply_piso_existing_status(record, False)
+            return
+
+        key = self._normalize_address_key(direccion)
+        cached = self._existing_piso_addresses.get(key)
+
+        if cached is None:
+            try:
+                matches = await self.api.get_records(
+                    "pisos", {"direccion": f"eq.{direccion}"}
+                )
+                cached = bool(matches)
+            except Exception:
+                cached = False
+            self._existing_piso_addresses[key] = cached
+
+        self._apply_piso_existing_status(record, bool(cached))
+
     def _apply_duplicate_status(
         self, record: Dict[str, Any], exists: bool, *, trigger_ui: bool = True
     ):
@@ -379,6 +482,20 @@ class AfiliadasImporterView:
             warnings.append(DUPLICATE_NIF_WARNING)
         if not exists and DUPLICATE_NIF_WARNING in warnings:
             warnings.remove(DUPLICATE_NIF_WARNING)
+
+        if trigger_ui:
+            for updater in record.get("ui_updaters", {}).values():
+                try:
+                    updater()
+                except Exception:
+                    pass
+
+    def _apply_piso_existing_status(
+        self, record: Dict[str, Any], exists: bool, *, trigger_ui: bool = True
+    ):
+        """Update piso metadata when the address already exists in the system."""
+        meta = record.setdefault("meta", {})
+        meta["piso_exists"] = exists
 
         if trigger_ui:
             for updater in record.get("ui_updaters", {}).values():
@@ -512,6 +629,19 @@ class AfiliadasImporterView:
             ui.notify("No hay registros fallidos para exportar.", type="warning")
             return
         export_to_csv(rows, "afiliadas_import_fallidos.csv")
+
+    def _export_import_log(self):
+        """Download the latest import log as a text file."""
+        if not self._last_import_log:
+            ui.notify(
+                "No hay registro de importación disponible para exportar.",
+                type="warning",
+            )
+            return
+
+        content = "\n".join(self._last_import_log)
+        ui.download(content.encode("utf-8"), "afiliadas_import_log.txt")
+        ui.notify("Registro de importación exportado.", type="positive")
 
     async def _apply_batch_bloque_suggestions(self):
         """Fetches bloque suggestions from the API and updates the records' state."""
@@ -654,6 +784,7 @@ class AfiliadasImporterView:
         full_log = []
         newly_created_afiliadas = []
         self._failed_records = []
+        self._last_import_log = []
 
         with ui.dialog() as progress_dialog, ui.card().classes("min-w-[700px]"):
             ui.label("Proceso de Importación").classes("text-h6")
@@ -665,13 +796,13 @@ class AfiliadasImporterView:
 
         progress_dialog.open()
 
+        def log_message(msg: str):
+            log_area.push(msg)
+            full_log.append(msg)
+
         for i, record in enumerate(valid_records):
             name = f"{record['afiliada']['nombre']} {record['afiliada']['apellidos']}".strip()
             status_label.set_text(f"Procesando {i + 1}/{total}: {name}...")
-
-            def log_message(msg):
-                log_area.push(msg)
-                full_log.append(msg)
 
             try:
                 # Step 1: Ensure Bloque exists
@@ -765,6 +896,34 @@ class AfiliadasImporterView:
             progress.value = (i + 1) / total
             await asyncio.sleep(0.05)
 
+        failure_count = len(failed_imports)
+        summary_lines = [
+            "",
+            "Resumen final del proceso de importación",
+            f"Total de registros procesados: {total}",
+            f"Importaciones exitosas: {success_count}",
+            f"Registros con errores: {failure_count}",
+        ]
+
+        if newly_created_afiliadas:
+            summary_lines.append("Afiliadas creadas durante este proceso:")
+            for afiliada in newly_created_afiliadas:
+                nombre = afiliada.get("nombre", "").strip()
+                apellidos = afiliada.get("apellidos", "").strip()
+                summary_lines.append(
+                    f" - {nombre} {apellidos} (ID: {afiliada.get('id')}, Nº: {afiliada.get('num_afiliada')})"
+                )
+
+        if failure_count:
+            summary_lines.append(
+                "Consulta la pestaña de fallidos para revisar y corregir los errores."
+            )
+
+        for line in summary_lines:
+            log_message(line)
+
+        self._last_import_log = list(full_log)
+
         progress_dialog.close()
 
         with ui.dialog() as summary_dialog, ui.card().classes(
@@ -806,9 +965,14 @@ class AfiliadasImporterView:
                 # Full log box
                 with ui.card().classes("w-full"):
                     ui.label("Registro Completo").classes("text-subtitle2 mb-1")
-                    ui.textarea(value="\n".join(full_log)).props(
+                    ui.textarea(value="\n".join(self._last_import_log)).props(
                         "readonly outlined"
                     ).classes("w-full h-[40vh]")
+                    with ui.row().classes("w-full justify-end mt-2"):
+                        ui.button(
+                            "Exportar registro",
+                            on_click=self._export_import_log,
+                        ).props("color=secondary")
 
             if self._failed_records:
                 with ui.row().classes("w-full justify-end gap-2"):

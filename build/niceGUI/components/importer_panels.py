@@ -144,10 +144,21 @@ def _render_standard_panel(
                 "w-full items-center gap-2 p-2 border-t no-wrap"
             ) as row:
                 def _update_row(r=row, rec=record):
+                    tooltip_lines: List[str] = []
+                    if data_key == "piso" and rec.get("meta", {}).get("piso_exists"):
+                        tooltip_lines.append(
+                            "el piso ya existe, se asociara al ya existente"
+                        )
+                    base_tooltip = _tooltip_text(rec)
+                    if base_tooltip and (
+                        base_tooltip != "Válido" or not tooltip_lines
+                    ):
+                        tooltip_lines.append(base_tooltip)
+                    tooltip_text = "\n".join(tooltip_lines) if tooltip_lines else base_tooltip
                     r.classes(
                         remove="bg-red-100 bg-green-50 bg-yellow-100",
                         add=_row_background_class(rec),
-                    ).tooltip(_tooltip_text(rec))
+                    ).tooltip(tooltip_text)
 
                 record.setdefault("ui_updaters", {})[data_key] = _update_row
 
@@ -182,13 +193,29 @@ def _render_standard_panel(
                         if field in ["email", "direccion", "iban"]
                         else "w-32 min-w-[8rem]"
                     )
-                    ui.input(value=record[data_key].get(field)).classes(
-                        width
-                    ).bind_value(record[data_key], field).on(
-                        "change", lambda r=record: on_revalidate(r)
-                    )
+                    field_input = ui.input(value=record[data_key].get(field))
+                    field_input.classes(width)
+                    field_input.bind_value(record[data_key], field)
+                    field_input.on("change", lambda r=record: on_revalidate(r))
+
+                    if data_key == "piso" and field == "direccion":
+                        def _update_piso_highlight(inp=field_input, rec=record):
+                            exists = rec.get("meta", {}).get("piso_exists")
+                            inp.classes(
+                                remove="bg-blue-100",
+                                add="bg-blue-100" if exists else "",
+                            )
+
+                        record["ui_updaters"][
+                            "piso_highlight_direccion"
+                        ] = _update_piso_highlight
 
             record["ui_updaters"][data_key]()
+            if (
+                data_key == "piso"
+                and "piso_highlight_direccion" in record.get("ui_updaters", {})
+            ):
+                record["ui_updaters"]["piso_highlight_direccion"]()
 
 
 def _render_bloques_panel(

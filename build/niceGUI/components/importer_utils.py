@@ -121,7 +121,12 @@ def transform_and_validate_row(row: pd.Series) -> Optional[Dict[str, Any]]:
                 "iban": iban_raw.upper() if iban_raw else None,
                 "afiliada_id": None,
             },
-            "meta": {"bloque": None, "bloque_manual": None, "nif_exists": False},
+            "meta": {
+                "bloque": None,
+                "bloque_manual": None,
+                "nif_exists": False,
+                "piso_exists": False,
+            },
         }
 
         # --- Validation ---
