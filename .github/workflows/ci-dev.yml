@@ -1,0 +1,84 @@
+# .github/workflows/ci.yml
+
+name: Continuous Integration
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install test dependencies
+              run: pip install -r tests/requirements.txt
+
+            - name: Start Docker services
+              run: |
+                  docker compose -f docker-compose.yaml -f docker-compose-dev.yaml --profile Frontend up -d
+
+            - name: Wait for services to be healthy
+              run: |
+                  echo "Waiting for services to become healthy..."
+                  TIMEOUT=120
+                  INTERVAL=5
+                  ELAPSED=0
+
+                  # Dynamically get the container ID for the database service
+                  DB_CONTAINER_ID=$(docker compose ps -q db)
+
+                  while [ $ELAPSED -lt $TIMEOUT ]; do
+                    # 1. Check the explicit health status of the database container
+                    HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$DB_CONTAINER_ID")
+
+                    if [ "$HEALTH_STATUS" = "healthy" ]; then
+                      echo "✅ Database is healthy."
+
+                      # 2. Check if PostgREST API is responsive
+                      if curl --fail --silent --output /dev/null http://localhost:3001/; then
+                        echo "✅ PostgREST API is responsive."
+
+                        # 3. Check if NiceGUI frontend is responsive
+                        if curl --fail --silent --output /dev/null http://localhost:8081/; then
+                          echo "✅ NiceGUI frontend is responsive."
+                          echo "All services are up. Proceeding with tests."
+                          exit 0
+                        else
+                          echo "⏳ Waiting for NiceGUI frontend..."
+                        fi
+                      else
+                        echo "⏳ Waiting for PostgREST API..."
+                      fi
+                    else
+                      echo "⏳ Waiting for database (current status: $HEALTH_STATUS)..."
+                    fi
+
+                    sleep $INTERVAL
+                    ELAPSED=$((ELAPSED + INTERVAL))
+                  done
+
+                  echo "❌ Timeout of $TIMEOUT seconds reached waiting for services."
+                  echo "Displaying container logs for debugging:"
+                  docker compose logs
+                  exit 1
+
+            - name: Run pytest
+              env:
+                  PYTHONPATH: ${{ github.workspace }}
+              run: pytest
+
+            - name: Stop Docker services
+              if: always() # This ensures cleanup runs even if tests fail
+              run: |
+                  docker compose -f docker-compose.yaml -f docker-compose-dev.yaml down --remove-orphans
