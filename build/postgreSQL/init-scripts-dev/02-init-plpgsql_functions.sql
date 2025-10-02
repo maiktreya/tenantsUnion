@@ -1,5 +1,7 @@
--- Dev: Fuzzy matching helpers and RPCs for bloque suggestions
--- Force extension objects into the public schema so normalize helpers can use unaccent
+-- =====================================================================
+-- PASO 2-init: Procedures, functions and triggers (Bussiness logic)
+-- =====================================================================
+
 SET search_path TO public;
 
 -- Ensure trigram and unaccent extensions are available for similarity()
@@ -7,6 +9,82 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 
 SET search_path TO sindicato_inq, public;
+
+
+
+-- =====================================================================
+-- FUNCIÓN, PROCEDIMIENTO Y TRIGGER PARA SINCRONIZACIÓN
+-- =====================================================================
+
+CREATE OR REPLACE FUNCTION sync_bloque_nodo()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE sindicato_inq.bloques
+    SET nodo_id = (SELECT nodo_id FROM sindicato_inq.nodos_cp_mapping WHERE cp = NEW.cp)
+    WHERE id = NEW.bloque_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_sync_bloque_nodo ON sindicato_inq.pisos;
+
+CREATE TRIGGER trigger_sync_bloque_nodo
+AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
+FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
+
+CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    bloque_record RECORD;
+    most_common_nodo_id INTEGER;
+BEGIN
+    FOR bloque_record IN SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL LOOP
+        SELECT ncm.nodo_id INTO most_common_nodo_id
+        FROM sindicato_inq.pisos p
+        JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
+        WHERE p.bloque_id = bloque_record.id
+        GROUP BY ncm.nodo_id
+        ORDER BY COUNT(*) DESC
+        LIMIT 1;
+
+        IF FOUND AND most_common_nodo_id IS NOT NULL THEN
+            UPDATE sindicato_inq.bloques
+            SET nodo_id = most_common_nodo_id
+            WHERE id = bloque_record.id;
+        END IF;
+    END LOOP;
+END;
+$$;
+
+-- This function extracts a 5-digit postal code from the 'direccion' string.
+CREATE OR REPLACE FUNCTION extract_cp_from_direccion()
+RETURNS TRIGGER AS $$
+DECLARE
+    matches TEXT[];
+BEGIN
+    -- Only run if 'direccion' is new or has changed.
+    IF (TG_OP = 'INSERT' OR NEW.direccion IS DISTINCT FROM OLD.direccion) THEN
+        -- Find the first 5-digit number in the direccion string.
+        matches := regexp_matches(NEW.direccion, '\m([0-9]{5})\M');
+        IF array_length(matches, 1) > 0 THEN
+            NEW.cp := matches[1]::INTEGER;
+        END IF;
+    END IF;
+    -- Return the (potentially modified) new row to be inserted/updated.
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================================
+-- SUGERENCIA DE BLOQUES PARA afiliadas_importer.py view
+-- =====================================================================
+
+-- This trigger executes the function BEFORE any insert or update on the 'pisos' table.
+-- It runs before 'trigger_sync_bloque_nodo' because BEFORE triggers execute before AFTER triggers.
+CREATE TRIGGER trigger_a_extract_cp
+BEFORE INSERT OR UPDATE ON sindicato_inq.pisos
+FOR EACH ROW EXECUTE FUNCTION extract_cp_from_direccion();
 
 -- Dev normalization helper to align with production scoring logic
 CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT)
@@ -188,5 +266,3 @@ $$;
 -- Trigram index to accelerate normalized comparison
 
 CREATE INDEX IF NOT EXISTS idx_bloques_normalized_trgm ON sindicato_inq.bloques USING gin (normalize_address_for_match(direccion) gin_trgm_ops);
-
-
