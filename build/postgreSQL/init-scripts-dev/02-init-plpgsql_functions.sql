@@ -25,9 +25,9 @@ BEGIN
 
     parts := regexp_split_to_array(address_text, ',');
     IF array_length(parts, 1) IS NULL OR array_length(parts, 1) = 0 THEN
-        cleaned := lower(unaccent(btrim(address_text)));
+        cleaned := lower(public.unaccent(btrim(address_text)));
     ELSE
-        first_part := lower(unaccent(btrim(parts[1])));
+        first_part := lower(public.unaccent(btrim(parts[1])));
         first_part := regexp_replace(first_part, '\s+', ' ', 'g');
 
         IF first_part ~ '[0-9]' THEN
@@ -43,7 +43,7 @@ BEGIN
             cleaned := first_part;
             IF array_length(parts, 1) > 1 THEN
                 FOR idx IN 2 .. array_length(parts, 1) LOOP
-                    token := lower(unaccent(btrim(parts[idx])));
+                    token := lower(public.unaccent(btrim(parts[idx])));
                     token := regexp_replace(token, '\s+', ' ', 'g');
                     IF token ~ '^[0-9]+[a-z]?$' THEN
                         cleaned := cleaned || ' ' || token;
@@ -188,4 +188,5 @@ $$;
 -- Trigram index to accelerate normalized comparison
 
 CREATE INDEX IF NOT EXISTS idx_bloques_normalized_trgm ON sindicato_inq.bloques USING gin (normalize_address_for_match(direccion) gin_trgm_ops);
+
 
