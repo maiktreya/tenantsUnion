@@ -1,10 +1,12 @@
 -- Dev: Fuzzy matching helpers and RPCs for bloque suggestions
-SET search_path TO sindicato_inq,
-                   public;
+-- Force extension objects into the public schema so normalize helpers can use unaccent
+SET search_path TO public;
 
 -- Ensure trigram and unaccent extensions are available for similarity()
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
+
+SET search_path TO sindicato_inq, public;
 
 -- Dev normalization helper to align with production scoring logic
 CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT)
@@ -186,3 +188,4 @@ $$;
 -- Trigram index to accelerate normalized comparison
 
 CREATE INDEX IF NOT EXISTS idx_bloques_normalized_trgm ON sindicato_inq.bloques USING gin (normalize_address_for_match(direccion) gin_trgm_ops);
+

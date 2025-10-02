@@ -3,11 +3,14 @@
 -- PRE-REQUISITE:
 -- This function requires the 'pg_trgm' extension for fuzzy string matching. (INSTALLED IN AN EARLIER SCRIPT)
 -- If you haven't enabled it yet, run the following command as a superuser on your database:
-SET search_path TO sindicato_inq, public;
+-- Force extension objects into the public schema so normalize helpers can use unaccent
+SET search_path TO public;
 
 -- Ensure required extensions exist for normalization and similarity
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
+
+SET search_path TO sindicato_inq, public;
 
 -- Normalization helper to keep address comparison consistent with UI logic
 CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT)
@@ -394,3 +397,4 @@ BEGIN
     ALTER COLUMN num_afiliada SET DEFAULT 'A' || nextval('sindicato_inq.afiliadas_num_afiliada_seq'::regclass);
 
 END $$;
+
