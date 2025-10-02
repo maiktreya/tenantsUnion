@@ -3,7 +3,7 @@ import io
 import asyncio
 import logging
 import copy
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Callable, Awaitable
 
 from nicegui import ui, events
 from api.client import APIClient
@@ -46,6 +46,20 @@ class AfiliadasImporterView:
         self._failed_preview_container: Optional[ui.column] = None
         self._last_import_log: List[str] = []
         self.status_service = ImporterRecordStatusService(api_client)
+
+    def _schedule_background_task(
+        self, coro_factory: Callable[[], Awaitable[Any]]
+    ) -> None:
+        """Run a coroutine immediately when no loop is active, otherwise schedule it."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                asyncio.run(coro_factory())
+            except Exception:
+                log.exception("Background task failed during synchronous execution")
+        else:
+            loop.create_task(coro_factory())
 
     def create(self) -> ui.column:
         """Create the main UI for the CSV importer view."""
@@ -254,7 +268,9 @@ class AfiliadasImporterView:
             if cached_status is None:
                 self.status_service.mark_unknown_cif(cif_value)
                 self._apply_duplicate_status(record, False, trigger_ui=False)
-                asyncio.create_task(self._refresh_duplicate_status(record))
+                self._schedule_background_task(
+                    lambda: self._refresh_duplicate_status(record)
+                )
             else:
                 self._apply_duplicate_status(
                     record, bool(cached_status), trigger_ui=False
@@ -269,7 +285,9 @@ class AfiliadasImporterView:
             if cached_piso is None:
                 self.status_service.mark_unknown_address(direccion_value)
                 self._apply_piso_existing_status(record, False, trigger_ui=False)
-                asyncio.create_task(self._refresh_piso_status(record))
+                self._schedule_background_task(
+                    lambda: self._refresh_piso_status(record)
+                )
             else:
                 self._apply_piso_existing_status(
                     record, bool(cached_piso), trigger_ui=False
@@ -551,7 +569,9 @@ class AfiliadasImporterView:
 
     def _handle_bloque_assignment_change(self, record: Dict):
         """Handles manual changes to a bloque assignment."""
-        asyncio.create_task(self._hydrate_assigned_bloque(record))
+        self._schedule_background_task(
+            lambda: self._hydrate_assigned_bloque(record)
+        )
         self._revalidate_record(record)
 
     async def _hydrate_assigned_bloque(self, record: Dict):
