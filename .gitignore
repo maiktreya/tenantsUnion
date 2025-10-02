@@ -22,4 +22,3 @@ screenshots/
 back
 dev
 build/nginx/certbot
-.github/ci-dev.yml
