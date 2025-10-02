@@ -5,14 +5,23 @@
 -- If you haven't enabled it yet, run the following command as a superuser on your database:
 SET search_path TO sindicato_inq, public;
 
--- Normalization helper to keep address comparison consistent with UI logic
+-- Ensure required extensions exist for normalization and similarity
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS unaccent;
 
-CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT) RETURNS TEXT LANGUAGE plpgsql IMMUTABLE AS $$
+-- Normalization helper to keep address comparison consistent with UI logic
+CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
 DECLARE
     parts TEXT[];
     first_part TEXT;
     token TEXT;
+    candidate TEXT;
     cleaned TEXT;
+    idx INT;
 BEGIN
     IF address_text IS NULL OR btrim(address_text) = '' THEN
         RETURN '';
@@ -20,18 +29,29 @@ BEGIN
 
     parts := regexp_split_to_array(address_text, ',');
     IF array_length(parts, 1) IS NULL OR array_length(parts, 1) = 0 THEN
-        cleaned := btrim(address_text);
+        cleaned := lower(unaccent(btrim(address_text)));
     ELSE
-        first_part := btrim(parts[1]);
+        first_part := lower(unaccent(btrim(parts[1])));
+        first_part := regexp_replace(first_part, '\s+', ' ', 'g');
 
         IF first_part ~ '[0-9]' THEN
-            cleaned := first_part;
+            candidate := regexp_replace(
+                first_part,
+                '^(.+?\b)(\d+[a-z]?).*$',
+                '\1\2'
+            );
+            IF candidate IS NOT NULL AND candidate <> '' THEN
+                cleaned := candidate;
+            ELSE
+                cleaned := first_part;
+            END IF;
         ELSE
             cleaned := first_part;
             IF array_length(parts, 1) > 1 THEN
                 FOR idx IN 2 .. array_length(parts, 1) LOOP
-                    token := btrim(parts[idx]);
-                    IF token ~ '^[0-9]+[A-Za-z]?$' THEN
+                    token := lower(unaccent(btrim(parts[idx])));
+                    token := regexp_replace(token, '\s+', ' ', 'g');
+                    IF token ~ '^[0-9]+[a-z]?$' THEN
                         cleaned := cleaned || ' ' || token;
                         EXIT;
                     END IF;
@@ -40,7 +60,7 @@ BEGIN
         END IF;
     END IF;
 
-    cleaned := lower(regexp_replace(cleaned, '\s+', ' ', 'g'));
+    cleaned := regexp_replace(cleaned, '\s+', ' ', 'g');
     RETURN cleaned;
 END;
 $$;
@@ -306,6 +326,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- El trigger se activa cada vez que se crea o modifica un piso.
+DROP TRIGGER IF EXISTS trigger_sync_bloque_nodo ON sindicato_inq.pisos;
 CREATE TRIGGER trigger_sync_bloque_nodo
 AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
 FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
@@ -335,6 +356,7 @@ $$ LANGUAGE plpgsql;
 
 -- This trigger executes the function BEFORE any insert or update on the 'pisos' table.
 -- It runs before 'trigger_sync_bloque_nodo' because BEFORE triggers execute before AFTER triggers.
+DROP TRIGGER IF EXISTS trigger_a_extract_cp ON sindicato_inq.pisos;
 CREATE TRIGGER trigger_a_extract_cp
 BEFORE INSERT OR UPDATE ON sindicato_inq.pisos
 FOR EACH ROW EXECUTE FUNCTION extract_cp_from_direccion();

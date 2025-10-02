@@ -2,18 +2,20 @@
 SET search_path TO sindicato_inq,
                    public;
 
--- Ensure trigram extension is available for similarity()
-
+-- Ensure trigram and unaccent extensions are available for similarity()
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS unaccent;
 
 -- Dev normalization helper to align with production scoring logic
-
-CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT) RETURNS TEXT LANGUAGE plpgsql IMMUTABLE AS $$
+CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT)
+RETURNS TEXT LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE
     parts TEXT[];
     first_part TEXT;
     token TEXT;
+    candidate TEXT;
     cleaned TEXT;
+    idx INT;
 BEGIN
     IF address_text IS NULL OR btrim(address_text) = '' THEN
         RETURN '';
@@ -21,18 +23,27 @@ BEGIN
 
     parts := regexp_split_to_array(address_text, ',');
     IF array_length(parts, 1) IS NULL OR array_length(parts, 1) = 0 THEN
-        cleaned := btrim(address_text);
+        cleaned := lower(unaccent(btrim(address_text)));
     ELSE
-        first_part := btrim(parts[1]);
+        first_part := lower(unaccent(btrim(parts[1])));
+        first_part := regexp_replace(first_part, '\s+', ' ', 'g');
 
         IF first_part ~ '[0-9]' THEN
-            cleaned := first_part;
+            candidate := regexp_replace(first_part,
+                                        '^(.+?\b)(\d+[a-z]?).*$',
+                                        '\1\2');
+            IF candidate IS NOT NULL AND candidate <> '' THEN
+                cleaned := candidate;
+            ELSE
+                cleaned := first_part;
+            END IF;
         ELSE
             cleaned := first_part;
             IF array_length(parts, 1) > 1 THEN
                 FOR idx IN 2 .. array_length(parts, 1) LOOP
-                    token := btrim(parts[idx]);
-                    IF token ~ '^[0-9]+[A-Za-z]?$' THEN
+                    token := lower(unaccent(btrim(parts[idx])));
+                    token := regexp_replace(token, '\s+', ' ', 'g');
+                    IF token ~ '^[0-9]+[a-z]?$' THEN
                         cleaned := cleaned || ' ' || token;
                         EXIT;
                     END IF;
@@ -41,7 +52,7 @@ BEGIN
         END IF;
     END IF;
 
-    cleaned := lower(regexp_replace(cleaned, '\s+', ' ', 'g'));
+    cleaned := regexp_replace(cleaned, '\s+', ' ', 'g');
     RETURN cleaned;
 END;
 $$;
