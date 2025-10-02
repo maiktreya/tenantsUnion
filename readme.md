@@ -175,5 +175,4 @@ Para más información, consulta la [documentación oficial de PostgREST](https:
 
 Planes de mejora y futuras implementaciones:
 
-  - [ ] **Entorno de Pruebas UI más granular:** Ampliar la suite de tests implementados sobre caracteristicas especificas del frontend.
-  - [ ] **Revisión de Permisos en BBDD:** Auditar y granularizar los permisos a nivel de base de datos en PostgreSQL para un control de acceso más estricto.
+  - [ ] **Revisión de Permisos en BBDD:** Auditar y granularizar los permisos a nivel de base de datos en PostgreSQL para un control de acceso más estricto @maiktreya 01-10-2025
