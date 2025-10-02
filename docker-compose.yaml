@@ -67,7 +67,6 @@ services:
     depends_on:
       - server
     restart: unless-stopped
-
   certbot:
     build:
       context: ./build/certbot # custom image with duckdns integration
