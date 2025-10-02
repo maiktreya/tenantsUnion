@@ -6,11 +6,8 @@
 SET search_path TO sindicato_inq, public;
 
 -- Normalization helper to keep address comparison consistent with UI logic
-CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT)
-RETURNS TEXT
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+
+CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT) RETURNS TEXT LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE
     parts TEXT[];
     first_part TEXT;
@@ -32,8 +29,8 @@ BEGIN
         ELSE
             cleaned := first_part;
             IF array_length(parts, 1) > 1 THEN
-                FOR token IN ARRAY parts[2:array_length(parts, 1)] LOOP
-                    token := btrim(token);
+                FOR idx IN 2 .. array_length(parts, 1) LOOP
+                    token := btrim(parts[idx]);
                     IF token ~ '^[0-9]+[A-Za-z]?$' THEN
                         cleaned := cleaned || ' ' || token;
                         EXIT;
