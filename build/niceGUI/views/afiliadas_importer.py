@@ -5,18 +5,15 @@ import logging
 import copy
 from typing import Dict, Any, Optional, List, Tuple, Callable, Awaitable
 from dataclasses import dataclass, field
-
 from nicegui import ui, events
+
 from api.client import APIClient
 from api.validate import validator
 from state.app_state import GenericViewState
 from components.importer_utils import transform_and_validate_row, short_address
 from components.importer_panels import render_preview_tabs
 from components.exporter import export_to_csv
-from components.importer_normalization import (
-    normalize_address_key,
-    normalize_for_sorting,
-)
+from components.importer_normalization import normalize_address_key, normalize_for_sorting
 from components.importer_record_status import ImporterRecordStatusService
 from config import FAILED_EXPORT_FIELD_MAP, DUPLICATE_NIF_WARNING
 
@@ -481,12 +478,22 @@ class AfiliadasImporterView:
     async def _schedule_refresh(self):
         if self._suggestion_task and not self._suggestion_task.done():
             self._suggestion_task.cancel()
+            try:
+                await self._suggestion_task
+            except asyncio.CancelledError:
+                pass
 
         async def refresh_task():
             await self._apply_batch_bloque_suggestions(self.state.records)
             self._render_all_panels()
 
         self._suggestion_task = asyncio.create_task(refresh_task())
+        try:
+            await self._suggestion_task
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._suggestion_task = None
 
     async def _refresh_record_statuses(self, record: Dict):
         cif = (record.get("afiliada", {}).get("cif") or "").strip().upper()
