@@ -372,5 +372,40 @@ IMPORTER_HEADER_MAP = {
     "iban": "IBAN",
     "bloque_id": "Bloque sugerido",
 }
+# =====================================================================
+#  AFILIADAS IMPORTER VIEW VALIDATION CONFIG
+# =====================================================================
+FAILED_EXPORT_FIELD_MAP = {
+    "afiliada": [
+        "nombre",
+        "apellidos",
+        "cif",
+        "telefono",
+        "email",
+        "fecha_nac",
+        "regimen",
+    ],
+    "piso": [
+        "direccion",
+        "municipio",
+        "cp",
+        "bloque_id",
+        "n_personas",
+        "inmobiliaria",
+        "propiedad",
+        "prop_vertical",
+        "fecha_firma",
+    ],
+    "bloque": [
+        "direccion",
+    ],
+    "facturacion": [
+        "cuota",
+        "periodicidad",
+        "forma_pago",
+        "iban",
+    ],
+}
+DUPLICATE_NIF_WARNING = "La afiliada con este NIF ya existe en el sistema."
 
 config = Config()

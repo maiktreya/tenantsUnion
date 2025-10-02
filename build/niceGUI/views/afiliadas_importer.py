@@ -1,5 +1,3 @@
-# build/niceGUI/views/afiliadas_importer.py (Corrected for Sorting)
-
 import pandas as pd
 import io
 import asyncio
@@ -19,42 +17,9 @@ from components.importer_normalization import (
     normalize_for_sorting,
 )
 from components.importer_record_status import ImporterRecordStatusService
+from config import FAILED_EXPORT_FIELD_MAP, DUPLICATE_NIF_WARNING
 
 log = logging.getLogger(__name__)
-
-DUPLICATE_NIF_WARNING = "La afiliada con este NIF ya existe en el sistema."
-
-FAILED_EXPORT_FIELD_MAP = {
-    "afiliada": [
-        "nombre",
-        "apellidos",
-        "cif",
-        "telefono",
-        "email",
-        "fecha_nac",
-        "regimen",
-    ],
-    "piso": [
-        "direccion",
-        "municipio",
-        "cp",
-        "bloque_id",
-        "n_personas",
-        "inmobiliaria",
-        "propiedad",
-        "prop_vertical",
-        "fecha_firma",
-    ],
-    "bloque": [
-        "direccion",
-    ],
-    "facturacion": [
-        "cuota",
-        "periodicidad",
-        "forma_pago",
-        "iban",
-    ],
-}
 
 
 class AfiliadasImporterView:
@@ -119,9 +84,7 @@ class AfiliadasImporterView:
                     "w-[90vw] max-w-[1200px]"
                 ):
                     ui.label("Registros fallidos").classes("text-h6")
-                    self._failed_preview_container = ui.column().classes(
-                        "w-full gap-2"
-                    )
+                    self._failed_preview_container = ui.column().classes("w-full gap-2")
                     ui.button(
                         "Cerrar", on_click=self._failed_preview_dialog.close
                     ).classes("self-end mt-2")
@@ -204,7 +167,8 @@ class AfiliadasImporterView:
             else ""
         )
         exists_afiliada = bool(
-            afiliada_cif and self.status_service.existing_afiliada_cifs.get(afiliada_cif)
+            afiliada_cif
+            and self.status_service.existing_afiliada_cifs.get(afiliada_cif)
         )
         self._apply_duplicate_status(record, exists_afiliada, trigger_ui=trigger_ui)
 
@@ -391,7 +355,9 @@ class AfiliadasImporterView:
                 except Exception:
                     pass
 
-    def _snapshot_failed_record(self, record: Dict[str, Any], error_message: str) -> Dict[str, Any]:
+    def _snapshot_failed_record(
+        self, record: Dict[str, Any], error_message: str
+    ) -> Dict[str, Any]:
         """Create a serializable snapshot of a record that failed to import."""
         snapshot = {
             "afiliada": copy.deepcopy(record.get("afiliada", {})),
@@ -475,8 +441,7 @@ class AfiliadasImporterView:
         )
 
         normalized_rows = [
-            {col["name"]: row.get(col["name"], "") for col in columns}
-            for row in rows
+            {col["name"]: row.get(col["name"], "") for col in columns} for row in rows
         ]
         return columns, normalized_rows
 
@@ -505,7 +470,9 @@ class AfiliadasImporterView:
                     columns=columns,
                     rows=rows,
                     row_key="__index",
-                ).classes("w-full").props("dense")
+                ).classes(
+                    "w-full"
+                ).props("dense")
 
         self._failed_preview_dialog.open()
 
