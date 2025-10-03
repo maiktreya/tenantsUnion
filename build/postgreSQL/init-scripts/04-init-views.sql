@@ -261,6 +261,7 @@ FROM
 -- =====================================================================
 -- PROCEDIMIENTO: SINCRONIZACIÓN MASIVA DE NODOS PARA BLOQUES
 -- =====================================================================
+DROP VIEW IF EXISTS comprobar_link_pisos_bloques CASCADE;
 CREATE OR REPLACE VIEW comprobar_link_pisos_bloques AS
 
 SELECT
@@ -285,6 +286,7 @@ FROM pisos p
     LEFT JOIN bloques b ON p.bloque_id = b.id
 ORDER BY linked DESC, score DESC;
 
+DROP VIEW IF EXISTS v_consolidar_pisos_bloques CASCADE;
 CREATE OR REPLACE VIEW v_consolidar_pisos_bloques AS
 SELECT
     p.id,
