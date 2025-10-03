@@ -1,12 +1,8 @@
 import pytest
 import respx
 from httpx import Response, ConnectError
-from build.niceGUI.api.client import APIClient
-from pathlib import Path
-import sys
 
-# Add the project root to the Python path to allow imports from the app source
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from api.client import APIClient
 
 # Marks all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio

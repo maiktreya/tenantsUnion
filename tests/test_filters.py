@@ -1,14 +1,10 @@
 # tests/test_filters.py
 
-import sys
-from pathlib import Path
 import pytest
 from unittest.mock import MagicMock, call
 
-# Add the project root to the Python path to allow imports from the app source
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from build.niceGUI.components.filters import FilterPanel
+from components.filters import FilterPanel
 
 # Import ui for creating the necessary context in the test fixture
 from nicegui import ui

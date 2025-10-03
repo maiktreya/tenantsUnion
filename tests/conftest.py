@@ -1,17 +1,17 @@
 # tests/conftest.py
 
+import os
+import sys
+from pathlib import Path
+
+# Add the project's source directory to the Python path
+SRC_DIR = Path(__file__).parent.parent / "build" / "niceGUI"
+sys.path.insert(0, str(SRC_DIR))
+
 import pytest
 import respx
 from httpx import Response
 from unittest.mock import AsyncMock
-import os
-
-import sys
-from pathlib import Path
-
-# Point sys.path directly to the application's source directory.
-SRC_DIR = Path(__file__).parent.parent / "build" / "niceGUI"
-sys.path.insert(0, str(SRC_DIR))
 
 from debug_client import DebugAPIClient
 from nicegui import ui, app
@@ -55,7 +55,7 @@ def setup_nicegui_app():
     # Import and initialize your main application
     # This should register all your @ui.page decorators
     try:
-        from build.niceGUI.main import (
+        from main import (
             main_page_entry,
         )  # This should register your routes
 
@@ -64,9 +64,9 @@ def setup_nicegui_app():
         print(f"⚠️ Could not import main application: {e}")
         # If main.py is in a different location, adjust the import
         try:
-            import build.niceGUI.main as main_module
+            import main as main_module
 
-            print("✅ Successfully imported main from build.niceGUI.main")
+            print("✅ Successfully imported main from main")
         except ImportError as e2:
             print(f"❌ Could not import main application from any location: {e2}")
 

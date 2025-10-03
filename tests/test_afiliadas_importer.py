@@ -1,15 +1,7 @@
-import sys
-import types
-from pathlib import Path
 import asyncio
+import types
+
 import pytest
-
-
-# Ensure modules under build/niceGUI are importable as top-level packages
-ROOT = Path(__file__).resolve().parents[1] / "build" / "niceGUI"
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
 
 # Provide a very small stub for nicegui if it's not available during tests
 try:

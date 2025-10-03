@@ -1,7 +1,7 @@
 
 import pytest
 import re
-from build.niceGUI.config import TABLE_INFO, VIEW_INFO
+from config import TABLE_INFO, VIEW_INFO
 
 # Helper function to parse SQL schema
 def parse_sql_schema(sql_content):

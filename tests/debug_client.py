@@ -1,19 +1,7 @@
 import httpx
 import logging
-from pathlib import Path
-import sys
 
-# Add the project root to the Python path to allow imports from the app source
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-# --- ROBUST FIX ---
-# Remove sys.path manipulation, as conftest.py now handles it.
-# Change the fragile relative import to a clean, absolute one.
-from build.niceGUI.api.client import (
-    APIClient,
-)  # Works because build/niceGUI is on the path
-
-# --- END FIX ---
+from api.client import APIClient
 
 # Set up a logger for clear test output
 logging.basicConfig(level=logging.INFO)

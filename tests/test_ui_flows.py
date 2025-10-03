@@ -2,24 +2,20 @@
 """
 End-to-end UI test suite for the application.
 """
-import pytest
+import os  # <<< FINAL FIX: Import the 'os' module
+import threading
 import time
+
+import pytest
+import requests
 import respx
 from httpx import Response
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-import threading
-import sys
-from pathlib import Path
-import requests
-import os  # <<< FINAL FIX: Import the 'os' module
-
-# Add project paths to allow the test server to import the application
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "build" / "niceGUI"))
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 pytestmark = pytest.mark.asyncio
 
