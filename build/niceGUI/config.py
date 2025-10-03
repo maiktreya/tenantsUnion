@@ -108,14 +108,14 @@ TABLE_INFO = {
     "afiliadas": {
         "display_name": "Afiliadas",
         "id_field": "id",
-        "hidden_fields": ["id", "seccion_sindical", "nivel_participacion", "comision"],
+        "hidden_fields": ["id", "nivel_participacion"],
         "fields": [
             "piso_id",
             "num_afiliada",
             "nombre",
             "apellidos",
             "cif",
-            "fecha_nacimiento",
+            "fecha_nac",
             "genero",
             "email",
             "telefono",

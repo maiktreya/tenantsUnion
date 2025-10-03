@@ -241,7 +241,7 @@ CREATE OR REPLACE VIEW v_facturacion AS
 SELECT
     -- Fields from 'afiliadas' table
     a.id AS "id",
-    CONCAT(a.apellidos, ', ', a.nombre) as afiliada_nombre_completo,
+    CONCAT(a.nombre, ' ', a.apellidos) as afiliada_nombre_completo,
     a.email AS "Email",
     a.cif AS "NIF",
     p.direccion AS "Direccion",
