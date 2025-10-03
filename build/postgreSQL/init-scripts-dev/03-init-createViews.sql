@@ -16,8 +16,7 @@ SET search_path TO sindicato_inq, public;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- VISTA 1: ENTRAMADO_EMPRESAS (CORREGIDA CON 'id' EXPLÍCITO)
--- NOTA: Esta es una vista de resumen. Al hacer clic en una fila, se mostrarán las empresas hijas (child records).
+-- Summary table with globals by entramado_empresa
 CREATE OR REPLACE VIEW v_resumen_entramados_empresas AS
 SELECT
     ee.id, -- FIX: Se asegura que el ID primario del entramado esté presente como 'id'.
@@ -38,7 +37,7 @@ GROUP BY
     ee.nombre,
     ee.descripcion;
 
--- VISTA 2: RESUMEN POR NODO TERRITORIAL (CORREGIDA CON 'id' EXPLÍCITO)
+-- Summary table with globals for table nodos
 DROP VIEW IF EXISTS v_resumen_nodos CASCADE;
 CREATE OR REPLACE VIEW v_resumen_nodos AS
 SELECT
@@ -68,8 +67,7 @@ GROUP BY
     n.descripcion
 ORDER BY "Num. Afiliadas" DESC;
 
--- VISTA 3: VISTA DE DETALLE DE CONFLICTOS (UNIFICADA)
--- Esta vista ya incluye 'c.id' a través de 'c.*', por lo que es correcta.
+-- Full log of diario_conflictos entries along auxiliary info
 DROP VIEW IF EXISTS v_conflictos_detalle CASCADE;
 CREATE OR REPLACE VIEW v_conflictos_detalle AS
 SELECT
@@ -84,7 +82,7 @@ FROM sindicato_inq.conflictos c
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
     LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id;
 
--- VISTA 4: AFILIADAS (CORRECTED ALIASES)
+-- Enhanced afilidas View with auxiliary info
 DROP VIEW IF EXISTS v_afiliadas_detalle CASCADE;
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
@@ -121,7 +119,7 @@ FROM
     LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
     LEFT JOIN nodos n ON ncm.nodo_id = n.id;
 
--- VISTA 5: RESUMEN DE BLOQUES (ESTA VISTA YA ERA CORRECTA)
+-- enhanced bloques view
 DROP VIEW IF EXISTS v_resumen_bloques CASCADE;
 CREATE OR REPLACE VIEW v_resumen_bloques AS
 SELECT
@@ -146,7 +144,7 @@ GROUP BY
     b.direccion,
     e.nombre;
 
--- VISTA 6: VISTA CON INFORMACIÓN DE FACTURACIÓN EXTENDIDA
+-- tailormade presentation to share with consultants
 CREATE OR REPLACE VIEW v_facturacion AS
 SELECT
     -- Fields from 'afiliadas' table
@@ -179,9 +177,12 @@ LEFT JOIN
 	pisos as p on a.piso_id = p.id
 ORDER BY
     a.apellidos;
+
 -- =====================================================================
 -- VISTAS INTERNAS VISTA CONFLICTOS (NO DISPONIBLE EN LA INTERFAZ NI EN CONFIG.PY)
 -- =====================================================================
+
+-- full log of diario_conflictos table along auxiliary info for internal conflictos.py usage
 CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
 SELECT
     dc.id,
@@ -201,6 +202,7 @@ FROM
     LEFT JOIN conflictos c ON dc.conflicto_id = c.id
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id;
 
+-- Internal view for the nicegul conflictos.py module
 DROP VIEW IF EXISTS v_conflictos_enhanced CASCADE;
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS
 SELECT
@@ -261,9 +263,9 @@ FROM
 -- =====================================================================
 -- PROCEDIMIENTO: SINCRONIZACIÓN MASIVA DE NODOS PARA BLOQUES
 -- =====================================================================
+-- View for checking matching bloques & pisos direcciones
 DROP VIEW IF EXISTS comprobar_link_pisos_bloques CASCADE;
 CREATE OR REPLACE VIEW comprobar_link_pisos_bloques AS
-
 SELECT
     p.id,
     p.direccion AS direccion1_piso,
@@ -286,6 +288,7 @@ FROM pisos p
     LEFT JOIN bloques b ON p.bloque_id = b.id
 ORDER BY linked DESC, score DESC;
 
+-- View for checking issues in the user provided "empresa" and the one already known for the bloque & missing ones
 DROP VIEW IF EXISTS v_consolidar_pisos_bloques CASCADE;
 CREATE OR REPLACE VIEW v_consolidar_pisos_bloques AS
 SELECT
@@ -297,7 +300,9 @@ SELECT
     p.propiedad AS "Propiedad Piso",
     e.nombre AS "Empresa Propietaria",
     CASE
+        WHEN b.empresa_id IS NULL THEN 'Falta empresa Bloque'
         WHEN COALESCE(NULLIF(LOWER(TRIM(p.propiedad)), ''), '') = COALESCE(NULLIF(LOWER(TRIM(e.nombre)), ''), '') THEN ''
+        WHEN p.propiedad IS NULL and b.empresa_id IS NOT NULL THEN ''
         ELSE 'Inconsistente'
     END AS "Consistencia Propiedad"
 FROM
