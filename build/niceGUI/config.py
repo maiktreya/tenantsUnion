@@ -145,10 +145,7 @@ TABLE_INFO = {
         "display_name": "Nodos Territoriales",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["nombre", "descripcion", "usuario_responsable_id"],
-        "relations": {
-            "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"}
-        },
+        "fields": ["nombre", "descripcion"],
         "child_relations": [
             {"table": "nodos_cp_mapping", "foreign_key": "nodo_id"},
         ],

@@ -297,6 +297,7 @@ SELECT
     p.propiedad AS "Propiedad Piso",
     e.nombre AS "Empresa Propietaria",
     CASE
+        WHEN b.empresa_id IS NULL THEN 'Falta empresa Bloque'
         WHEN COALESCE(NULLIF(LOWER(TRIM(p.propiedad)), ''), '') = COALESCE(NULLIF(LOWER(TRIM(e.nombre)), ''), '') THEN ''
         ELSE 'Inconsistente'
     END AS "Consistencia Propiedad"
