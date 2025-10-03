@@ -229,6 +229,29 @@ class AfiliadasImporterView:
         summary_dialog.open()
 
     # ====================================================================
+
+    def _open_failed_records_preview(self):
+        """Open dialog listing failed records from the last import attempt."""
+        if not self._failed_preview_dialog or not self._failed_preview_container:
+            ui.notify("La vista de registros fallidos no está disponible.", type="warning")
+            return
+
+        if not self._failed_records:
+            ui.notify("No hay registros fallidos para mostrar.", type="info")
+            return
+
+        columns, rows = self._get_failed_records_table_data()
+        self._failed_preview_container.clear()
+
+        with self._failed_preview_container:
+            if not rows:
+                ui.label("No hay registros fallidos para mostrar.").classes("text-gray-500")
+            else:
+                ui.table(columns=columns, rows=rows, row_key="__index").classes("w-full")
+
+        self._failed_preview_dialog.open()
+
+    # ====================================================================
     # Pure Business Logic Methods
     # ====================================================================
 
