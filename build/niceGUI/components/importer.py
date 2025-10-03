@@ -4,6 +4,7 @@ from typing import Dict, Callable, Optional
 
 from nicegui import ui
 from api.client import APIClient
+from .upload_event_utils import read_upload_event_bytes
 from .utils import _clean_record
 
 async def import_from_csv(
@@ -106,10 +107,19 @@ class CSVImporterDialog:
 
         self.dialog.open()
 
-    def _handle_upload(self, e):
+    async def _handle_upload(self, e):
         """Callback function to store the content of the uploaded file."""
-        self.uploaded_file_content = e.content.read()
-        ui.notify(f"Archivo '{e.name}' cargado y listo para importar.", type='info')
+        try:
+            self.uploaded_file_content = await read_upload_event_bytes(e)
+        except Exception as exc:
+            self.uploaded_file_content = None
+            ui.notify(f"No se pudo leer el archivo: {exc}", type='negative')
+            return
+
+        filename = getattr(e, 'name', None)
+        if not filename and getattr(e, 'file', None):
+            filename = getattr(e.file, 'name', '')
+        ui.notify(f"Archivo '{filename or 'CSV'}' cargado y listo para importar.", type='info')
 
     async def _start_import(self):
         """Validates and initiates the CSV import process."""

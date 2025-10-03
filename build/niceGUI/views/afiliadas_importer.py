@@ -15,6 +15,7 @@ from components.importer_panels import render_preview_tabs
 from components.exporter import export_to_csv
 from components.importer_normalization import normalize_address_key, normalize_for_sorting
 from components.importer_record_status import ImporterRecordStatusService
+from components.upload_event_utils import read_upload_event_bytes
 from config import FAILED_EXPORT_FIELD_MAP, DUPLICATE_NIF_WARNING
 
 log = logging.getLogger(__name__)
@@ -115,7 +116,8 @@ class AfiliadasImporterView:
         """UI Orchestrator: Handles file upload, delegates processing, and updates UI."""
         self._failed_records = []
         try:
-            prepared_records = await self._prepare_records_from_csv(e.content.read())
+            csv_bytes = await read_upload_event_bytes(e)
+            prepared_records = await self._prepare_records_from_csv(csv_bytes)
             self.state.set_records(prepared_records)
             self._render_all_panels()
             ui.notify(
