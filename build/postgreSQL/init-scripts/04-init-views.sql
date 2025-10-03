@@ -299,6 +299,7 @@ SELECT
     CASE
         WHEN b.empresa_id IS NULL THEN 'Falta empresa Bloque'
         WHEN COALESCE(NULLIF(LOWER(TRIM(p.propiedad)), ''), '') = COALESCE(NULLIF(LOWER(TRIM(e.nombre)), ''), '') THEN ''
+        WHEN p.propiedad IS NULL and b.empresa_id IS NOT NULL THEN ''
         ELSE 'Inconsistente'
     END AS "Consistencia Propiedad"
 FROM
