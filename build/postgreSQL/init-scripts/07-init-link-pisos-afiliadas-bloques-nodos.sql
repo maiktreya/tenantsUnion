@@ -14,7 +14,6 @@ WHERE
     bloque_id IS NULL;
 
 -- 2. SYNC BLOQUES TO NODOS: Ensure all bloques are linked to their nodos
-CALL sync_all_bloques_to_nodos ();
 
 -- =====================================================================
 -- B: LOGIC TO CAPTURE AND LINK ORPHANED EMPRESAS (APPENDED)

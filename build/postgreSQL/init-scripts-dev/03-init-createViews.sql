@@ -4,14 +4,15 @@
 
 SET search_path TO sindicato_inq, public;
 
+DROP VIEW IF EXISTS v_resumen_bloques CASCADE;
 CREATE OR REPLACE VIEW v_resumen_bloques AS
 SELECT
     b.id,
     b.empresa_id,
-    b.nodo_id,
-    b.direccion AS "Dirección",
+    MIN(ncm.nodo_id) AS nodo_id,
+    b.direccion AS "Direccion",
     e.nombre AS "Empresa Propietaria",
-    n.nombre AS "Nodo Territorial",
+    COALESCE(MAX(n.nombre), 'Sin Nodo Asignado') AS "Nodo Territorial",
     COUNT(DISTINCT p.id) AS "Pisos en el bloque",
     COUNT(DISTINCT a.id) AS "Afiliadas en el bloque"
 FROM
@@ -19,15 +20,18 @@ FROM
     LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN empresas e ON b.empresa_id = e.id
-    LEFT JOIN nodos n ON b.nodo_id = n.id
+    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN nodos n ON ncm.nodo_id = n.id
 WHERE
     a.estado = 'Alta'
 GROUP BY
     b.id,
-    e.nombre,
-    n.nombre
+    b.empresa_id,
+    b.direccion,
+    e.nombre
 ORDER BY "Afiliadas en el bloque" DESC;
 
+DROP VIEW IF EXISTS v_resumen_nodos CASCADE;
 CREATE OR REPLACE VIEW v_resumen_nodos AS
 SELECT
     n.id,
@@ -68,15 +72,16 @@ GROUP BY
     ee.nombre,
     ee.descripcion;
 
+DROP VIEW IF EXISTS v_afiliadas_detalle CASCADE;
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
-    a.id, -- ID primario de la afiliada (para buscar hijos)
-    a.piso_id, -- ID foráneo del piso (para buscar padres)
-    a.num_afiliada AS "Núm.Afiliada",
+    a.id,
+    a.piso_id,
+    a.num_afiliada AS "Num.Afiliada",
     a.nombre AS "Nombre",
     a.apellidos AS "Apellidos",
     a.cif AS "CIF",
-    a.genero AS "Género",
+    a.genero AS "Genero",
     TRIM(
         CONCAT_WS(
             ', ',
@@ -84,8 +89,8 @@ SELECT
             p.municipio,
             p.cp::text
         )
-    ) AS "Dirección",
-    a.regimen AS "Régimen",
+    ) AS "Direccion",
+    a.regimen AS "Regimen",
     a.estado AS "Estado",
     a.fecha_alta as "Fecha Alta",
     a.fecha_baja as "Fecha Baja",
@@ -100,8 +105,10 @@ FROM
     LEFT JOIN bloques b ON p.bloque_id = b.id
     LEFT JOIN empresas e ON b.empresa_id = e.id
     LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
-    LEFT JOIN nodos n ON b.nodo_id = n.id;
+    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN nodos n ON ncm.nodo_id = n.id;
 
+DROP VIEW IF EXISTS v_conflictos_detalle CASCADE;
 CREATE OR REPLACE VIEW v_conflictos_detalle AS
 SELECT
     c.id,
@@ -118,14 +125,14 @@ SELECT
     CONCAT(a.nombre, ' ', a.apellidos) as afiliada_nombre_completo,
     a.num_afiliada,
     p.direccion as direccion_piso,
-    b.direccion as direccion_bloque,
     n.nombre as nodo_nombre
 FROM
     conflictos c
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN pisos p ON a.piso_id = p.id
     LEFT JOIN bloques b ON p.bloque_id = b.id
-    LEFT JOIN nodos n ON b.nodo_id = n.id;
+    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN nodos n ON ncm.nodo_id = n.id;
 
 CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
 SELECT
@@ -181,6 +188,7 @@ FROM
     LEFT JOIN empresas e ON b.empresa_id = e.id;
 
 -- TABLE USED BY NICEGUI "conflictos.py" view interrnally. Not user accessible in niceGUI
+DROP VIEW IF EXISTS v_conflictos_enhanced CASCADE;
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS
 SELECT
     c.id,
@@ -203,8 +211,8 @@ SELECT
     p.cp AS piso_cp,
     b.id AS bloque_id,
     b.direccion AS bloque_direccion,
-    COALESCE(n1.id, n2.id) AS nodo_id,
-    COALESCE(n1.nombre, n2.nombre) AS nodo_nombre,
+    ncm.nodo_id AS nodo_id,
+    n.nombre AS nodo_nombre,
     CONCAT(
         '(',
         c.id,
@@ -215,7 +223,7 @@ SELECT
         COALESCE(
             p.direccion,
             b.direccion,
-            'Sin dirección'
+            'Sin direccion'
         ),
         ' | ',
         COALESCE(
@@ -232,9 +240,8 @@ FROM
     LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos n1 ON b.nodo_id = n1.id
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id;
+    LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id;
 
 -- VISTA 6: VISTA CON INFORMACIÓN DE FACTURACIÓN EXTENDIDA
 CREATE OR REPLACE VIEW v_facturacion AS

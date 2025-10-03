@@ -39,14 +39,15 @@ GROUP BY
     ee.descripcion;
 
 -- VISTA 2: RESUMEN POR NODO TERRITORIAL (CORREGIDA CON 'id' EXPLÍCITO)
+DROP VIEW IF EXISTS v_resumen_nodos CASCADE;
 CREATE OR REPLACE VIEW v_resumen_nodos AS
 SELECT
-    n.id, -- FIX: Se asegura que el ID primario del nodo esté presente como 'id'.
+    n.id,
     n.nombre AS "Nodo Territorial",
-    n.descripcion AS "Descripción",
-    COUNT(DISTINCT b.id) AS "Núm. Bloques",
-    COUNT(DISTINCT e.id) AS "Núm. Empresas Activas",
-    COUNT(DISTINCT a.id) AS "Núm. Afiliadas",
+    n.descripcion AS "Descripcion",
+    COUNT(DISTINCT b.id) AS "Num. Bloques",
+    COUNT(DISTINCT e.id) AS "Num. Empresas Activas",
+    COUNT(DISTINCT a.id) AS "Num. Afiliadas",
     COUNT(DISTINCT c.id) AS "Total Conflictos",
     COUNT(DISTINCT c.id) FILTER (
         WHERE
@@ -55,19 +56,21 @@ SELECT
     ) AS "Conflictos Abiertos"
 FROM
     nodos n
-    LEFT JOIN bloques b ON n.id = b.nodo_id
+    LEFT JOIN nodos_cp_mapping ncm ON n.id = ncm.nodo_id
+    LEFT JOIN pisos p ON p.cp = ncm.cp
+    LEFT JOIN bloques b ON p.bloque_id = b.id
     LEFT JOIN empresas e ON b.empresa_id = e.id
-    LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN conflictos c ON a.id = c.afiliada_id
 GROUP BY
     n.id,
     n.nombre,
     n.descripcion
-ORDER BY "Núm. Afiliadas" DESC;
+ORDER BY "Num. Afiliadas" DESC;
 
 -- VISTA 3: VISTA DE DETALLE DE CONFLICTOS (UNIFICADA)
 -- Esta vista ya incluye 'c.id' a través de 'c.*', por lo que es correcta.
+DROP VIEW IF EXISTS v_conflictos_detalle CASCADE;
 CREATE OR REPLACE VIEW v_conflictos_detalle AS
 SELECT
     c.*,
@@ -78,18 +81,20 @@ FROM sindicato_inq.conflictos c
     LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id;
+    LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id;
 
 -- VISTA 4: AFILIADAS (CORRECTED ALIASES)
+DROP VIEW IF EXISTS v_afiliadas_detalle CASCADE;
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
-    a.id, -- ID primario de la afiliada (para buscar hijos)
-    a.piso_id, -- ID foráneo del piso (para buscar padres)
-    a.num_afiliada AS "Núm.Afiliada",
+    a.id,
+    a.piso_id,
+    a.num_afiliada AS "Num.Afiliada",
     a.nombre AS "Nombre",
     a.apellidos AS "Apellidos",
     a.cif AS "CIF",
-    a.genero AS "Género",
+    a.genero AS "Genero",
     TRIM(
         CONCAT_WS(
             ', ',
@@ -97,8 +102,8 @@ SELECT
             p.municipio,
             p.cp::text
         )
-    ) AS "Dirección",
-    a.regimen AS "Régimen",
+    ) AS "Direccion",
+    a.regimen AS "Regimen",
     a.estado AS "Estado",
     a.fecha_alta as "Fecha Alta",
     a.fecha_baja as "Fecha Baja",
@@ -113,32 +118,33 @@ FROM
     LEFT JOIN bloques b ON p.bloque_id = b.id
     LEFT JOIN empresas e ON b.empresa_id = e.id
     LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
-    LEFT JOIN nodos n ON b.nodo_id = n.id;
+    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN nodos n ON ncm.nodo_id = n.id;
 
 -- VISTA 5: RESUMEN DE BLOQUES (ESTA VISTA YA ERA CORRECTA)
+DROP VIEW IF EXISTS v_resumen_bloques CASCADE;
 CREATE OR REPLACE VIEW v_resumen_bloques AS
 SELECT
-    b.id, -- Primary key for the block
-    b.empresa_id, -- Foreign key to empresas
-    b.nodo_id, -- Foreign key to nodos
-    b.direccion AS "Dirección",
+    b.id,
+    b.empresa_id,
+    MIN(ncm.nodo_id) AS nodo_id,
+    b.direccion AS "Direccion",
     e.nombre AS "Empresa Propietaria",
-    n.nombre AS "Nodo Territorial",
+    COALESCE(MAX(n.nombre), 'Sin Nodo Asignado') AS "Nodo Territorial",
     COUNT(DISTINCT p.id) AS "Pisos en el bloque",
     COUNT(DISTINCT a.id) AS "Afiliadas en el bloque"
 FROM
     bloques b
-    LEFT JOIN pisos p ON b.id = p.bloque_id
-    LEFT JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN empresas e ON b.empresa_id = e.id
-    LEFT JOIN nodos n ON b.nodo_id = n.id
-WHERE
-    a.estado = 'Alta'
+    LEFT JOIN pisos p ON b.id = p.bloque_id
+    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN nodos n ON ncm.nodo_id = n.id
+    LEFT JOIN afiliadas a ON p.id = a.piso_id
 GROUP BY
     b.id,
-    e.nombre,
-    n.nombre
-ORDER BY "Afiliadas en el bloque" DESC;
+    b.empresa_id,
+    b.direccion,
+    e.nombre;
 
 -- VISTA 6: VISTA CON INFORMACIÓN DE FACTURACIÓN EXTENDIDA
 CREATE OR REPLACE VIEW v_facturacion AS
@@ -195,6 +201,7 @@ FROM
     LEFT JOIN conflictos c ON dc.conflicto_id = c.id
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id;
 
+DROP VIEW IF EXISTS v_conflictos_enhanced CASCADE;
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS
 SELECT
     c.id,
@@ -219,8 +226,8 @@ SELECT
     p.inmobiliaria AS piso_inmobiliaria,
     b.id AS bloque_id,
     b.direccion AS bloque_direccion,
-    COALESCE(n1.id, n2.id) AS nodo_id,
-    COALESCE(n1.nombre, n2.nombre) AS nodo_nombre,
+    ncm.nodo_id AS nodo_id,
+    n.nombre AS nodo_nombre,
     CONCAT(
         '(',
         c.id,
@@ -231,7 +238,7 @@ SELECT
         COALESCE(
             p.direccion,
             b.direccion,
-            'Sin dirección'
+            'Sin direccion'
         ),
         ' | ',
         COALESCE(
@@ -248,9 +255,8 @@ FROM
     LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos n1 ON b.nodo_id = n1.id
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id;
+    LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id;
 
 -- =====================================================================
 -- PROCEDIMIENTO: SINCRONIZACIÓN MASIVA DE NODOS PARA BLOQUES

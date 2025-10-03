@@ -22,10 +22,3 @@ CREATE TABLE sindicato_inq.nodos_cp_mapping (
 );
 
 CREATE INDEX idx_nodos_cp_mapping_nodo_id ON sindicato_inq.nodos_cp_mapping (nodo_id);
-
--- 2. Se añade la columna 'nodo_id' a 'bloques' para rendimiento, como sugiere Claude.
---    Esta columna puede ser NULL para manejar bloques sin un CP definido.
-ALTER TABLE sindicato_inq.bloques
-ADD COLUMN nodo_id INTEGER REFERENCES sindicato_inq.nodos (id) ON DELETE SET NULL;
-
-CREATE INDEX idx_bloques_nodo_id ON sindicato_inq.bloques (nodo_id);

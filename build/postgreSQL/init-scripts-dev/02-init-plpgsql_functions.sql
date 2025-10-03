@@ -12,51 +12,6 @@ SET search_path TO sindicato_inq, public;
 
 
 
--- =====================================================================
--- FUNCIÓN, PROCEDIMIENTO Y TRIGGER PARA SINCRONIZACIÓN
--- =====================================================================
-
-CREATE OR REPLACE FUNCTION sync_bloque_nodo()
-RETURNS TRIGGER AS $$
-BEGIN
-    UPDATE sindicato_inq.bloques
-    SET nodo_id = (SELECT nodo_id FROM sindicato_inq.nodos_cp_mapping WHERE cp = NEW.cp)
-    WHERE id = NEW.bloque_id;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trigger_sync_bloque_nodo ON sindicato_inq.pisos;
-
-CREATE TRIGGER trigger_sync_bloque_nodo
-AFTER INSERT OR UPDATE OF cp ON sindicato_inq.pisos
-FOR EACH ROW EXECUTE FUNCTION sync_bloque_nodo();
-
-CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    bloque_record RECORD;
-    most_common_nodo_id INTEGER;
-BEGIN
-    FOR bloque_record IN SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL LOOP
-        SELECT ncm.nodo_id INTO most_common_nodo_id
-        FROM sindicato_inq.pisos p
-        JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-        WHERE p.bloque_id = bloque_record.id
-        GROUP BY ncm.nodo_id
-        ORDER BY COUNT(*) DESC
-        LIMIT 1;
-
-        IF FOUND AND most_common_nodo_id IS NOT NULL THEN
-            UPDATE sindicato_inq.bloques
-            SET nodo_id = most_common_nodo_id
-            WHERE id = bloque_record.id;
-        END IF;
-    END LOOP;
-END;
-$$;
-
 -- This function extracts a 5-digit postal code from the 'direccion' string.
 CREATE OR REPLACE FUNCTION extract_cp_from_direccion()
 RETURNS TRIGGER AS $$
@@ -80,8 +35,8 @@ $$ LANGUAGE plpgsql;
 -- SUGERENCIA DE BLOQUES PARA afiliadas_importer.py view
 -- =====================================================================
 
--- This trigger executes the function BEFORE any insert or update on the 'pisos' table.
--- It runs before 'trigger_sync_bloque_nodo' because BEFORE triggers execute before AFTER triggers.
+-- This trigger executes the function BEFORE any insert or update on the 'pisos' table to ensure
+-- the CP column stays in sync with the address field.
 CREATE TRIGGER trigger_a_extract_cp
 BEFORE INSERT OR UPDATE ON sindicato_inq.pisos
 FOR EACH ROW EXECUTE FUNCTION extract_cp_from_direccion();

@@ -60,9 +60,9 @@ TABLE_INFO = {
         "display_name": "Bloques",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["direccion", "empresa_id", "nodo_id"],
+        "fields": ["direccion", "empresa_id"],
         "relations": {
-            "empresa_id": {"view": "empresas", "display_field": "nombre"},
+            "empresa_id": {"view": "empresas", "display_field": "nombre"}
         },
         "child_relations": [
             {
@@ -145,13 +145,12 @@ TABLE_INFO = {
         "display_name": "Nodos Territoriales",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["nombre", "descripcion"],
+        "fields": ["nombre", "descripcion", "usuario_responsable_id"],
         "relations": {
             "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"}
         },
         "child_relations": [
             {"table": "nodos_cp_mapping", "foreign_key": "nodo_id"},
-            {"table": "bloques", "foreign_key": "nodo_id"},
         ],
     },
     "roles": {
@@ -185,7 +184,7 @@ TABLE_INFO = {
     },
     "nodos_cp_mapping": {
         "display_name": "Mapeo CP-Nodos",
-        "id_field": "cp",
+        "id_field": "cp,nodo_id",
         "hidden_fields": [],
         "fields": ["cp", "nodo_id"],
         "relations": {"nodo_id": {"view": "nodos", "display_field": "nombre"}},
