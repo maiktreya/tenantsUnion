@@ -63,7 +63,6 @@ TABLE_INFO = {
         "fields": ["direccion", "empresa_id", "nodo_id"],
         "relations": {
             "empresa_id": {"view": "empresas", "display_field": "nombre"},
-            "nodo_id": {"view": "nodos", "display_field": "nombre"},
         },
         "child_relations": [
             {
@@ -83,6 +82,7 @@ TABLE_INFO = {
             "bloque_id",
             "vpo",
             "vpo_date",
+            "propiedad",
             "prop_vertical",
             "n_personas",
             "fecha_firma",
@@ -132,7 +132,7 @@ TABLE_INFO = {
                 "search_fields": ["direccion", "municipio", "cp", "id"],
                 "options_limit": 5000,
                 "order_by": "direccion",
-                "value_field": "id"
+                "value_field": "id",
             }
         },
         "child_relations": [
@@ -145,7 +145,7 @@ TABLE_INFO = {
         "display_name": "Nodos Territoriales",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["nombre", "descripcion", "usuario_responsable_id"],
+        "fields": ["nombre", "descripcion"],
         "relations": {
             "usuario_responsable_id": {"view": "usuarios", "display_field": "alias"}
         },

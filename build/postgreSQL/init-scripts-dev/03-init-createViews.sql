@@ -160,6 +160,7 @@ SELECT
 FROM pisos p
     LEFT JOIN bloques b ON p.bloque_id = b.id;
 
+--
 CREATE OR REPLACE VIEW v_consolidar_pisos_bloques AS
 SELECT
     p.id,
@@ -170,6 +171,7 @@ SELECT
     p.propiedad AS "Empresa Propietaria (Piso)",
     e.nombre AS "Empresa Propietaria (Bloque, real)",
     CASE
+    WHEN b.empresa_id = NULL THEN 'Bloque sin empresa'
         WHEN COALESCE(NULLIF(LOWER(TRIM(p.propiedad)), ''), '') = COALESCE(NULLIF(LOWER(TRIM(e.nombre)), ''), '') THEN ''
         ELSE 'Inconsistente'
     END AS "Consistencia Propiedad"
@@ -178,6 +180,7 @@ FROM
     LEFT JOIN bloques b ON p.bloque_id = b.id
     LEFT JOIN empresas e ON b.empresa_id = e.id;
 
+-- TABLE USED BY NICEGUI "conflictos.py" view interrnally. Not user accessible in niceGUI
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS
 SELECT
     c.id,
@@ -232,9 +235,6 @@ FROM
     LEFT JOIN sindicato_inq.nodos n1 ON b.nodo_id = n1.id
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
     LEFT JOIN sindicato_inq.nodos n2 ON ncm.nodo_id = n2.id;
-
-
-
 
 -- VISTA 6: VISTA CON INFORMACIÓN DE FACTURACIÓN EXTENDIDA
 CREATE OR REPLACE VIEW v_facturacion AS
