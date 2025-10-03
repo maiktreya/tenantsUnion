@@ -1,65 +1,68 @@
-# Testing Suite for Sindicato de Inquilinas App
+# Testing Guide
 
-This directory contains the automated tests for the application. The goal is to ensure code quality, prevent regressions, and validate functionality across all layers of the architecture.
+This document describes the automated test stack for the Sindicato de Inquilinas application and how to run it locally.
 
-## 🚀 How to Run Tests
+## Prerequisites
 
-Prerequisites
-Docker and Docker Compose must be installed.
+- Python 3.10 or newer with `pip`.
+- Google Chrome or Chromium for the UI flow tests. The suite uses Selenium in headless mode.
+- Recommended: create and activate a virtual environment before installing the test dependencies.
 
-Python 3.10+ with pip is required.
-
-Installation
-Install Python dependencies:
-From the root of the project, install the required packages for testing:
+Install the testing dependencies from the project root:
 
 ```bash
 pip install -r tests/requirements.txt
 ```
 
-Running the Suite requires just running pytest directly:
+## Running the test suite
+
+Run every test (unit, integration-style, and UI) with:
 
 ```bash
 pytest
 ```
 
-## 🗂️ Test Structure
+Useful selections:
 
-The testing suite is organized into three main categories:
+- Skip the Selenium UI suite while focusing on fast tests: `pytest -k "not ui_flows"`.
+- Run only the end-to-end UI flows: `pytest tests/test_ui_flows.py`.
+- Run the schema alignment guard: `pytest tests/test_config_schema_alignment.py`.
 
-### 1. Unit Tests
+## Test inventory
 
-Purpose: To test individual components (functions, classes) in isolation. These tests are fast and do not require external services like a database.
+### Fast unit-style tests
 
-Examples:
+These tests execute quickly and use fixtures plus `respx` to isolate network calls.
 
-- **test_api_client.py**: Tests the APIClient's methods for making HTTP requests, mocking the API endpoints.
-- **test_state_management.py**: Tests the logic within state classes for filtering, sorting, and pagination.
-  test_auth.py: Tests authentication helper functions like password verification.
-- **test_dialogs.py**: Tests the dialogs module, including the RecordDialog class. This includes testing the save_record method with mocked API responses.
+- `test_auth.py` checks authentication helpers (password hashing and validation).
+- `test_filters.py` and `test_estate_management.py` validate the NiceGUI table filtering, sorting, and pagination helpers.
+- `test_database_api.py` exercises `APIClient` behaviour with mocked PostgREST responses.
+- `test_afiliadas_importer.py` covers the async importer workflow, including fuzzy matching helpers.
+- `test_config_schema_alignment.py` compares `TABLE_INFO` and `VIEW_INFO` against the SQL DDL under `build/postgreSQL/init-scripts-dev`, ensuring configuration stays in sync with the database schema.
 
-### 2. Integration Tests
+### Integration and consistency checks
 
-Purpose: To test the interaction between different components of the system. These tests are slower as they require spinning up live services.
+Fixtures defined in `tests/conftest.py` provide shared wiring:
 
-Example:
+- `DebugAPIClient` wraps the NiceGUI API client for easier assertions.
+- Async fixtures expose ready-to-use mocked clients and reusable data factories.
+- Utilities automatically add the NiceGUI build directory to `sys.path` so tests import the application modules without additional setup.
 
-- **test_database_api.py**: This is a crucial test that starts the PostgreSQL and PostgREST services using Docker. It inserts data directly into the database, then uses the real APIClient to verify that the data can be correctly retrieved through the live API. This validates the entire backend stack.
+### End-to-end UI tests
 
-### 3. End-to-End (E2E) Tests
+`tests/test_ui_flows.py` spins up the NiceGUI app in-process, launches a headless Chrome session with Selenium, and mocks backend calls through `respx`.
 
-Purpose: To simulate real user interactions with the application's user interface. These tests run a headless browser to interact with the NiceGUI frontend.
+Notes:
 
-Example:
+- Chrome must be installed; `webdriver-manager` downloads the matching driver automatically.
+- The fixture `app_server` starts the UI on `http://localhost:8899`; all API calls inside the UI are intercepted and mocked.
+- Keep the environment quiet while the Selenium tests run, because they expect the chosen port to be free.
 
-- **test_login_flow.py**: Simulates a user navigating to the login page, entering credentials, and verifying that they are redirected to the home page upon successful login. This tests the complete authentication flow from the UI to the backend logic.
+## Troubleshooting
 
----
+- If Selenium cannot start Chrome, install or update Chrome/Chromium and rerun `pip install -r tests/requirements.txt` to refresh the driver manager.
+- Stale caches in `.pytest_cache/` can be removed with `pytest --cache-clear` when changing schema or configuration files.
 
-#### 📦 Key Libraries Used
+This guide stays in sync with the current test files under `tests/` and the SQL definitions in `build/postgreSQL/init-scripts*`.
 
-- **Pytest**: The core testing framework.
-- **Pytest-Asyncio**: For testing asynchronous code.
-- **RESPX**: For mocking HTTP requests in unit tests.
-- **Pytest-Docker**: For managing Docker containers within integration tests.
-- **NiceGUI Testing Tools**: For E2E testing of the user interface.
+> TRICK: To push hot reload recreation of views in the production database, from inside the host machine project´s root folder run: docker exec -i tenantsunion-db-1 psql -U app_user -d mydb -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/04-init-views.sql
