@@ -189,47 +189,102 @@ class EnhancedRecordDialog:
                 )
             elif field in relations:
                 relation = relations[field]
-                view_name = relation["view"]
-                display_field = relation["display_field"]
+                view_name = relation['view']
+                display_field = relation.get('display_field', '')
+                value_field = relation.get('value_field', 'id')
+                options_limit = relation.get('options_limit', 2000)
+                order_by = relation.get('order_by')
+                label_template = relation.get('label_template')
+                include_value_prefix = relation.get('include_value_prefix')
                 try:
-                    options_records = await self.api.get_records(view_name, limit=2000)
-                    if "," in display_field:
+                    options_records = await self.api.get_records(
+                        view_name,
+                        limit=options_limit,
+                        order=order_by,
+                    )
 
-                        def get_disp(r):
-                            return " ".join(
-                                [str(r.get(df, "")) for df in display_field.split(",")]
-                            ).strip()
+                    def build_label(record, option_value):
+                        if label_template:
+                            try:
+                                return label_template.format(**record)
+                            except Exception:
+                                pass
 
-                    else:
+                        fields_to_join = [
+                            part.strip() for part in display_field.split(',') if part.strip()
+                        ]
+                        parts = [
+                            str(record.get(part, '')).strip()
+                            for part in fields_to_join
+                            if record.get(part) not in (None, '')
+                        ]
+                        display_text = ' '.join(parts).strip()
 
-                        def get_disp(r):
-                            return str(r.get(display_field, f"ID: {r.get('id')}"))
+                        if display_text:
+                            if include_value_prefix or field == 'piso_id':
+                                return f"[{option_value}] {display_text}".strip()
+                            return display_text
 
-                    # FIX: Ensure the dictionary keys are strings to match potential integer
-                    # values from the record, which ui.select treats as strings.
-                    # The `value` from self.record.get(field) might be an int, but select options are string-keyed.
-                    options = {str(r["id"]): get_disp(r) for r in options_records}
+                        return (
+                            f"[{option_value}]"
+                            if include_value_prefix or field == 'piso_id'
+                            else str(option_value)
+                        )
+
+                    option_items = []
+                    for record in options_records:
+                        option_value = record.get(value_field)
+                        if option_value is None:
+                            continue
+                        label_text = build_label(record, option_value)
+                        option_items.append((option_value, label_text))
+
+                    option_items.sort(key=lambda item: str(item[1]).lower())
+                    options = {value: label for value, label in option_items}
                 except Exception as e:
                     ui.notify(
-                        f"Error loading options for {field}: {e}", type="negative"
+                        f"Error loading options for {field}: {e}", type='negative'
                     )
                     options = {}
 
-                current_value = value if value in options else None
-                # If value is an int, it won't be found in string-keyed options.
-                # Let's try converting it to a string for the lookup.
-                if current_value is None and value is not None:
-                    current_value = str(value) if str(value) in options else None
-                if field in ["conflicto_id", "usuario_id"] and self.mode == "create":
-                    self.inputs[field] = ui.input(value=current_value).style(
-                        "display: none"
+                option_values = set(options.keys())
+
+                normalized_value = value
+                if isinstance(normalized_value, str):
+                    stripped = normalized_value.strip()
+                    if stripped in option_values:
+                        normalized_value = stripped
+                    else:
+                        try:
+                            converted = int(stripped)
+                            if converted in option_values:
+                                normalized_value = converted
+                        except ValueError:
+                            pass
+                elif normalized_value is not None and normalized_value not in option_values:
+                    str_value = str(normalized_value)
+                    if str_value in option_values:
+                        normalized_value = str_value
+
+                if normalized_value not in option_values:
+                    normalized_value = None
+
+                if field in ['conflicto_id', 'usuario_id'] and self.mode == 'create':
+                    self.inputs[field] = ui.input(value=normalized_value).style(
+                        'display: none'
                     )
                     continue
 
                 self.inputs[field] = (
-                    ui.select(options=options, label=label, value=current_value)
-                    .classes("w-full")
-                    .props("use-input")
+                    ui.select(
+                        options=options,
+                        label=label,
+                        value=normalized_value,
+                        with_input=True,
+                        clearable=True,
+                    )
+                    .classes('w-full')
+                    .props("input-debounce='0' fill-input")
                 )
             elif field in field_options:
                 options = field_options[field]

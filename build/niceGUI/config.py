@@ -124,7 +124,17 @@ TABLE_INFO = {
             "fecha_alta",
             "fecha_baja",
         ],
-        "relations": {"piso_id": {"view": "pisos", "display_field": "direccion"}},
+        "relations": {
+            "piso_id": {
+                "view": "pisos",
+                "display_field": "direccion",
+                "label_template": "[{id}] {direccion}",
+                "search_fields": ["direccion", "municipio", "cp", "id"],
+                "options_limit": 5000,
+                "order_by": "direccion",
+                "value_field": "id"
+            }
+        },
         "child_relations": [
             {"table": "facturacion", "foreign_key": "afiliada_id"},
             {"table": "asesorias", "foreign_key": "afiliada_id"},
