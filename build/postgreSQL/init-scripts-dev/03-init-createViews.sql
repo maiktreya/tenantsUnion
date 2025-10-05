@@ -92,7 +92,7 @@ SELECT
     a.nombre AS "Nombre",
     a.apellidos AS "Apellidos",
     a.cif AS "CIF",
-    a.genero AS "Genero",
+    a.email AS "Correo",
     TRIM(
         CONCAT_WS(
             ', ',

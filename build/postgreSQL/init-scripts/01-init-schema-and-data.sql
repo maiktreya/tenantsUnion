@@ -66,7 +66,7 @@ CREATE TABLE usuarios (
 
 CREATE SEQUENCE IF NOT EXISTS sindicato_inq.afiliadas_num_afiliada_seq;
 
-CREATE TABLE sindicato_inq.afiliadas (
+CREATE TABLE afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES sindicato_inq.pisos (id) ON DELETE SET NULL,
     num_afiliada TEXT UNIQUE, -- Notice: NO DEFAULT value here yet!
