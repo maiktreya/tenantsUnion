@@ -245,11 +245,11 @@ class ConflictsView(BaseView):
                     ui.badge(conflict["estado"], color=color).props("outline")
                 info_items = [
                     ("Ámbito", conflict.get("ambito")),
+                    ("Contacto", conflict.get("afiliada_nombre_completo")),
                     ("Causa", conflict.get("causa")),
                     ("Fecha Apertura", conflict.get("fecha_apertura")),
                     ("Fecha Cierre", conflict.get("fecha_cierre")),
                     ("Tarea Actual", conflict.get("tarea_actual")),
-                    ("Contacto", conflict.get("afiliada_nombre_completo")),
                 ]
                 for label, value in info_items:
                     with ui.row().classes("mb-1"):

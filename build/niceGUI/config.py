@@ -225,10 +225,10 @@ TABLE_INFO = {
         "hidden_fields": ["id", "fecha_cierre", "estado", "tarea_actual", "resolucion"],
         "fields": [
             "ambito",
+            "afiliada_id",
             "causa",
             "fecha_apertura",
             "descripcion",
-            "afiliada_id",
         ],
         "field_options": {
             "estado": sorted(["Abierto", "En proceso", "Resuelto", "Cerrado"]),
