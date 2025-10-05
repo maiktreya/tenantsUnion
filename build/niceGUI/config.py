@@ -61,9 +61,7 @@ TABLE_INFO = {
         "id_field": "id",
         "hidden_fields": ["id"],
         "fields": ["direccion", "empresa_id"],
-        "relations": {
-            "empresa_id": {"view": "empresas", "display_field": "nombre"}
-        },
+        "relations": {"empresa_id": {"view": "empresas", "display_field": "nombre"}},
         "child_relations": [
             {
                 "table": "pisos",
@@ -250,8 +248,10 @@ TABLE_INFO = {
                     "Impago",
                     "Actualización del precio (IPC)",
                     "Negociación del contrato",
+                    "Otros",
                 ]
             ),
+            "tipo": sorted([]),
         },
         "relations": {
             "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"}
@@ -314,7 +314,7 @@ TABLE_INFO = {
 }
 
 # =====================================================================
-#  MATERIALIZED VIEW METADATA
+#  VIEWS METADATA
 # =====================================================================
 VIEW_INFO = {
     "v_resumen_nodos": {"display_name": "Resumen de Nodos", "base_table": "nodos"},
