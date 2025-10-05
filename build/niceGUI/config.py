@@ -288,6 +288,7 @@ TABLE_INFO = {
                     "justicia gratuita",
                     "demanda",
                     "sentencia",
+                    "protocolo institutos",
                 ]
             ),
         },
