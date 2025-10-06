@@ -219,6 +219,7 @@ TABLE_INFO = {
                 "view": "afiliadas",
                 "display_field": "nombre,apellidos",
                 "label_template": "[{id}] {nombre} {apellidos}",
+                "options_limit": 5000,
             },
             "tecnica_id": {"view": "usuarios", "display_field": "alias"},
         },
@@ -262,6 +263,7 @@ TABLE_INFO = {
                 "view": "afiliadas",
                 "display_field": "nombre,apellidos",
                 "label_template": "[{id}] {nombre} {apellidos}",
+                "options_limit": 5000,
             }
         },
         "child_relations": [
@@ -315,6 +317,7 @@ TABLE_INFO = {
                 "view": "afiliadas",
                 "display_field": "nombre,apellidos",
                 "label_template": "[{id}] {nombre} {apellidos}",
+                "options_limit": 5000,
             }
         },
         "field_patterns": {
