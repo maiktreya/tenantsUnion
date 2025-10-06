@@ -131,8 +131,6 @@ CREATE TABLE IF NOT EXISTS diario_conflictos (
 -- =====================================================================
 -- PARTE 1.5: CREACIÓN DE ÍNDICES PARA MEJORAR EL RENDIMIENTO
 -- =====================================================================
-CREATE INDEX IF NOT EXISTS idx_bloques_nodo_id ON bloques (nodo_id);
-
 CREATE INDEX IF NOT EXISTS idx_empresas_entramado_id ON empresas (entramado_id);
 
 CREATE INDEX IF NOT EXISTS idx_bloques_empresa_id ON bloques (empresa_id);
