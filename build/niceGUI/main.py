@@ -266,7 +266,9 @@ if __name__ in {"__main__", "__mp_main__"}:
     except locale.Error:
         print("Spanish locale not found, falling back to default.")
 
-    storage_secret = os.environ.get("NICEGUI_STORAGE_SECRET")
+    storage_secret = os.environ.get(
+        "NICEGUI_STORAGE_SECRET", "a-secure-secret-key-here"
+    )
     ui.run(
         host=config.APP_HOST,
         port=config.APP_PORT,

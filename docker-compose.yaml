@@ -49,8 +49,9 @@ services:
       - db
     restart: unless-stopped
     environment:
-      - PYTHONUNBUFFERED=1
-      - POSTGREST_API_URL=${POSTGRES_API_URL}
+      PYTHONUNBUFFERED: 1
+      POSTGREST_API_URL: ${POSTGRES_API_URL}
+      NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET}
 
   nginx:
     image: nginx:latest
