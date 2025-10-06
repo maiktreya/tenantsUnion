@@ -35,6 +35,7 @@ CREATE TABLE empresas (
 CREATE TABLE bloques (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
+    nodo_id INTEGER REFERENCES nodos (id) ON DELETE SET NULL, -- New foreign key
     direccion TEXT UNIQUE
 );
 
@@ -131,21 +132,23 @@ CREATE TABLE IF NOT EXISTS diario_conflictos (
 -- =====================================================================
 -- PARTE 1.5: CREACIÓN DE ÍNDICES PARA MEJORAR EL RENDIMIENTO
 -- =====================================================================
-CREATE INDEX idx_empresas_entramado_id ON empresas (entramado_id);
+CREATE INDEX IF NOT EXISTS idx_bloques_nodo_id ON bloques (nodo_id);
 
-CREATE INDEX idx_bloques_empresa_id ON bloques (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_empresas_entramado_id ON empresas (entramado_id);
 
-CREATE INDEX idx_pisos_bloque_id ON pisos (bloque_id);
+CREATE INDEX IF NOT EXISTS idx_bloques_empresa_id ON bloques (empresa_id);
 
-CREATE INDEX idx_afiliadas_piso_id ON afiliadas (piso_id);
+CREATE INDEX IF NOT EXISTS idx_pisos_bloque_id ON pisos (bloque_id);
 
-CREATE INDEX idx_facturacion_afiliada_id ON facturacion (afiliada_id);
+CREATE INDEX IF NOT EXISTS idx_afiliadas_piso_id ON afiliadas (piso_id);
 
-CREATE INDEX idx_asesorias_afiliada_id ON asesorias (afiliada_id);
+CREATE INDEX IF NOT EXISTS idx_facturacion_afiliada_id ON facturacion (afiliada_id);
 
-CREATE INDEX idx_asesorias_tecnica_id ON asesorias (tecnica_id);
+CREATE INDEX  IF NOT EXISTS idx_asesorias_afiliada_id ON asesorias (afiliada_id);
 
-CREATE INDEX idx_conflictos_afiliada_id ON conflictos (afiliada_id);
+CREATE INDEX  IF NOT EXISTS idx_asesorias_tecnica_id ON asesorias (tecnica_id);
+
+CREATE INDEX IF NOT EXISTS idx_conflictos_afiliada_id ON conflictos (afiliada_id);
 
 CREATE INDEX IF NOT EXISTS idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
 

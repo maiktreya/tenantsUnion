@@ -60,8 +60,11 @@ TABLE_INFO = {
         "display_name": "Bloques",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["direccion", "empresa_id"],
-        "relations": {"empresa_id": {"view": "empresas", "display_field": "nombre"}},
+        "fields": ["direccion", "empresa_id", "nodo_id"],
+        "relations": {
+            "empresa_id": {"view": "empresas", "display_field": "nombre"},
+            "nodo_id": {"view": "nodos", "display_field": "nombre"},
+        },
         "child_relations": [
             {
                 "table": "pisos",
