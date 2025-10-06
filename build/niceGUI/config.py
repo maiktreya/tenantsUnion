@@ -273,7 +273,7 @@ TABLE_INFO = {
             "usuario_id",
         ],
         "field_options": {
-            "estado": sorted(["Abierto", "En proceso", "Resuelto", "Cerrado"]),
+            "estado": sorted(["Abierto", "Victoria", "Cerrado"]),
             "accion": sorted(
                 [
                     "nota simple",
