@@ -1,25 +1,20 @@
 -- =====================================================================
--- ARCHIVO 04: CREACIÓN DE VISTAS (VERSIÓN REFACTORIZADA Y CORREGIDA)
+-- ARCHIVO 04: CREACIÓN DE VISTAS (VERSIÓN MEJORADA Y OPTIMIZADA)
 -- =====================================================================
--- Este script se ejecuta después del 01. Asume que todas las tablas
--- y datos ya existen y crea las vistas para facilitar las consultas.
--- NOTA: Se ha garantizado que cada vista principal exponga la clave
--- primaria de su tabla base como 'id' para permitir la funcionalidad
--- del explorador de relaciones en la interfaz.
--- =====================================================================
-
--- =====================================================================
--- LISTADO DE VISTAS DISPONIBLES EN LA INTERFAZ NICEGUI (DESCRITAS EN build/niceGUI/config.py)
+-- Este script aprovecha la nueva clave foránea 'nodo_id' en la tabla
+-- 'bloques' para simplificar las uniones y mejorar el rendimiento.
+-- Las vistas ahora obtienen la información del nodo directamente desde
+-- 'bloques' en lugar de a través de 'pisos' y 'nodos_cp_mapping'.
 -- =====================================================================
 
 SET search_path TO sindicato_inq, public;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- Summary table with globals by entramado_empresa
+-- Summary table with globals by entramado_empresa (Sin cambios)
 CREATE OR REPLACE VIEW v_resumen_entramados_empresas AS
 SELECT
-    ee.id, -- FIX: Se asegura que el ID primario del entramado esté presente como 'id'.
+    ee.id,
     ee.nombre AS "Entramado",
     ee.descripcion AS "Descripción",
     COUNT(DISTINCT e.id) AS "Núm. Empresas",
@@ -37,7 +32,7 @@ GROUP BY
     ee.nombre,
     ee.descripcion;
 
--- Summary table with globals for table nodos
+-- Summary table with globals for table nodos (Optimizada)
 DROP VIEW IF EXISTS v_resumen_nodos CASCADE;
 CREATE OR REPLACE VIEW v_resumen_nodos AS
 SELECT
@@ -55,10 +50,10 @@ SELECT
     ) AS "Conflictos Abiertos"
 FROM
     nodos n
-    LEFT JOIN nodos_cp_mapping ncm ON n.id = ncm.nodo_id
-    LEFT JOIN pisos p ON p.cp = ncm.cp
-    LEFT JOIN bloques b ON p.bloque_id = b.id
+    -- OPTIMIZACIÓN: Se une directamente de nodos a bloques, eliminando la necesidad de pasar por pisos y nodos_cp_mapping.
+    LEFT JOIN bloques b ON n.id = b.nodo_id
     LEFT JOIN empresas e ON b.empresa_id = e.id
+    LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN conflictos c ON a.id = c.afiliada_id
 GROUP BY
@@ -67,7 +62,7 @@ GROUP BY
     n.descripcion
 ORDER BY "Num. Afiliadas" DESC;
 
--- Full log of diario_conflictos entries along auxiliary info
+-- Full log of diario_conflictos entries along auxiliary info (Optimizada)
 DROP VIEW IF EXISTS v_conflictos_detalle CASCADE;
 CREATE OR REPLACE VIEW v_conflictos_detalle AS
 SELECT
@@ -79,10 +74,10 @@ FROM sindicato_inq.conflictos c
     LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id;
+    -- OPTIMIZACIÓN: Se une directamente de bloques a nodos.
+    LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id;
 
--- Enhanced afilidas View with auxiliary info
+-- Enhanced afilidas View with auxiliary info (Optimizada)
 DROP VIEW IF EXISTS v_afiliadas_detalle CASCADE;
 CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
@@ -109,6 +104,7 @@ SELECT
     p.inmobiliaria AS "Inmob.",
     e.nombre AS "Propiedad",
     COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
+    -- OPTIMIZACIÓN: Se obtiene el nombre del nodo directamente desde el bloque.
     COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"
 FROM
     afiliadas a
@@ -116,38 +112,39 @@ FROM
     LEFT JOIN bloques b ON p.bloque_id = b.id
     LEFT JOIN empresas e ON b.empresa_id = e.id
     LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id
-    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN nodos n ON ncm.nodo_id = n.id;
+    -- OPTIMIZACIÓN: Se une directamente a nodos, eliminando el paso intermedio por nodos_cp_mapping.
+    LEFT JOIN nodos n ON b.nodo_id = n.id;
 
--- enhanced bloques view
+-- enhanced bloques view (Optimizada)
 DROP VIEW IF EXISTS v_resumen_bloques CASCADE;
 CREATE OR REPLACE VIEW v_resumen_bloques AS
 SELECT
     b.id,
     b.empresa_id,
-    MIN(ncm.nodo_id) AS nodo_id,
+    b.nodo_id, -- AHORA: El nodo_id es una columna directa del bloque.
     b.direccion AS "Direccion",
     e.nombre AS "Empresa Propietaria",
-    COALESCE(MAX(n.nombre), 'Sin Nodo Asignado') AS "Nodo Territorial",
+    COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo Territorial", -- AHORA: Se obtiene directamente.
     COUNT(DISTINCT p.id) AS "Pisos en el bloque",
     COUNT(DISTINCT a.id) AS "Afiliadas en el bloque"
 FROM
     bloques b
     LEFT JOIN empresas e ON b.empresa_id = e.id
+    -- OPTIMIZACIÓN: Se une directamente a nodos.
+    LEFT JOIN nodos n ON b.nodo_id = n.id
     LEFT JOIN pisos p ON b.id = p.bloque_id
-    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN nodos n ON ncm.nodo_id = n.id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
 GROUP BY
     b.id,
     b.empresa_id,
+    b.nodo_id, -- Se agrupa por el nuevo campo.
     b.direccion,
-    e.nombre;
+    e.nombre,
+    n.nombre; -- Se agrupa por el nombre del nodo.
 
--- tailormade presentation to share with consultants
+-- tailormade presentation to share with consultants (Sin cambios)
 CREATE OR REPLACE VIEW v_facturacion AS
 SELECT
-    -- Fields from 'afiliadas' table
     a.id AS "id",
     CONCAT(a.nombre, ' ', a.apellidos) as afiliada_nombre_completo,
     a.email AS "Email",
@@ -162,7 +159,7 @@ SELECT
     CASE f.periodicidad
         WHEN 1 THEN 'Anual'
         WHEN 12 THEN 'Mensual'
-        WHEN 3 THEN 'Trimestral' -- Added for completeness
+        WHEN 3 THEN 'Trimestral'
         ELSE 'Otra'
     END AS "Periodicidad",
     f.forma_pago AS "Forma de pago",
@@ -174,15 +171,15 @@ FROM
 LEFT JOIN
     facturacion AS f ON a.id = f.afiliada_id
 LEFT JOIN
-	pisos as p on a.piso_id = p.id
+    pisos as p on a.piso_id = p.id
 ORDER BY
     a.apellidos;
 
 -- =====================================================================
--- VISTAS INTERNAS VISTA CONFLICTOS (NO DISPONIBLE EN LA INTERFAZ NI EN CONFIG.PY)
+-- VISTAS INTERNAS VISTA CONFLICTOS (OPTIMIZADAS)
 -- =====================================================================
 
--- full log of diario_conflictos table along auxiliary info for internal conflictos.py usage
+-- full log of diario_conflictos table along auxiliary info for internal conflictos.py usage (Sin cambios)
 CREATE OR REPLACE VIEW v_diario_conflictos_con_afiliada AS
 SELECT
     dc.id,
@@ -202,7 +199,7 @@ FROM
     LEFT JOIN conflictos c ON dc.conflicto_id = c.id
     LEFT JOIN afiliadas a ON c.afiliada_id = a.id;
 
--- Internal view for the nicegul conflictos.py module
+-- Internal view for the nicegui conflictos.py module (Optimizada)
 DROP VIEW IF EXISTS v_conflictos_enhanced CASCADE;
 CREATE OR REPLACE VIEW v_conflictos_enhanced AS
 SELECT
@@ -228,41 +225,27 @@ SELECT
     p.inmobiliaria AS piso_inmobiliaria,
     b.id AS bloque_id,
     b.direccion AS bloque_direccion,
-    ncm.nodo_id AS nodo_id,
-    n.nombre AS nodo_nombre,
+    b.nodo_id AS nodo_id, -- AHORA: El nodo_id viene directamente del bloque.
+    n.nombre AS nodo_nombre, -- AHORA: El nombre del nodo viene de la unión directa.
     CONCAT(
-        '(',
-        c.id,
-        '-',
-        ' ',
-        c.ambito,
-        ') ',
-        COALESCE(
-            p.direccion,
-            b.direccion,
-            'Sin direccion'
-        ),
+        '(', c.id, '-', ' ', c.ambito, ') ',
+        COALESCE(p.direccion, b.direccion, 'Sin direccion'),
         ' | ',
-        COALESCE(
-            a.nombre || ' ' || a.apellidos,
-            'Sin afiliada'
-        ),
-        CASE
-            WHEN c.estado IS NOT NULL THEN ' [' || c.estado || ']'
-            ELSE ''
-        END
+        COALESCE(a.nombre || ' ' || a.apellidos, 'Sin afiliada'),
+        CASE WHEN c.estado IS NOT NULL THEN ' [' || c.estado || ']' ELSE '' END
     ) AS conflict_label
 FROM
     sindicato_inq.conflictos c
     LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id;
+    -- OPTIMIZACIÓN: Se une directamente de bloques a nodos.
+    LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id;
 
 -- =====================================================================
--- PROCEDIMIENTO: SINCRONIZACIÓN MASIVA DE NODOS PARA BLOQUES
+-- VISTAS DE DIAGNÓSTICO (Sin cambios)
 -- =====================================================================
+
 -- View for checking matching bloques & pisos direcciones
 DROP VIEW IF EXISTS comprobar_link_pisos_bloques CASCADE;
 CREATE OR REPLACE VIEW comprobar_link_pisos_bloques AS
@@ -273,16 +256,8 @@ SELECT
     b.direccion AS direccion2_bloque,
     (p.bloque_id IS NOT NULL) AS linked,
     similarity (
-        trim(
-            split_part(b.direccion, ',', 1)
-        ) || ', ' || trim(
-            split_part(b.direccion, ',', 2)
-        ),
-        trim(
-            split_part(p.direccion, ',', 1)
-        ) || ', ' || trim(
-            split_part(p.direccion, ',', 2)
-        )
+        trim(split_part(b.direccion, ',', 1)) || ', ' || trim(split_part(b.direccion, ',', 2)),
+        trim(split_part(p.direccion, ',', 1)) || ', ' || trim(split_part(p.direccion, ',', 2))
     ) AS score
 FROM pisos p
     LEFT JOIN bloques b ON p.bloque_id = b.id

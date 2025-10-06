@@ -31,15 +31,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- =====================================================================
--- SUGERENCIA DE BLOQUES PARA afiliadas_importer.py view
--- =====================================================================
-
 -- This trigger executes the function BEFORE any insert or update on the 'pisos' table to ensure
 -- the CP column stays in sync with the address field.
 CREATE TRIGGER trigger_a_extract_cp
 BEFORE INSERT OR UPDATE ON sindicato_inq.pisos
 FOR EACH ROW EXECUTE FUNCTION extract_cp_from_direccion();
+
+-- =====================================================================
+-- SUGERENCIA DE BLOQUES PARA afiliadas_importer.py view
+-- =====================================================================
 
 -- Dev normalization helper to align with production scoring logic
 CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT)

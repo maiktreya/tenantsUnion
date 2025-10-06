@@ -346,6 +346,7 @@ END $$;
 
 
 -- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
+-- =====================================================================
 -- This procedure assigns nodo_id to bloques based on the most common nodo_id among their pisos' CPs
 -- It assumes the existence of a mapping table 'nodos_cp_mapping' with columns
 CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
