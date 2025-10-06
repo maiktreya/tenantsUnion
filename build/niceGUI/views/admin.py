@@ -1,10 +1,10 @@
-# build/niceGUI/views/admin.py (Corrected)
+# build/niceGUI/views/admin.py (Enhanced for Client-Side State)
 
 from typing import Dict, Any
-from nicegui import ui
+from nicegui import ui, app
 
 from api.client import APIClient
-from state.app_state import AppState
+from state.app_state import GenericViewState  # We still use the class for its logic
 from components.data_table import DataTable
 from components.dialogs import EnhancedRecordDialog, ConfirmationDialog
 from components.exporter import export_to_csv
@@ -16,11 +16,19 @@ from config import TABLE_INFO
 
 
 class AdminView(BaseView):
-    """Enhanced admin view for table management with client-side UX."""
+    """Enhanced admin view for table management with client-side (per-tab) state."""
 
-    def __init__(self, api_client: APIClient, state: AppState):
+    def __init__(self, api_client: APIClient):
         self.api = api_client
-        self.state = state.admin
+
+        # --- STATE REFACTOR ---
+        # Instead of using a global singleton, we get or create the state
+        # from the client's (per-tab) storage.
+        if 'admin_view_state' not in app.storage.client:
+            app.storage.client['admin_view_state'] = GenericViewState()
+        self.state: GenericViewState = app.storage.client['admin_view_state']
+        # --- END REFACTOR ---
+
         self.select_table = None
         self.data_table_container = None
         self.detail_container = None
@@ -40,6 +48,8 @@ class AdminView(BaseView):
                 self.select_table = ui.select(
                     options=list(TABLE_INFO.keys()),
                     label="Seleccionar Tabla",
+                    # Bind the value directly to our client-side state
+                    value=self.state.selected_entity_name.value,
                     on_change=lambda e: ui.timer(
                         0.1, lambda: self._load_table_data(e.value), once=True
                     ),
@@ -76,6 +86,11 @@ class AdminView(BaseView):
             self.relationship_explorer = RelationshipExplorer(
                 self.api, self.detail_container
             )
+
+        # If a table was already selected in this tab, reload its data
+        if self.state.selected_entity_name.value:
+            ui.timer(0.1, self._refresh_data, once=True)
+
         return container
 
     async def _load_table_data(self, table_name: str = None):
@@ -209,3 +224,21 @@ class AdminView(BaseView):
                 self.state.filtered_records,
                 f"{self.state.selected_entity_name.value}_export.csv",
             )
+
+    # Overriding the base method to also clear client-side state
+    def clear_view_internals(self):
+        """Clears UI elements and resets the client-side state for this view."""
+        # Clear UI containers
+        if self.data_table_container:
+            self.data_table_container.clear()
+        if self.filter_container:
+            self.filter_container.clear()
+        if self.detail_container:
+            self.detail_container.clear()
+
+        # Reset the select input
+        if self.select_table:
+            self.select_table.set_value(None)
+
+        # Reset the client-side state object
+        self.state.clear_selection()

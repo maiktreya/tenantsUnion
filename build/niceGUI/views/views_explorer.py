@@ -1,10 +1,10 @@
-# build/niceGUI/views/views_explorer.py (Corrected)
+# build/niceGUI/views/views_explorer.py (Enhanced for Client-Side State)
 
 from typing import Dict, Any
-from nicegui import ui
+from nicegui import ui, app
 
 from api.client import APIClient
-from state.app_state import AppState
+from state.app_state import GenericViewState  # We still use the class for its logic
 from components.data_table import DataTable
 from components.filters import FilterPanel
 from components.exporter import export_to_csv
@@ -14,11 +14,18 @@ from config import VIEW_INFO, TABLE_INFO
 
 
 class ViewsExplorerView(BaseView):
-    """Views explorer with enhanced client-side filtering and multi-sorting."""
+    """Views explorer with client-side (per-tab) state."""
 
-    def __init__(self, api_client: APIClient, state: AppState):
+    def __init__(self, api_client: APIClient):
         self.api = api_client
-        self.state = state.views_explorer
+
+        # --- STATE REFACTOR ---
+        # Get or create the state from the client's (per-tab) storage.
+        if "views_explorer_state" not in app.storage.client:
+            app.storage.client["views_explorer_state"] = GenericViewState()
+        self.state: GenericViewState = app.storage.client["views_explorer_state"]
+        # --- END REFACTOR ---
+
         self.select_view = None
         self.data_table_container = None
         self.detail_container = None
@@ -36,6 +43,7 @@ class ViewsExplorerView(BaseView):
                 self.select_view = ui.select(
                     options=list(VIEW_INFO.keys()),
                     label="Seleccionar Vista",
+                    value=self.state.selected_entity_name.value,
                     on_change=lambda e: ui.timer(
                         0.1, lambda: self._load_view_data(e.value), once=True
                     ),
@@ -64,6 +72,11 @@ class ViewsExplorerView(BaseView):
             self.relationship_explorer = RelationshipExplorer(
                 self.api, self.detail_container
             )
+
+        # If a view was already selected in this tab, reload its data
+        if self.state.selected_entity_name.value:
+            ui.timer(0.1, self._refresh_data, once=True)
+
         return container
 
     def _clear_view(self):

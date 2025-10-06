@@ -8,6 +8,7 @@ from nicegui import ui, app
 
 from logging_config import setup_logging
 from config import config
+
 setup_logging()
 
 from fastapi import Request
@@ -195,15 +196,19 @@ class Application:
         try:
             self.views["home"] = HomeView(self.show_view)
             self.views["user_profile"] = UserProfileView(self.api_client)
+
             if self.has_role("admin", "sistemas"):
-                self.views["admin"] = AdminView(self.api_client, self.state)
+                self.views["admin"] = AdminView(self.api_client)
                 self.views["user_management"] = UserManagementView(self.api_client)
+
             if self.has_role("admin", "gestor"):
-                self.views["views"] = ViewsExplorerView(self.api_client, self.state)
+                self.views["views"] = ViewsExplorerView(self.api_client)
+
                 self.views["afiliadas_importer"] = AfiliadasImporterView(
-                    self.api_client, self.state.afiliadas_importer
+                    self.api_client
                 )
             if self.has_role("admin", "gestor", "actas"):
+                # Note: This one will also need to be refactored
                 self.views["conflicts"] = ConflictsView(self.api_client, self.state)
             with ui.column().classes("w-full min-h-screen bg-gray-50"):
                 for name, view in self.views.items():

@@ -1,3 +1,5 @@
+# build/niceGUI/views/afiliadas_importer.py (Enhanced for Client-Side State)
+
 import pandas as pd
 import io
 import asyncio
@@ -5,7 +7,7 @@ import logging
 import copy
 from typing import Dict, Any, Optional, List, Tuple, Callable, Awaitable
 from dataclasses import dataclass, field
-from nicegui import ui, events
+from nicegui import ui, events, app
 
 from api.client import APIClient
 from api.validate import validator
@@ -13,7 +15,10 @@ from state.app_state import GenericViewState
 from components.importer_utils import transform_and_validate_row, short_address
 from components.importer_panels import render_preview_tabs
 from components.exporter import export_to_csv
-from components.importer_normalization import normalize_address_key, normalize_for_sorting
+from components.importer_normalization import (
+    normalize_address_key,
+    normalize_for_sorting,
+)
 from components.importer_record_status import ImporterRecordStatusService
 from components.upload_event_utils import read_upload_event_bytes
 from config import FAILED_EXPORT_FIELD_MAP, DUPLICATE_NIF_WARNING
@@ -36,12 +41,19 @@ class ImportResult:
 class AfiliadasImporterView:
     """
     A view to import 'afiliadas', with a clear separation between UI orchestration
-    and pure, testable business logic methods.
+    and pure, testable business logic methods, using per-tab client state.
     """
 
-    def __init__(self, api_client: APIClient, state: GenericViewState):
+    def __init__(self, api_client: APIClient):
         self.api = api_client
-        self.state = state
+
+        # --- STATE REFACTOR ---
+        # Get or create the state from the client's (per-tab) storage.
+        if "afiliadas_importer_state" not in app.storage.client:
+            app.storage.client["afiliadas_importer_state"] = GenericViewState()
+        self.state: GenericViewState = app.storage.client["afiliadas_importer_state"]
+        # --- END REFACTOR ---
+
         self.status_service = ImporterRecordStatusService(api_client)
 
         # UI-specific state and elements
@@ -105,6 +117,10 @@ class AfiliadasImporterView:
                     ui.button(
                         "Cerrar", on_click=self._failed_preview_dialog.close
                     ).classes("self-end mt-2")
+
+        # If there are records in the state for this tab, render them.
+        if self.state.records:
+            self._render_all_panels()
 
         return container
 
@@ -233,7 +249,9 @@ class AfiliadasImporterView:
     def _open_failed_records_preview(self):
         """Open dialog listing failed records from the last import attempt."""
         if not self._failed_preview_dialog or not self._failed_preview_container:
-            ui.notify("La vista de registros fallidos no está disponible.", type="warning")
+            ui.notify(
+                "La vista de registros fallidos no está disponible.", type="warning"
+            )
             return
 
         if not self._failed_records:
@@ -245,9 +263,13 @@ class AfiliadasImporterView:
 
         with self._failed_preview_container:
             if not rows:
-                ui.label("No hay registros fallidos para mostrar.").classes("text-gray-500")
+                ui.label("No hay registros fallidos para mostrar.").classes(
+                    "text-gray-500"
+                )
             else:
-                ui.table(columns=columns, rows=rows, row_key="__index").classes("w-full")
+                ui.table(columns=columns, rows=rows, row_key="__index").classes(
+                    "w-full"
+                )
 
         self._failed_preview_dialog.open()
 
