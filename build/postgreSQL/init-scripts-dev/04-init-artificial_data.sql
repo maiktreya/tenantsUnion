@@ -51,28 +51,16 @@ VALUES (
     );
 
 -- Insertar nodos territoriales
-INSERT INTO
-    nodos (nombre, descripcion)
-VALUES (
-        'Centro-Arganzuela-Retiro',
-        'Agrupa los distritos de Centro, Arganzuela, Retiro, Moncloa y Chamberí.'
-    ),
-    (
-        'Latina',
-        'Nodo del distrito de Latina.'
-    ),
-    (
-        'Este',
-        'Agrupa los distritos del este de Madrid.'
-    ),
-    (
-        'Norte',
-        'Distritos del norte de Madrid'
-    ),
-    (
-        'Sur',
-        'Distritos del sur de Madrid'
-    );
+INSERT INTO nodos (nombre, descripcion) VALUES
+    ('Centro-Arganzuela-Retiro', 'Agrupa los distritos de Centro, Arganzuela, Retiro, Moncloa y Chamberí.'),
+    ('Latina', 'Nodo del distrito de Latina.'),
+    ('Carabanchel', 'Nodo del distrito de Carabanchel.'),
+    ('Usera-Villaverde', 'Agrupa los distritos de Usera y Villaverde.'),
+    ('Este', 'Agrupa los distritos del este de Madrid: Salamanca, Chamartín, Ciudad Lineal, Hortaleza, San Blas-Canillejas, Moratalaz, Vicálvaro y Barajas.'),
+    ('Sur', 'Agrupa los municipios de la zona sur de la Comunidad de Madrid.'),
+    ('Corredor', 'Agrupa los municipios del Corredor del Henares.'),
+    ('Sierra Norte', 'Agrupa los municipios de la Sierra Norte.')
+ON CONFLICT (nombre) DO NOTHING;
 
 -- Mapeo códigos postales a nodos
 INSERT INTO
