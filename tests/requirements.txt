@@ -13,6 +13,7 @@ pytest-docker
 
 # Required for NiceGUI's basic functionality
 nicegui
+pandas
 
 # Selenium for robust browser automation
 selenium>=4.0.0
