@@ -35,7 +35,6 @@ CREATE TABLE empresas (
 CREATE TABLE bloques (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
-    nodo_id INTEGER REFERENCES nodos (id) ON DELETE SET NULL, -- New foreign key
     direccion TEXT UNIQUE
 );
 
