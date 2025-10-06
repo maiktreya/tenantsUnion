@@ -56,13 +56,6 @@ CREATE TABLE IF NOT EXISTS nodos_cp_mapping (
     nodo_id INTEGER REFERENCES nodos (id) ON DELETE CASCADE NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS bloques (
-    id SERIAL PRIMARY KEY,
-    empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
-    nodo_id INTEGER REFERENCES nodos (id) ON DELETE SET NULL, -- New foreign key
-    direccion TEXT UNIQUE
-);
-
 CREATE TABLE IF NOT EXISTS empresas (
     id SERIAL PRIMARY KEY,
     entramado_id INTEGER REFERENCES entramado_empresas (id) ON DELETE SET NULL,
@@ -71,6 +64,13 @@ CREATE TABLE IF NOT EXISTS empresas (
     directivos TEXT,
     direccion_fiscal TEXT,
     url_notas TEXT
+);
+
+CREATE TABLE IF NOT EXISTS bloques (
+    id SERIAL PRIMARY KEY,
+    empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
+    nodo_id INTEGER REFERENCES nodos (id) ON DELETE SET NULL, -- New foreign key
+    direccion TEXT UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS usuario_credenciales (
@@ -82,14 +82,6 @@ CREATE TABLE IF NOT EXISTS usuario_roles (
     usuario_id INTEGER REFERENCES usuarios (id) ON DELETE CASCADE,
     role_id INTEGER REFERENCES roles (id) ON DELETE CASCADE,
     PRIMARY KEY (usuario_id, role_id)
-);
-
--- Redefined 'bloques' table with a direct foreign key to 'nodos'
-CREATE TABLE bloques (
-    id SERIAL PRIMARY KEY,
-    empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
-    nodo_id INTEGER REFERENCES nodos (id) ON DELETE SET NULL, -- New foreign key
-    direccion TEXT UNIQUE
 );
 
 -- CORREGIDO: Añadido el campo 'propiedad' para alinear con el esquema final.

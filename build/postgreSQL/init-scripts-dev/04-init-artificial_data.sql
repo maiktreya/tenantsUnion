@@ -554,7 +554,7 @@ VALUES (
     (
         2,
         2,
-        'En proceso',
+        'Victoria',
         '2024-12-01',
         'Inquilina',
         'Técnica',
@@ -583,7 +583,7 @@ INSERT INTO
     )
 VALUES (
         1,
-        'En proceso',
+        'Victoria',
         'Afiliada',
         'No renovación',
         'Comunicación con propietario',
@@ -623,7 +623,7 @@ INSERT INTO
 VALUES (
         1,
         1,
-        'En proceso',
+        'Victoria',
         'comunicación enviada',
         'Se envió burofax al propietario solicitando renovación del contrato.',
         'Esperar respuesta',
@@ -632,7 +632,7 @@ VALUES (
     (
         1,
         2,
-        'En proceso',
+        'Victoria',
         'llamada',
         'Contacto telefónico con la afiliada para informar del estado.',
         'Comunicación con propietario',
@@ -641,7 +641,7 @@ VALUES (
     (
         2,
         3,
-        'En proceso',
+        'Victoria',
         'nota localización propiedades',
         'Investigación de bienes del propietario para posible ejecución.',
         'Preparar demanda',
