@@ -2,6 +2,7 @@
 
 import os
 import logging
+import locale
 from pathlib import Path
 from typing import Optional
 from nicegui import ui, app
@@ -259,6 +260,12 @@ async def shutdown_handler():
 
 
 if __name__ in {"__main__", "__mp_main__"}:
+    # Set the locale for the entire application to Spanish
+    try:
+        locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8') # <-- ADD THIS LINE
+    except locale.Error:
+        print("Spanish locale not found, falling back to default.")
+
     storage_secret = os.environ.get(
         "NICEGUI_STORAGE_SECRET", "a-secure-secret-key-here"
     )
