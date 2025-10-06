@@ -44,15 +44,15 @@ class AfiliadasImporterView:
     and pure, testable business logic methods, using per-tab client state.
     """
 
-    def __init__(
-        self, api_client: APIClient, state: Optional[GenericViewState] = None
-    ):
+    def __init__(self, api_client: APIClient):
         self.api = api_client
 
-        if state is not None:
-            self.state = state
-        else:
-            self.state = self._get_or_create_client_state()
+        # --- STATE REFACTOR ---
+        # Get or create the state from the client's (per-tab) storage.
+        if "afiliadas_importer_state" not in app.storage.client:
+            app.storage.client["afiliadas_importer_state"] = GenericViewState()
+        self.state: GenericViewState = app.storage.client["afiliadas_importer_state"]
+        # --- END REFACTOR ---
 
         self.status_service = ImporterRecordStatusService(api_client)
 
@@ -75,21 +75,6 @@ class AfiliadasImporterView:
         # Dialogs are part of the view's UI responsibility
         self._failed_preview_dialog: Optional[ui.dialog] = None
         self._failed_preview_container: Optional[ui.column] = None
-
-    def _get_or_create_client_state(self) -> GenericViewState:
-        """Retrieve or initialize the per-client state."""
-        storage = getattr(app, "storage", None)
-        client_storage = getattr(storage, "client", None)
-        if client_storage is None:
-            return GenericViewState()
-        if "afiliadas_importer_state" not in client_storage:
-            client_storage["afiliadas_importer_state"] = GenericViewState()
-        state = client_storage.get("afiliadas_importer_state")
-        if isinstance(state, GenericViewState):
-            return state
-        new_state = GenericViewState()
-        client_storage["afiliadas_importer_state"] = new_state
-        return new_state
 
     def create(self) -> ui.column:
         """Create the main UI for the CSV importer view."""

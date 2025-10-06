@@ -215,7 +215,11 @@ TABLE_INFO = {
             "tecnica_id",
         ],
         "relations": {
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"},
+            "afiliada_id": {
+                "view": "afiliadas",
+                "display_field": "nombre,apellidos",
+                "label_template": "[{id}] {nombre} {apellidos}",
+            },
             "tecnica_id": {"view": "usuarios", "display_field": "alias"},
         },
     },
@@ -254,7 +258,11 @@ TABLE_INFO = {
             "tipo": sorted([]),
         },
         "relations": {
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"}
+            "afiliada_id": {
+                "view": "afiliadas",
+                "display_field": "nombre,apellidos",
+                "label_template": "[{id}] {nombre} {apellidos}",
+            }
         },
         "child_relations": [
             {"table": "diario_conflictos", "foreign_key": "conflicto_id"},
@@ -303,7 +311,11 @@ TABLE_INFO = {
         "hidden_fields": ["id"],
         "fields": ["cuota", "periodicidad", "forma_pago", "iban", "afiliada_id"],
         "relations": {
-            "afiliada_id": {"view": "afiliadas", "display_field": "nombre,apellidos"}
+            "afiliada_id": {
+                "view": "afiliadas",
+                "display_field": "nombre,apellidos",
+                "label_template": "[{id}] {nombre} {apellidos}",
+            }
         },
         "field_patterns": {
             "iban": {

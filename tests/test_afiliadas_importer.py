@@ -43,6 +43,7 @@ except Exception:  # pragma: no cover - only used in environments without NiceGU
 
 # Now we can safely import the app modules
 from views.afiliadas_importer import AfiliadasImporterView  # type: ignore
+from views import afiliadas_importer as afiliadas_module  # type: ignore
 from state.app_state import GenericViewState  # type: ignore
 from components.importer_utils import short_address  # type: ignore
 
@@ -95,7 +96,11 @@ class DummyAPI:
 def view(monkeypatch):
     state = GenericViewState()
     api = DummyAPI()
-    v = AfiliadasImporterView(api, state)
+    storage = types.SimpleNamespace(client={"afiliadas_importer_state": state})
+    monkeypatch.setattr(
+        afiliadas_module.app, "storage", storage, raising=False
+    )
+    v = AfiliadasImporterView(api)
     # Avoid rendering UI during tests
     monkeypatch.setattr(v, "_render_all_panels", lambda: None)
     return v
