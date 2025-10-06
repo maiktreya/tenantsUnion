@@ -23,7 +23,7 @@ class GenericViewState(BaseTableState):
 
 
 class AppState:
-    """The centralized singleton state manager for the application. Now a pure data store."""
+    """The centralized state manager for the application shared globals. Now a pure data store."""
 
     def __init__(self):
         self.admin = GenericViewState()
