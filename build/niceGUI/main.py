@@ -229,7 +229,7 @@ class Application:
 # =====================================================================
 
 api_singleton = APIClient(config.API_BASE_URL)
-app_state_singleton = AppState()
+app_state_init = AppState()
 app_instance: Optional[Application] = None
 
 
@@ -241,7 +241,7 @@ app_instance: Optional[Application] = None
 @ui.page("/")
 def main_page_entry():
     global app_instance
-    app_instance = Application(api_client=api_singleton, state=app_state_singleton)
+    app_instance = Application(api_client=api_singleton, state=app_state_init)
 
     ui.timer(0.2, app_instance.initialize_global_data, once=True)
 
