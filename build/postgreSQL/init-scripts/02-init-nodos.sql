@@ -27,4 +27,6 @@ FOREIGN KEY (nodo_id)
 REFERENCES nodos(id)
 ON DELETE SET NULL;
 
-CREATE INDEX idx_nodos_cp_mapping_nodo_id ON sindicato_inq.nodos_cp_mapping (nodo_id);
+CREATE INDEX IF NOT EXISTS idx_nodos_cp_mapping_nodo_id ON sindicato_inq.nodos_cp_mapping (nodo_id);
+
+CREATE INDEX IF NOT EXISTS idx_bloques_nodo_id ON bloques (nodo_id);
