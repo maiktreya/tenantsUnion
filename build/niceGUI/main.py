@@ -225,7 +225,7 @@ class Application:
 
 
 # =====================================================================
-# INITIALIZATION AND GLOBAL SINGLETONS
+# INITIALIZATION OF GLOBAL INSTANCES
 # =====================================================================
 
 api_singleton = APIClient(config.API_BASE_URL)
