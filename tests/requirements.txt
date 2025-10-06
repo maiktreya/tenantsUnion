@@ -13,6 +13,8 @@ pytest-docker
 
 # Required for NiceGUI's basic functionality
 nicegui
+
+# For testing NiceGUI interface for live edition of preview records
 pandas
 
 # Selenium for robust browser automation
