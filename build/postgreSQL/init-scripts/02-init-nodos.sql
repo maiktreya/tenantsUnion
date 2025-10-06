@@ -21,4 +21,10 @@ CREATE TABLE sindicato_inq.nodos_cp_mapping (
     nodo_id INTEGER REFERENCES nodos (id) ON DELETE CASCADE NOT NULL
 );
 
+ALTER TABLE bloques
+ADD CONSTRAINT fk_nodo_id
+FOREIGN KEY (nodo_id)
+REFERENCES nodos(id)
+ON DELETE SET NULL;
+
 CREATE INDEX idx_nodos_cp_mapping_nodo_id ON sindicato_inq.nodos_cp_mapping (nodo_id);
