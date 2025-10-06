@@ -35,7 +35,7 @@ The result: faster delivery, fewer moving parts, and stronger guarantees.
 - Database as backend: just a **stateless PostgREST** server.
 - **Config-driven** validation through metadata **schema mapping** = forget object-relational impedance!
 - Minimal **full CRUD API** client with flexible generics & **integrated validation logic**.
-- **Singletons** everywhere: **async API** & **reactive UI** state fully centralized.
+- **Reactivity** everywhere: **async API** & **reactive UI** state fully centralized.
 
 ---
 
