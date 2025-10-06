@@ -56,6 +56,13 @@ CREATE TABLE IF NOT EXISTS nodos_cp_mapping (
     nodo_id INTEGER REFERENCES nodos (id) ON DELETE CASCADE NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS bloques (
+    id SERIAL PRIMARY KEY,
+    empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
+    nodo_id INTEGER REFERENCES nodos (id) ON DELETE SET NULL, -- New foreign key
+    direccion TEXT UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS empresas (
     id SERIAL PRIMARY KEY,
     entramado_id INTEGER REFERENCES entramado_empresas (id) ON DELETE SET NULL,
