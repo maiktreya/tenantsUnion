@@ -196,14 +196,11 @@ class Application:
         try:
             self.views["home"] = HomeView(self.show_view)
             self.views["user_profile"] = UserProfileView(self.api_client)
-
             if self.has_role("admin", "sistemas"):
                 self.views["admin"] = AdminView(self.api_client)
                 self.views["user_management"] = UserManagementView(self.api_client)
-
             if self.has_role("admin", "gestor"):
                 self.views["views"] = ViewsExplorerView(self.api_client)
-
                 self.views["afiliadas_importer"] = AfiliadasImporterView(
                     self.api_client
                 )
