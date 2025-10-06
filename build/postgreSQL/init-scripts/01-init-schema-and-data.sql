@@ -84,7 +84,7 @@ CREATE TABLE afiliadas (
     nivel_participacion TEXT
 );
 
-CREATE TABLE sindicato_inq.facturacion (
+CREATE TABLE facturacion (
     id SERIAL PRIMARY KEY,
     afiliada_id INTEGER REFERENCES afiliadas (id) ON DELETE CASCADE,
     cuota DECIMAL(8, 2),
