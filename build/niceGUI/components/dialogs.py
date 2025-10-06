@@ -84,6 +84,36 @@ class EnhancedRecordDialog:
         self.sort_fields = sort_fields
         self.extra_hidden_fields = set(extra_hidden_fields or [])
 
+
+    def _resolve_select_value(self, value: Any, options: Any) -> Any:
+        """Return the option matching value, ignoring case when possible."""
+        if value is None:
+            return None
+        try:
+            # Direct match first
+            if isinstance(options, dict):
+                if value in options:
+                    return value
+                value_str = str(value).lower()
+                for opt_value, opt_label in options.items():
+                    if isinstance(opt_value, str) and opt_value.lower() == value_str:
+                        return opt_value
+                    if isinstance(opt_label, str) and opt_label.lower() == value_str:
+                        return opt_value
+                return None
+            if isinstance(options, (list, tuple, set)):
+                if value in options:
+                    return value
+                if isinstance(value, str):
+                    value_str = value.lower()
+                    for opt in options:
+                        if isinstance(opt, str) and opt.lower() == value_str:
+                            return opt
+                return None
+        except Exception:
+            return None
+        return None
+
     async def open(self):
         """Open the dialog asynchronously."""
         self.dialog = ui.dialog()
@@ -181,7 +211,7 @@ class EnhancedRecordDialog:
 
             if field in self.custom_options:
                 options = self.custom_options[field]
-                current_value = value if value in options else None
+                current_value = self._resolve_select_value(value, options)
                 self.inputs[field] = (
                     ui.select(options=options, label=label, value=current_value)
                     .classes("w-full")
@@ -288,7 +318,7 @@ class EnhancedRecordDialog:
                 )
             elif field in field_options:
                 options = field_options[field]
-                current_value = value if value in options else None
+                current_value = self._resolve_select_value(value, options)
                 self.inputs[field] = ui.select(
                     options=options, label=label, value=current_value
                 ).classes("w-full")

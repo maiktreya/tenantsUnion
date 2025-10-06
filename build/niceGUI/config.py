@@ -231,7 +231,7 @@ TABLE_INFO = {
             "descripcion",
         ],
         "field_options": {
-            "estado": sorted(["Abierto", "En proceso", "Resuelto", "Cerrado"]),
+            "estado": sorted(["Abierto", "Victoria", "Cerrado"]),
             "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"],
             "causa": sorted(
                 [
@@ -265,10 +265,10 @@ TABLE_INFO = {
         "id_field": "id",
         "hidden_fields": ["id", "created_at"],
         "fields": [
-            "estado",
             "accion",
             "notas",
             "tarea_actual",
+            "estado",
             "conflicto_id",
             "usuario_id",
         ],

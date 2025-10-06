@@ -1,6 +1,7 @@
 
 import pytest
 import re
+from pathlib import Path
 from config import TABLE_INFO, VIEW_INFO
 
 # Helper function to parse SQL schema
@@ -32,12 +33,16 @@ def parse_sql_views(sql_content):
     views = view_regex.findall(sql_content)
     return set(views)
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SCHEMA_PATH = PROJECT_ROOT / "build" / "postgreSQL" / "init-scripts-dev" / "01-init-schemaDBdef.sql"
+VIEWS_PATH = PROJECT_ROOT / "build" / "postgreSQL" / "init-scripts-dev" / "03-init-createViews.sql"
+
 # Read the schema definition file
-with open("c:\\Users\\70254057\\Desktop\\basic-hub\\tenantsUnion\\build\\postgreSQL\\init-scripts-dev\\01-init-schemaDBdef.sql", "r", encoding="utf-8") as f:
+with SCHEMA_PATH.open("r", encoding="utf-8") as f:
     schema_sql = f.read()
 
 # Read the views definition file
-with open("c:\\Users\\70254057\\Desktop\\basic-hub\\tenantsUnion\\build\\postgreSQL\\init-scripts-dev\\03-init-createViews.sql", "r", encoding="utf-8") as f:
+with VIEWS_PATH.open("r", encoding="utf-8") as f:
     views_sql = f.read()
 
 # Parse the SQL to get the actual schema

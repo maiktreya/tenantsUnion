@@ -204,8 +204,7 @@ class ConflictsView(BaseView):
                 for estado, count in sorted(status_counts.items()):
                     color = {
                         "Abierto": "red",
-                        "En proceso": "orange",
-                        "Resuelto": "green",
+                        "Victoria": "green",
                         "Cerrado": "gray",
                     }.get(estado, "blue")
                     ui.chip(f"{estado}: {count}", color=color)
@@ -238,8 +237,7 @@ class ConflictsView(BaseView):
                 if conflict.get("estado"):
                     color = {
                         "Abierto": "red",
-                        "En proceso": "orange",
-                        "Resuelto": "green",
+                        "Victoria": "green",
                         "Cerrado": "gray",
                     }.get(conflict["estado"], "blue")
                     ui.badge(conflict["estado"], color=color).props("outline")
@@ -368,6 +366,7 @@ class ConflictsView(BaseView):
         initial_record = {
             "conflicto_id": self.selected_conflict["id"],
             "usuario_id": app.storage.user.get("user_id"),
+            "estado": self.selected_conflict.get("estado"),
         }
         dialog = EnhancedRecordDialog(
             api=self.api,
@@ -376,6 +375,8 @@ class ConflictsView(BaseView):
             record=initial_record,
             on_success=self._on_note_saved,
             on_save=self._save_note_handler(None),
+            custom_labels={"estado": "Estado Conflicto"},
+            sort_fields=False,
             extra_hidden_fields=["conflicto_id", "usuario_id"],
         )
         await dialog.open()
@@ -400,6 +401,8 @@ class ConflictsView(BaseView):
             mode="edit",
             on_success=self._on_note_saved,
             on_save=self._save_note_handler(note),
+            custom_labels={"estado": "Estado Conflicto"},
+            sort_fields=False,
             extra_hidden_fields=["conflicto_id", "usuario_id"],
         )
         await dialog.open()
