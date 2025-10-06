@@ -205,7 +205,7 @@ class Application:
                     self.api_client
                 )
             if self.has_role("admin", "gestor", "actas"):
-                self.views["conflicts"] = ConflictsView(self.api_client)
+                self.views["conflicts"] = ConflictsView(self.api_client, self.state)
             with ui.column().classes("w-full min-h-screen bg-gray-50"):
                 for name, view in self.views.items():
                     self.view_containers[name] = container = ui.column().classes(
