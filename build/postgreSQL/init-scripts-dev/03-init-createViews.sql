@@ -225,21 +225,19 @@ SELECT
     p.inmobiliaria AS piso_inmobiliaria,
     b.id AS bloque_id,
     b.direccion AS bloque_direccion,
-    b.nodo_id AS nodo_id, -- AHORA: El nodo_id viene directamente del bloque.
-    n.nombre AS nodo_nombre, -- AHORA: El nombre del nodo viene de la unión directa.
+    b.nodo_id AS nodo_id,
+    n.nombre AS nodo_nombre,
     CONCAT(
-        '(', c.id, '-', ' ', c.ambito, ') ',
-        COALESCE(p.direccion, b.direccion, 'Sin direccion'),
-        ' | ',
+        '(', c.id, '-', ') ',
         COALESCE(a.nombre || ' ' || a.apellidos, 'Sin afiliada'),
-        CASE WHEN c.estado IS NOT NULL THEN ' [' || c.estado || ']' ELSE '' END
+         ', ',
+        COALESCE(p.direccion, b.direccion, 'Sin direccion')
     ) AS conflict_label
 FROM
     sindicato_inq.conflictos c
     LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    -- OPTIMIZACIÓN: Se une directamente de bloques a nodos.
     LEFT JOIN sindicato_inq.nodos n ON b.nodo_id = n.id;
 
 -- =====================================================================
