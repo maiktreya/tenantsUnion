@@ -4,8 +4,8 @@
 # --- SQL / PLpgSQL ---
 *.sql linguist-language=SQL
 # If you have PLpgSQL files (PostgreSQL stored procedures, etc.)
-*.pgsql linguist-language=PLpgSQL
-*.plpgsql linguist-language=PLpgSQL
+*.sql linguist-detectable=true
+*.sql linguist-language=sql
 
 # --- Shell scripts ---
 *.sh linguist-language=Shell
@@ -14,3 +14,9 @@
 # --- Dockerfiles ---
 Dockerfile linguist-language=Dockerfile
 */Dockerfile linguist-language=Dockerfile
+
+# --- Docker Compose (YAML) ---
+docker-compose.yml linguist-language=YAML
+docker-compose.yaml linguist-language=YAML
+compose.yml linguist-language=YAML
+compose.yaml linguist-language=YAML
