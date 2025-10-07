@@ -1,2 +1,16 @@
-*.sql linguist-detectable=true
-*.sql linguist-language=sql
+# --- Python ---
+*.py linguist-language=Python
+
+# --- SQL / PLpgSQL ---
+*.sql linguist-language=SQL
+# If you have PLpgSQL files (PostgreSQL stored procedures, etc.)
+*.pgsql linguist-language=PLpgSQL
+*.plpgsql linguist-language=PLpgSQL
+
+# --- Shell scripts ---
+*.sh linguist-language=Shell
+*.bash linguist-language=Shell
+
+# --- Dockerfiles ---
+Dockerfile linguist-language=Dockerfile
+*/Dockerfile linguist-language=Dockerfile
