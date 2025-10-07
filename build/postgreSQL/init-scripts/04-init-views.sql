@@ -94,6 +94,7 @@ SELECT
     a.apellidos AS "Apellidos",
     a.cif AS "CIF",
     a.email AS "Correo",
+    a.telefono AS "Teléfono",
     TRIM(
         CONCAT_WS(
             ', ',
