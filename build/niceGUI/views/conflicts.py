@@ -215,8 +215,9 @@ class ConflictsView(BaseView):
         self.stats_card.clear()
         with self.stats_card:
             ui.label("Estadísticas").classes("text-h6 mb-2")
+            # Ensure None values are counted as 'Sin estado' to avoid sort errors
             status_counts = Counter(
-                c.get("estado", "Sin estado") for c in self.state.filtered_records
+                (c.get("estado") or "Sin estado") for c in self.state.filtered_records
             )
             with ui.row().classes("w-full gap-4 flex-wrap"):
                 ui.chip(
