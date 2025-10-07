@@ -19,7 +19,6 @@ class ConflictsView(BaseView):
         self.api = api_client
         self.global_state = state  # For read-only global data like nodos
 
-        # --- STATE REFACTOR ---
         # Get or create the state from the client's (per-tab) storage.
         if "conflicts_view_state" not in app.storage.client:
             # Initialize the state object for this tab
@@ -27,7 +26,6 @@ class ConflictsView(BaseView):
             client_state.history = []  # Add custom attribute for this view
             app.storage.client["conflicts_view_state"] = client_state
         self.state: GenericViewState = app.storage.client["conflicts_view_state"]
-        # --- END REFACTOR ---
 
         # UI elements
         self.history_container = None
@@ -104,23 +102,26 @@ class ConflictsView(BaseView):
                         on_click=self._clear_filters,
                     ).props("flat color=orange-600")
 
-            with ui.row().classes("w-full gap-4"):
-                with ui.column().classes("w-96 gap-4"):
-                    with ui.row().classes("w-full gap-2"):
-                        self.conflict_select = (
-                            ui.select(
-                                options={},
-                                label="Seleccionar Conflicto",
-                                value=self.state.selected_item.value,
-                                on_change=lambda e: self._on_conflict_change(e.value),
-                                clearable=True,
-                            )
-                            .classes("flex-grow")
-                            .props("use-input")
-                        )
-                        ui.button(icon="refresh", on_click=self._load_conflicts).props(
-                            "flat"
-                        )
+            # Full-width conflict selector bar (separate row)
+            with ui.row().classes("w-full gap-2 items-center"):
+                self.conflict_select = (
+                    ui.select(
+                        options={},
+                        label="Seleccionar Conflicto",
+                        value=self.state.selected_item.value,
+                        on_change=lambda e: self._on_conflict_change(e.value),
+                        clearable=True,
+                    )
+                    .classes("flex-grow")
+                    .props("use-input")
+                )
+                ui.button(icon="refresh", on_click=self._load_conflicts).props("flat")
+
+            # This is the key fix: 'items-start' aligns the columns to the top.
+            # Two-column layout that collapses to a single column on small screens
+            with ui.row().classes("w-full gap-4 items-start flex-wrap md:flex-nowrap"):
+                # Left panel: fixed width on desktop, full width on mobile
+                with ui.column().classes("w-full md:w-96 md:shrink-0 gap-4"):
                     self.stats_card = ui.card().classes("w-full p-4")
                     self._display_statistics()
                     with ui.row().classes("w-full gap-2"):
@@ -133,7 +134,8 @@ class ConflictsView(BaseView):
                             on_click=self._create_conflict,
                         ).props("color=green-600").classes("flex-grow")
                     self.info_container = ui.column().classes("w-full")
-                with ui.column().classes("flex-grow"):
+                # Right panel: grows on desktop, full width on mobile
+                with ui.column().classes("w-full md:flex-grow"):
                     self.history_container = ui.column().classes("w-full gap-4")
 
         ui.timer(0.5, self._load_conflicts, once=True)
@@ -147,7 +149,6 @@ class ConflictsView(BaseView):
             self.state.set_records(conflicts)
             await self._apply_filters()
 
-            # After loading, if a conflict was previously selected in this tab, re-display its info
             if self.state.selected_item.value:
                 await self._on_conflict_change(self.state.selected_item.value.get("id"))
 
@@ -161,7 +162,6 @@ class ConflictsView(BaseView):
         }
 
     async def _apply_filters(self, _=None):
-        """Updates the generic state's filters and refreshes the UI."""
         filters = {
             "nodo_id": (
                 self.filter_nodo.value
@@ -190,12 +190,11 @@ class ConflictsView(BaseView):
         options = self._get_conflict_options(self.state.filtered_records)
         if self.conflict_select:
             self.conflict_select.set_options(options)
-
-            current_selection = self.state.selected_item.value
             current_selection_id = (
-                current_selection.get("id") if current_selection else None
+                self.state.selected_item.value.get("id")
+                if self.state.selected_item.value
+                else None
             )
-
             if current_selection_id and current_selection_id not in options:
                 self.state.selected_item.set(None)
                 self.conflict_select.value = None
@@ -211,18 +210,14 @@ class ConflictsView(BaseView):
         ui.timer(0.1, self._apply_filters, once=True)
 
     def _display_statistics(self):
-        """Calculates and displays statistics for the filtered conflicts."""
         if not self.stats_card:
             return
         self.stats_card.clear()
         with self.stats_card:
             ui.label("Estadísticas").classes("text-h6 mb-2")
-            all_estados = [
-                str(conflict.get("estado", "Sin estado"))
-                for conflict in self.state.filtered_records
-            ]
-            status_counts = Counter(all_estados)
-
+            status_counts = Counter(
+                c.get("estado", "Sin estado") for c in self.state.filtered_records
+            )
             with ui.row().classes("w-full gap-4 flex-wrap"):
                 ui.chip(
                     f"Total: {len(self.state.filtered_records)}",
@@ -238,16 +233,13 @@ class ConflictsView(BaseView):
                     ui.chip(f"{estado}: {count}", color=color)
 
     async def _on_conflict_change(self, conflict_id: Optional[int]):
-        """Handles selection from the dropdown."""
         if not conflict_id:
             self.state.selected_item.set(None)
             self._clear_displays()
             return
-
         conflict = next(
             (c for c in self.state.records if c.get("id") == conflict_id), None
         )
-
         if conflict:
             self.state.selected_item.set(conflict)
             await self._display_conflict_info()
@@ -258,7 +250,6 @@ class ConflictsView(BaseView):
         if not self.info_container or not selected_conflict:
             return
         self.info_container.clear()
-
         with self.info_container:
             ui.label("Información del Conflicto").classes("text-h6 mb-2")
             with ui.card().classes("w-full mb-2"):
@@ -312,7 +303,6 @@ class ConflictsView(BaseView):
         selected_conflict = self.state.selected_item.value
         if not self.history_container or not selected_conflict:
             return
-
         self.history_container.clear()
         try:
             history_records = await self.api.get_records(
@@ -322,7 +312,10 @@ class ConflictsView(BaseView):
             )
             self.state.history = history_records
             with self.history_container:
-                ui.label("Historial del conflicto").classes("text-h6 mb-2")
+                # Subheader for the diary/history section
+                ui.label("Historial del conflicto").classes(
+                    "text-subtitle1 font-semibold mb-2"
+                )
                 if self.state.history:
                     for entry in self.state.history:
                         self._create_history_entry(entry)
@@ -334,12 +327,11 @@ class ConflictsView(BaseView):
             ui.notify(f"Error loading history: {str(e)}", type="negative")
 
     def _create_history_entry(self, entry: dict):
-        # ... (This method has no state dependencies and remains the same)
         title = f"{entry.get('created_at', 'Sin fecha').split('T')[0]}"
         if entry.get("usuario_alias"):
             title += f" |-----| AUTOR: {entry['usuario_alias']}"
         if entry.get("accion"):
-            title += f" | ACCION: {entry['tarea_actual']}"
+            title += f" | ACCION: {entry['accion']}"
         if entry.get("tarea_actual"):
             title += f" | TAREA: {entry['tarea_actual']}"
         with ui.card().classes("w-full mb-2"):
@@ -451,10 +443,8 @@ class ConflictsView(BaseView):
                     "Error: Usuario o conflicto no identificado.", type="negative"
                 )
                 return False
-
             data["conflicto_id"] = selected_conflict["id"]
             data["usuario_id"] = user_id
-
             if record:
                 result = await self.api.update_record(
                     "diario_conflictos", record["id"], data
@@ -463,10 +453,8 @@ class ConflictsView(BaseView):
             else:
                 result, error = await self.api.create_record("diario_conflictos", data)
                 success = result is not None
-
             if not success:
                 return False
-
             conflict_update = {}
             if data.get("tarea_actual"):
                 conflict_update["tarea_actual"] = data.get("tarea_actual")
@@ -486,9 +474,8 @@ class ConflictsView(BaseView):
 
     async def _on_note_saved(self):
         await self._load_conflicts()
-        selected_conflict = self.state.selected_item.value
-        if selected_conflict:
-            await self._on_conflict_change(selected_conflict["id"])
+        if self.state.selected_item.value:
+            await self._on_conflict_change(self.state.selected_item.value["id"])
 
     def _delete_note(self, note: dict):
         async def _confirm_delete():
