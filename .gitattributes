@@ -1,9 +1,3 @@
-# --- Python ---
-*.py linguist-language=Python
-
-# --- SQL / PLpgSQL ---
-*.sql linguist-language=SQL
-# If you have PLpgSQL files (PostgreSQL stored procedures, etc.)
 *.sql linguist-detectable=true
 *.sql linguist-language=sql
 
