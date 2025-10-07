@@ -111,7 +111,6 @@ SELECT
     p.inmobiliaria AS "Inmob.",
     e.nombre AS "Propiedad",
     COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
-
     COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"
 FROM
     afiliadas a
