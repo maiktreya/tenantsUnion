@@ -51,9 +51,10 @@ CREATE TABLE IF NOT EXISTS nodos (
     descripcion TEXT
 );
 
-CREATE TABLE IF NOT EXISTS nodos_cp_mapping (
-    cp INTEGER PRIMARY KEY,
-    nodo_id INTEGER REFERENCES nodos (id) ON DELETE CASCADE NOT NULL
+CREATE TABLE IF NOT EXISTS sindicato_inq.nodos_cp_mapping (
+    id SERIAL PRIMARY KEY,
+    cp INTEGER NOT NULL UNIQUE,
+    nodo_id INTEGER REFERENCES sindicato_inq.nodos (id) ON DELETE CASCADE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS empresas (

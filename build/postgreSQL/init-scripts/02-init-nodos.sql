@@ -16,9 +16,10 @@ CREATE TABLE sindicato_inq.nodos (
     usuario_responsable_id INTEGER REFERENCES usuarios (id) ON DELETE SET NULL
 );
 
-CREATE TABLE sindicato_inq.nodos_cp_mapping (
-    cp INTEGER PRIMARY KEY,
-    nodo_id INTEGER REFERENCES nodos (id) ON DELETE CASCADE NOT NULL
+CREATE TABLE IF NOT EXISTS sindicato_inq.nodos_cp_mapping (
+    id SERIAL PRIMARY KEY,
+    cp INTEGER NOT NULL UNIQUE,
+    nodo_id INTEGER REFERENCES sindicato_inq.nodos (id) ON DELETE CASCADE NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_nodos_cp_mapping_nodo_id ON sindicato_inq.nodos_cp_mapping (nodo_id);
