@@ -69,7 +69,6 @@ CREATE TABLE IF NOT EXISTS empresas (
 CREATE TABLE IF NOT EXISTS bloques (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
-    nodo_id INTEGER REFERENCES nodos (id) ON DELETE SET NULL, -- New foreign key
     direccion TEXT UNIQUE
 );
 
@@ -174,8 +173,6 @@ CREATE INDEX IF NOT EXISTS idx_usuario_roles_usuario_id ON usuario_roles (usuari
 CREATE INDEX IF NOT EXISTS idx_usuario_roles_role_id ON usuario_roles (role_id);
 
 CREATE INDEX IF NOT EXISTS idx_bloques_empresa_id ON bloques (empresa_id);
-
-CREATE INDEX IF NOT EXISTS idx_bloques_nodo_id ON bloques (nodo_id);
 
 CREATE INDEX IF NOT EXISTS idx_pisos_bloque_id ON pisos (bloque_id);
 
