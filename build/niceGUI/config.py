@@ -182,8 +182,8 @@ TABLE_INFO = {
     },
     "nodos_cp_mapping": {
         "display_name": "Mapeo CP-Nodos",
-        "id_field": "cp,nodo_id",
-        "hidden_fields": [],
+        "id_field": "id",
+        "hidden_fields": ["id"],
         "fields": ["cp", "nodo_id"],
         "relations": {"nodo_id": {"view": "nodos", "display_field": "nombre"}},
     },

@@ -57,8 +57,7 @@ class APIClient:
             if validate_response and isinstance(records, list):
                 validated_records = []
                 for record in records:
-                    is_valid, errors = validator.validate_record(
-                        table, record, "read")
+                    is_valid, errors = validator.validate_record(table, record, "read")
                     if is_valid:
                         validated_records.append(record)
                     else:
@@ -70,16 +69,14 @@ class APIClient:
 
             return records
         except httpx.HTTPStatusError as e:
-            log.error(
-                f"HTTP Error getting records from '{table}'", exc_info=True)
+            log.error(f"HTTP Error getting records from '{table}'", exc_info=True)
             ui.notify(
                 f"Error HTTP {e.response.status_code}: {e.response.text}",
                 type="negative",
             )
             return []
         except Exception as e:
-            log.error(
-                f"Unexpected error getting records from '{table}'", exc_info=True)
+            log.error(f"Unexpected error getting records from '{table}'", exc_info=True)
             ui.notify(f"Error al obtener registros: {str(e)}", type="negative")
             return []
 
@@ -105,8 +102,7 @@ class APIClient:
             return None
         except httpx.HTTPStatusError as e:
             if e.response is not None and e.response.status_code == 404:
-                log.info(
-                    f"RPC '{fn_name}' not found (404); falling back if supported.")
+                log.info(f"RPC '{fn_name}' not found (404); falling back if supported.")
                 return None
             log.error(f"HTTP Error calling RPC '{fn_name}'", exc_info=True)
             ui.notify(
@@ -115,10 +111,8 @@ class APIClient:
             )
             return None
         except Exception as e:
-            log.error(
-                f"Unexpected error calling RPC '{fn_name}'", exc_info=True)
-            ui.notify(
-                f"Error al invocar función {fn_name}: {str(e)}", type="negative")
+            log.error(f"Unexpected error calling RPC '{fn_name}'", exc_info=True)
+            ui.notify(f"Error al invocar función {fn_name}: {str(e)}", type="negative")
             return None
 
     async def get_bloque_suggestions(
@@ -162,8 +156,7 @@ class APIClient:
 
             suggestions: List[Dict[str, Any]] = []
             for item in addresses:
-                idx = item.get(
-                    "index") if "index" in item else item.get("piso_id")
+                idx = item.get("index") if "index" in item else item.get("piso_id")
                 direccion = item.get("direccion")
                 norm_src = _normalize(direccion)
                 best = None
@@ -281,8 +274,7 @@ class APIClient:
                 f"Error creating record in '{table}' with data: {data}", exc_info=True
             )
             if show_validation_errors:
-                ui.notify(
-                    f"Error al crear registro: {str(e)}", type="negative")
+                ui.notify(f"Error al crear registro: {str(e)}", type="negative")
             return None, f"Error Inesperado: {str(e)}"
 
     async def update_record(
@@ -307,8 +299,6 @@ class APIClient:
         pk_filter = f"id=eq.{record_id}"
         if table == "usuario_credenciales":
             pk_filter = f"usuario_id=eq.{record_id}"
-        elif table == "nodos_cp_mapping":
-            pk_filter = f"cp=eq.{record_id}"
 
         url = f"{self.base_url}/{table}?{pk_filter}"
         headers = {"Prefer": "return=representation"}
@@ -333,8 +323,7 @@ class APIClient:
             log.error(
                 f"Error updating record ID '{record_id}' in '{table}'", exc_info=True
             )
-            ui.notify(
-                f"Error al actualizar registro: {str(e)}", type="negative")
+            ui.notify(f"Error al actualizar registro: {str(e)}", type="negative")
             return None
 
     async def delete_record(self, table: str, record_id: int) -> bool:
@@ -451,8 +440,7 @@ class APIClient:
 
         child_relations = schema.get("child_relations", [])
         relation_config = next(
-            (rel for rel in child_relations if rel["table"]
-             == relation_table), None
+            (rel for rel in child_relations if rel["table"] == relation_table), None
         )
 
         if not relation_config:
