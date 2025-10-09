@@ -1,5 +1,5 @@
 -- =====================================================================
--- ARCHIVO 04: CREACIÓN DE VISTAS (VERSIÓN REFACTORIZADA Y CORREGIDA)
+-- PASO 03: CREACIÓN DE VISTAS (VERSIÓN REFACTORIZADA Y CORREGIDA)
 -- =====================================================================
 -- Este script se ejecuta después del 01. Asume que todas las tablas
 -- y datos ya existen y crea las vistas para facilitar las consultas.
