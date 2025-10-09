@@ -1,5 +1,5 @@
 -- =====================================================================
--- PASO 2-init: Procedures, functions and triggers (Bussiness logic)
+-- PASO 2-init: Procedures, functions and triggers (Business logic)
 -- =====================================================================
 
 SET search_path TO public;
@@ -10,40 +10,48 @@ CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 
 SET search_path TO sindicato_inq, public;
 
+-- =====================================================================
+-- FUNCTION: extract_cp_from_direccion
+-- =====================================================================
 
+DROP FUNCTION IF EXISTS extract_cp_from_direccion() CASCADE;
 
--- This function extracts a 5-digit postal code from the 'direccion' string.
 CREATE OR REPLACE FUNCTION extract_cp_from_direccion()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 DECLARE
     matches TEXT[];
 BEGIN
-    -- Only run if 'direccion' is new or has changed.
+    -- Only run if 'direccion' is new or has changed
     IF (TG_OP = 'INSERT' OR NEW.direccion IS DISTINCT FROM OLD.direccion) THEN
-        -- Find the first 5-digit number in the direccion string.
+        -- Find the first 5-digit number in the direccion string
         matches := regexp_matches(NEW.direccion, '\m([0-9]{5})\M');
         IF array_length(matches, 1) > 0 THEN
             NEW.cp := matches[1]::INTEGER;
         END IF;
     END IF;
-    -- Return the (potentially modified) new row to be inserted/updated.
+
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
--- This trigger executes the function BEFORE any insert or update on the 'pisos' table to ensure
--- the CP column stays in sync with the address field.
+DROP TRIGGER IF EXISTS trigger_a_extract_cp ON sindicato_inq.pisos;
+
 CREATE TRIGGER trigger_a_extract_cp
 BEFORE INSERT OR UPDATE ON sindicato_inq.pisos
 FOR EACH ROW EXECUTE FUNCTION extract_cp_from_direccion();
 
 -- =====================================================================
--- SUGERENCIA DE BLOQUES PARA afiliadas_importer.py view
+-- FUNCTION: normalize_address_for_match
 -- =====================================================================
 
--- Dev normalization helper to align with production scoring logic
+DROP FUNCTION IF EXISTS normalize_address_for_match(TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION normalize_address_for_match(address_text TEXT)
-RETURNS TEXT LANGUAGE plpgsql IMMUTABLE AS $$
+RETURNS TEXT
+LANGUAGE plpgsql IMMUTABLE
+AS $$
 DECLARE
     parts TEXT[];
     first_part TEXT;
@@ -64,9 +72,7 @@ BEGIN
         first_part := regexp_replace(first_part, '\s+', ' ', 'g');
 
         IF first_part ~ '[0-9]' THEN
-            candidate := regexp_replace(first_part,
-                                        '^(.+?\b)(\d+[a-z]?).*$',
-                                        '\1\2');
+            candidate := regexp_replace(first_part, '^(.+?\b)(\d+[a-z]?).*$', '\1\2');
             IF candidate IS NOT NULL AND candidate <> '' THEN
                 cleaned := candidate;
             ELSE
@@ -92,49 +98,80 @@ BEGIN
 END;
 $$;
 
--- View: top bloque match per piso with score
+-- =====================================================================
+-- VIEW: sindicato_inq.v_bloque_suggestion_scores
+-- =====================================================================
 
-CREATE OR REPLACE VIEW sindicato_inq.v_bloque_suggestion_scores AS WITH normalized_pisos AS
-    (SELECT p.id AS piso_id,
-            p.direccion AS piso_direccion,
-            normalize_address_for_match(p.direccion) AS normalized_direccion
-     FROM sindicato_inq.pisos p
-     WHERE p.direccion IS NOT NULL
-         AND btrim(p.direccion) <> ''
-         AND normalize_address_for_match(p.direccion) <> '' ),
-                                                                        normalized_bloques AS
-    (SELECT b.id AS bloque_id,
-            b.direccion AS bloque_direccion,
-            normalize_address_for_match(b.direccion) AS normalized_direccion
-     FROM sindicato_inq.bloques b
-     WHERE b.direccion IS NOT NULL
-         AND btrim(b.direccion) <> ''
-         AND normalize_address_for_match(b.direccion) <> '' ),
-                                                                        scored AS
-    (SELECT np.piso_id,
-            np.piso_direccion,
-            nb.bloque_id,
-            nb.bloque_direccion,
-            similarity(np.normalized_direccion, nb.normalized_direccion) AS score,
-            ROW_NUMBER() OVER (PARTITION BY np.piso_id
-                               ORDER BY (np.normalized_direccion <-> nb.normalized_direccion) ASC) AS rn
-     FROM normalized_pisos np
-     JOIN normalized_bloques nb ON (np.normalized_direccion % nb.normalized_direccion))
-SELECT piso_id,
-       piso_direccion,
-       bloque_id AS top_match_bloque_id,
-       bloque_direccion AS top_match_bloque_direccion,
-       score AS top_match_score
+DROP VIEW IF EXISTS sindicato_inq.v_bloque_suggestion_scores CASCADE;
+
+CREATE OR REPLACE VIEW sindicato_inq.v_bloque_suggestion_scores AS
+WITH normalized_pisos AS (
+    SELECT
+        p.id AS piso_id,
+        p.direccion AS piso_direccion,
+        normalize_address_for_match(p.direccion) AS normalized_direccion
+    FROM sindicato_inq.pisos p
+    WHERE p.direccion IS NOT NULL
+      AND btrim(p.direccion) <> ''
+      AND normalize_address_for_match(p.direccion) <> ''
+),
+normalized_bloques AS (
+    SELECT
+        b.id AS bloque_id,
+        b.direccion AS bloque_direccion,
+        normalize_address_for_match(b.direccion) AS normalized_direccion
+    FROM sindicato_inq.bloques b
+    WHERE b.direccion IS NOT NULL
+      AND btrim(b.direccion) <> ''
+      AND normalize_address_for_match(b.direccion) <> ''
+),
+scored AS (
+    SELECT
+        np.piso_id,
+        np.piso_direccion,
+        nb.bloque_id,
+        nb.bloque_direccion,
+        similarity(np.normalized_direccion, nb.normalized_direccion) AS score,
+        ROW_NUMBER() OVER (
+            PARTITION BY np.piso_id
+            ORDER BY (np.normalized_direccion <-> nb.normalized_direccion) ASC
+        ) AS rn
+    FROM normalized_pisos np
+    JOIN normalized_bloques nb
+      ON (np.normalized_direccion % nb.normalized_direccion)
+)
+SELECT
+    piso_id,
+    piso_direccion,
+    bloque_id AS top_match_bloque_id,
+    bloque_direccion AS top_match_bloque_direccion,
+    score AS top_match_score
 FROM scored
 WHERE rn = 1;
 
--- RPC: get bloque suggestions for provided addresses (by index)
+-- =====================================================================
+-- FUNCTION: rpc_get_bloque_suggestions
+-- =====================================================================
 
-CREATE OR REPLACE FUNCTION rpc_get_bloque_suggestions(p_addresses JSONB DEFAULT NULL, p_score_limit REAL DEFAULT 0.88) RETURNS TABLE(piso_id INT, piso_direccion TEXT, suggested_bloque_id INT, suggested_bloque_direccion TEXT, suggested_score REAL) LANGUAGE plpgsql STABLE SECURITY DEFINER
-SET search_path = sindicato_inq,
-    public AS $$
+DROP FUNCTION IF EXISTS rpc_get_bloque_suggestions(JSONB, REAL) CASCADE;
+
+CREATE OR REPLACE FUNCTION rpc_get_bloque_suggestions(
+    p_addresses JSONB DEFAULT NULL,
+    p_score_limit REAL DEFAULT 0.88
+)
+RETURNS TABLE(
+    piso_id INT,
+    piso_direccion TEXT,
+    suggested_bloque_id INT,
+    suggested_bloque_direccion TEXT,
+    suggested_score REAL
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = sindicato_inq, public
+AS $$
 BEGIN
     PERFORM set_limit(p_score_limit);
+
     IF p_addresses IS NULL THEN
         RETURN QUERY
         SELECT
@@ -145,16 +182,19 @@ BEGIN
             CASE WHEN v.top_match_score >= p_score_limit THEN v.top_match_score ELSE NULL END
         FROM sindicato_inq.v_bloque_suggestion_scores v
         ORDER BY v.top_match_score DESC NULLS LAST, v.piso_id;
+
     ELSE
         RETURN QUERY
         WITH input_rows AS (
             SELECT
                 COALESCE(
                     CASE
-                        WHEN value ? 'index' AND (value->>'index') ~ '^[0-9]+$' THEN (value->>'index')::INT
+                        WHEN value ? 'index' AND (value->>'index') ~ '^[0-9]+$'
+                            THEN (value->>'index')::INT
                     END,
                     CASE
-                        WHEN value ? 'piso_id' AND (value->>'piso_id') ~ '^[0-9]+$' THEN (value->>'piso_id')::INT
+                        WHEN value ? 'piso_id' AND (value->>'piso_id') ~ '^[0-9]+$'
+                            THEN (value->>'piso_id')::INT
                     END,
                     (ord::INT - 1)
                 ) AS idx,
@@ -193,7 +233,7 @@ BEGIN
                 ) AS rn
             FROM normalized_inputs ni
             JOIN normalized_bloques nb
-                ON (ni.normalized % nb.normalized)
+              ON (ni.normalized % nb.normalized)
         ),
         ranked AS (
             SELECT
@@ -218,13 +258,21 @@ BEGIN
 END;
 $$;
 
--- Trigram index to accelerate normalized comparison
+-- =====================================================================
+-- INDEX: accelerate normalized comparison
+-- =====================================================================
 
-CREATE INDEX IF NOT EXISTS idx_bloques_normalized_trgm ON sindicato_inq.bloques USING gin (normalize_address_for_match(direccion) gin_trgm_ops);
+DROP INDEX IF EXISTS idx_bloques_normalized_trgm;
 
--- PROCEDURE TO SYNC BLOQUES TO NODOS BASED ON PISOS' CPs
--- This procedure assigns nodo_id to bloques based on the most common nodo_id among their pisos' CPs
--- It assumes the existence of a mapping table 'nodos_cp_mapping' with columns
+CREATE INDEX idx_bloques_normalized_trgm
+ON sindicato_inq.bloques USING gin (normalize_address_for_match(direccion) gin_trgm_ops);
+
+-- =====================================================================
+-- PROCEDURE: sync_all_bloques_to_nodos
+-- =====================================================================
+
+DROP PROCEDURE IF EXISTS sync_all_bloques_to_nodos() CASCADE;
+
 CREATE OR REPLACE PROCEDURE sync_all_bloques_to_nodos()
 LANGUAGE plpgsql
 AS $$
@@ -232,9 +280,9 @@ DECLARE
     bloque_record RECORD;
     most_common_nodo_id INTEGER;
 BEGIN
-    -- Itera sobre cada bloque que no tiene un nodo asignado
-    FOR bloque_record IN SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL LOOP
-        -- Encuentra el nodo_id más común entre los pisos de este bloque
+    FOR bloque_record IN
+        SELECT id FROM sindicato_inq.bloques WHERE nodo_id IS NULL
+    LOOP
         SELECT ncm.nodo_id INTO most_common_nodo_id
         FROM sindicato_inq.pisos p
         JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
@@ -243,7 +291,6 @@ BEGIN
         ORDER BY COUNT(*) DESC
         LIMIT 1;
 
-        -- Si se encontró un nodo común, actualiza el bloque
         IF FOUND AND most_common_nodo_id IS NOT NULL THEN
             UPDATE sindicato_inq.bloques
             SET nodo_id = most_common_nodo_id
@@ -253,18 +300,26 @@ BEGIN
 END;
 $$;
 
+-- =====================================================================
+-- FUNCTION: sync_bloque_nodo (trigger)
+-- =====================================================================
 
--- TRIGGER TO AUTOMATICALLY SYNC BLOQUES WHEN A PISO IS INSERTED OR UPDATED
--- This trigger updates the nodo_id of the parent bloque whenever a piso's CP is set or changed
--- It uses the mapping table 'nodos_cp_mapping' to find the corresponding nodo_id
+DROP FUNCTION IF EXISTS sync_bloque_nodo() CASCADE;
+
 CREATE OR REPLACE FUNCTION sync_bloque_nodo()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 BEGIN
-    -- Cuando se inserta o actualiza un piso...
-    -- Se busca el nodo correspondiente a su CP y se actualiza el bloque padre.
     UPDATE sindicato_inq.bloques
-    SET nodo_id = (SELECT nodo_id FROM sindicato_inq.nodos_cp_mapping WHERE cp = NEW.cp)
+    SET nodo_id = (
+        SELECT nodo_id
+        FROM sindicato_inq.nodos_cp_mapping
+        WHERE cp = NEW.cp
+    )
     WHERE id = NEW.bloque_id;
+
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
+
