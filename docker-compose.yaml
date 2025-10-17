@@ -38,6 +38,10 @@ services:
     profiles: ["Frontend", "Secured"]
     expose:
       - "8081" # Internal only - no external access
+    environment:
+      PYTHONUNBUFFERED: 1
+      POSTGREST_API_URL: ${POSTGRES_API_URL}
+      NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET}
     volumes:
       - ./build/niceGUI:/app${DEV_MODE:+:rw}${DEV_MODE:-:ro}
     working_dir: /app
@@ -45,10 +49,6 @@ services:
       - server
       - db
     restart: unless-stopped
-    environment:
-      PYTHONUNBUFFERED: 1
-      POSTGREST_API_URL: ${POSTGRES_API_URL}
-      NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET}
 
   nginx:
     image: nginx:latest
