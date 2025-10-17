@@ -93,7 +93,7 @@ CREATE OR REPLACE VIEW v_afiliadas_detalle AS
 SELECT
     a.id,
     a.piso_id,
-    a.num_afiliada AS "Num.Afiliada",
+    a.num_afiliada AS "Nº Afiliada",
     CONCAT(a.nombre, ' ', a.apellidos) AS "Nombre Completo",
     a.cif AS "CIF",
     a.email AS "Correo",
