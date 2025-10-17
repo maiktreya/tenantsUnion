@@ -4,7 +4,7 @@
 
 [](https://www.google.com/search?q=https://github.com/maiktreya/tenantsUnion/actions/workflows/ci.yml)
 
-Este proyecto es una aplicación web de escritorio desarrollada para facilitar la gestión interna de la información del **Sindicato de Inquilinas e Inquilinos de Madrid**. La interfaz, construida con **NiceGUI**, ofrece una experiencia de usuario rápida y reactiva para interactuar con una base de datos PostgreSQL a través de una API RESTful generada automáticamente con **PostgREST**.
+Este proyecto es una aplicación web de escritorio desarrollada para facilitar la gestión interna de la información del **Sindicato de Inquilinas e Inquilinos**. La interfaz, construida con **NiceGUI**, ofrece una experiencia de usuario rápida y reactiva para interactuar con una base de datos PostgreSQL a través de una API RESTful generada automáticamente con **PostgREST**.
 
 ## 🏛️ Arquitectura
 
@@ -31,7 +31,7 @@ graph TD
     E <--> F
 ```
 
-- **Capa de Datos (PostgreSQL):** La única fuente de verdad. La lógica de negocio, como la sincronización de nodos o la validación, se implementa directamente en la BBDD mediante vistas, funciones y triggers para centralizar las reglas y garantizar la consistencia.
+- **Capa de Datos (PostgreSQL):** La única fuente de verdad. La lógica de bajo nivel, como la sincronización de nodos o la validación, se implementa directamente en la BBDD mediante vistas, funciones y triggers para centralizar las reglas y garantizar la consistencia.
 - **Capa de API (PostgREST):** En lugar de escribir un backend manualmente, PostgREST genera una API RESTful de alto rendimiento directamente desde el esquema de la base de datos, reduciendo drásticamente el tiempo de desarrollo.
 - **Capa de Presentación (NiceGUI):** Un framework moderno en Python que permite construir la interfaz de usuario de forma rápida y eficiente, sin necesidad de escribir JavaScript, HTML o CSS por separado.
 
@@ -81,64 +81,78 @@ La aplicación se organiza en módulos funcionales clave, accesibles según los 
 
 Este método expone los puertos de la base de datos y la API para facilitar el desarrollo.
 
-1.  **Clonar el repositorio:**
-    ```bash
-    git clone https://github.com/maiktreya/tenantsUnion.git
-    cd tenantsUnion
-    ```
-2.  **Configurar el entorno de desarrollo:**
-    Copia `.env.example` a `.env`. Asegúrate de que la siguiente variable esté configurada para usar datos de prueba:
-    ```dotenv
-    INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev
-    ```
-3.  **Levantar los servicios:**
-    ```bash
-    docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml up -d --build
-    ```
-4.  **Acceder a la aplicación:**
-    - **Frontend:** `http://localhost:8081`
-    - **API (ejemplo):** `http://localhost:3001/afiliadas`
-    - **Base de Datos:** `postgresql://app_user:password@localhost:5432/mydb`
+1. **Clonar el repositorio:**
+
+   ```bash
+   git clone https://github.com/maiktreya/tenantsUnion.git
+   cd tenantsUnion
+   ```
+
+2. **Configurar el entorno de desarrollo:**
+   Copia `.env.example` a `.env`. Asegúrate de que la siguiente variable esté configurada para usar datos de prueba:
+
+   ```dotenv
+   INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev
+   ```
+
+3. **Levantar los servicios:**
+
+   ```bash
+   # Desarrollo local
+    docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml up -d --build --renew-anon-volumes
+   ```
+
+4. **Acceder a la aplicación:**
+   - **Frontend:** `http://localhost:8081`
+   - **API (ejemplo):** `http://localhost:3001/afiliadas`
+   - **Base de Datos:** `postgresql://app_user:password@localhost:5432/mydb`
 
 ### Despliegue en Producción (Seguro con SSL)
 
 Sigue estos pasos para un despliegue en un único host con seguridad y HTTPS habilitado.
 
-1.  **Clonar el repositorio:**
-    ```bash
-    git clone https://github.com/maiktreya/tenantsUnion.git
-    cd tenantsUnion
-    ```
-2.  **Configurar las variables de entorno:**
-    Crea una copia de `.env.example` y renómbrala a `.env`. **Ajusta los siguientes valores obligatorios**:
+1. **Clonar el repositorio:**
 
-    ```dotenv
-    # Asegúrate de usar los scripts de producción
-    INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts
+   ```bash
+   git clone https://github.com/maiktreya/tenantsUnion.git
+   cd tenantsUnion
+   ```
 
-    # --- CONFIGURACIÓN SSL OBLIGATORIA ---
-    HOSTNAME=tu-dominio.duckdns.org
-    DUCKDNS_TOKEN=tu-token-de-duckdns
-    EMAIL=tu-email@ejemplo.com
-    ```
+2. **Configurar las variables de entorno:**
+   Crea una copia de `.env.example` y renómbrala a `.env`. **Ajusta los siguientes valores obligatorios**:
 
-3.  **Ejecutar el script de configuración inicial de SSL:**
-    Este script automatiza la obtención de certificados. **Solo necesitas ejecutarlo la primera vez.**
-    ```bash
-    chmod +x utils/init-letsencrypt.sh
-    ./utils/init-letsencrypt.sh
-    ```
-4.  **Levantar todos los servicios:**
-    Una vez generados los certificados, levanta la aplicación completa.
-    ```bash
-    docker compose --profile Secured --profile Frontend up -d
-    ```
-5.  **Configurar el Firewall (Recomendado):**
-    Asegura tu servidor permitiendo únicamente el tráfico necesario.
-    ```bash
-    chmod +x utils/setup_firewall.sh
-    sudo ./utils/setup_firewall.sh
-    ```
+   ```dotenv
+   # Asegúrate de usar los scripts de producción
+   INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts
+
+   # --- CONFIGURACIÓN SSL OBLIGATORIA ---
+   HOSTNAME=tu-dominio.duckdns.org
+   DUCKDNS_TOKEN=tu-token-de-duckdns
+   EMAIL=tu-email@ejemplo.com
+   ```
+
+3. **Ejecutar el script de configuración inicial de SSL:**
+   Este script automatiza la obtención de certificados. **Solo necesitas ejecutarlo la primera vez.**
+
+   ```bash
+   chmod +x utils/init-letsencrypt.sh
+   ./utils/init-letsencrypt.sh
+   ```
+
+4. **Levantar todos los servicios:**
+   Una vez generados los certificados, levanta la aplicación completa.
+
+   ```bash
+   docker compose --profile Secured --profile Frontend up -d
+   ```
+
+5. **Configurar el Firewall (Recomendado):**
+   Asegura tu servidor permitiendo únicamente el tráfico necesario.
+
+   ```bash
+   chmod +x utils/setup_firewall.sh
+   sudo ./utils/setup_firewall.sh
+   ```
 
 ¡Listo\! La aplicación estará disponible en `https://tu-dominio.duckdns.org`.
 
@@ -151,9 +165,10 @@ Este proyecto utiliza **PostgREST**, que convierte tu base de datos en una API R
 - **Acceso:** La API es interna a la red de Docker. En un entorno de desarrollo, puedes acceder a ella a través del puerto expuesto (`http://localhost:3001`).
 - **Endpoints:** Cada tabla y vista de tu esquema `sindicato_inq` se convierte en un endpoint. Por ejemplo, la tabla `afiliadas` es accesible en `/afiliadas`.
 - **Consultas:** Puedes usar parámetros de URL para filtrar, ordenar y paginar. Por ejemplo, para obtener las afiliadas del estado "Alta":
-  ```
-  http://localhost:3001/afiliadas?estado=eq.Alta
-  ```
+
+`
+http://localhost:3001/afiliadas?estado=eq.Alta
+`
 
 Para más información, consulta la [documentación oficial de PostgREST](https://postgrest.org/en/stable/api.html).
 
@@ -184,14 +199,12 @@ Planes de mejora y futuras implementaciones:
 
 ¡Las contribuciones son bienvenidas! Si tienes ideas, sugerencias o quieres colaborar en el desarrollo de este proyecto, no dudes en ponerte en contacto.
 
-**Contacto:** garciaduchm@gmail.com
+**Contacto:** <garciaduchm@gmail.com>
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto está licenciado bajo la [GNU General Public License v3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.html).
-
-Además, el contenido y la documentación asociada se distribuyen bajo una licencia [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).
+Este proyecto está licenciado bajo la [GNU General Public License v3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.html). Además, el contenido y la documentación asociada se distribuyen bajo una licencia [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).
 
 **Autor:** Miguel García-Duch (@maiktreya)
