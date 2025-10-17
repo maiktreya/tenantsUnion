@@ -1,9 +1,8 @@
 -- =====================================================================
 -- SCRIPT DE DATOS ARTIFICIALES PARA PRUEBAS (VERSIÓN REVISADA Y CORREGIDA)
 -- =====================================================================
--- Este script crea el esquema completo, define las tablas, crea índices,
--- configura la autenticación, y puebla la base de datos con datos
--- artificiales.
+-- Este script puebla la base de datos con datos artificiales. Para funcionar
+-- desde 01-init hasta 03-init files deben haberse corrido con anterioridad.
 --
 -- REVISIÓN: El esquema de las tablas comunes ha sido sincronizado con
 -- el script de producción '01-init-schema-and-data.sql'.
