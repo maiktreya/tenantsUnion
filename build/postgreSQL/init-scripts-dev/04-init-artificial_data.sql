@@ -663,14 +663,6 @@ VALUES (
 -- =====================================================================
 SELECT 'Base de datos poblada correctamente con datos artificiales' as mensaje;
 
-ALTER TABLE sindicato_inq.facturacion
-ADD CONSTRAINT chk_iban_format CHECK (
-    iban IS NULL
-    OR iban ~ '^ES[0-9]{22}$'
-) NOT VALID;
-
-
-
 -- =====================================================================
 -- PARTE 2: MAPEADO DE CÓDIGOS POSTALES A NODOS
 -- =====================================================================

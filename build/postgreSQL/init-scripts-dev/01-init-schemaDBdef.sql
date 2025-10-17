@@ -126,7 +126,11 @@ CREATE TABLE IF NOT EXISTS facturacion (
     cuota DECIMAL(8, 2),
     periodicidad SMALLINT,
     forma_pago TEXT,
-    iban TEXT
+    iban TEXT,
+    CONSTRAINT chk_iban_format CHECK (
+        iban IS NULL
+        OR iban ~ '^ES[0-9]{22}$'
+    ) NOT VALID
 );
 
 CREATE TABLE IF NOT EXISTS asesorias (
