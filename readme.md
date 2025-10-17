@@ -1,5 +1,3 @@
----
-
 # Sistema de Gestión para el Sindicato de Inquilinas de Madrid
 
 [](https://www.google.com/search?q=https://github.com/maiktreya/tenantsUnion/actions/workflows/ci.yml)
