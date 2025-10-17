@@ -54,7 +54,7 @@ services:
     image: nginx:latest
     profiles: ["Secured"]
     environment:
-      - HOSTNAME=${HOSTNAME}
+      HOSTNAME: ${HOSTNAME}
     ports:
       - "80:80" # HTTP EntryPoint
       - "443:443" # HTTPs EntryPoint

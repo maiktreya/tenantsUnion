@@ -4,6 +4,7 @@
 # Core testing framework
 pytest
 pytest-asyncio
+pytest-cov
 
 # For mocking HTTP requests
 respx
