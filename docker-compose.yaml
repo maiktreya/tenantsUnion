@@ -33,17 +33,14 @@ services:
     restart: unless-stopped
 
   nicegui-app:
-    image: python:3.11-slim
+    build:
+      context: ./build/niceGUI
     profiles: ["Frontend", "Secured"]
     expose:
       - "8081" # Internal only - no external access
     volumes:
       - ./build/niceGUI:/app${DEV_MODE:+:rw}${DEV_MODE:-:ro}
     working_dir: /app
-    command: >
-      sh -c "pip install --upgrade pip &&
-             pip install --root-user-action=ignore passlib==1.7.4 bcrypt==4.0.1 nicegui httpx pandas &&
-             python main.py"
     depends_on:
       - server
       - db
