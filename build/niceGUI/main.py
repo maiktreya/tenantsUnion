@@ -3,6 +3,7 @@
 import os
 import logging
 import locale
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 from nicegui import ui, app
@@ -52,6 +53,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(AuthMiddleware)
+
+# for security user session expires after 3 hours
+app.storage.user.lifetime = timedelta(hours=3)
+log.info(f"User session lifetime set to {app.storage.user.lifetime}")
 
 # =====================================================================
 # MAIN APPLICATION CLASS

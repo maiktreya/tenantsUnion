@@ -107,6 +107,7 @@ SELECT
     p.fecha_firma AS "Fecha Firma",
     p.inmobiliaria AS "Inmob.",
     e.nombre AS "Propiedad",
+    p.prop_vertical AS "Prop. Vertical",
     COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
     COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"
 FROM afiliadas a

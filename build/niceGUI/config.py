@@ -302,6 +302,9 @@ TABLE_INFO = {
                     "demanda",
                     "sentencia",
                     "protocolo institutos",
+                    "taller de portavocías",
+                    "taller de pancartas",
+                    "acción directa",
                 ]
             ),
         },

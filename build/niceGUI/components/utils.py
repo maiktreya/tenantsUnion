@@ -1,4 +1,17 @@
 from typing import Dict, Callable, Optional
+from datetime import datetime
+
+
+def format_date_es(date_str: Optional[str]) -> Optional[str]:
+    """Formats an ISO-like date string (YYYY-MM-DD...) to Spanish format (DD/MM/YYYY)."""
+    if not date_str:
+        return None
+    try:
+        # Assuming the date starts in a standard format like YYYY-MM-DD
+        dt = datetime.fromisoformat(date_str.split("T")[0])
+        return dt.strftime("%d/%m/%Y")
+    except (ValueError, TypeError):
+        return date_str  # Return original if parsing fails
 
 
 def _clean_record(record: Dict) -> Dict:

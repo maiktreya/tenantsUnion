@@ -109,6 +109,7 @@ SELECT
     a.fecha_baja as "Fecha Baja",
     p.fecha_firma as "Fecha Firma",
     p.inmobiliaria AS "Inmob.",
+    p.prop_vertical AS "Prop. Vertical",
     e.nombre AS "Propiedad",
     COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
     COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"
