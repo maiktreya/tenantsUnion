@@ -339,6 +339,21 @@ TABLE_INFO = {
 #  VIEWS METADATA
 # =====================================================================
 VIEW_INFO = {
+    "v_afiliadas_detalle": {
+        "display_name": "Detalle de Afiliadas",
+        "base_table": "afiliadas",
+        "hidden_fields": ["id", "piso_id", "entramado_id", "empresa_id", "nodo_id"],
+    },
+    "v_conflictos_detalle": {
+        "display_name": "Detalle de Conflictos",
+        "base_table": "conflictos",
+        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
+    },
+    "v_facturacion": {
+        "display_name": "Vista extendida de facturación",
+        "base_table": "afiliadas",
+        "hidden_fields": ["id"],
+    },
     "v_resumen_nodos": {"display_name": "Resumen de Nodos", "base_table": "nodos"},
     "v_resumen_bloques": {
         "display_name": "Resumen de Bloques",
@@ -350,24 +365,9 @@ VIEW_INFO = {
         "base_table": "entramado_empresas",
         "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
-    "v_afiliadas_detalle": {
-        "display_name": "Detalle de Afiliadas",
-        "base_table": "afiliadas",
-        "hidden_fields": ["id", "piso_id", "entramado_id", "empresa_id", "nodo_id"],
-    },
-    "v_conflictos_detalle": {
-        "display_name": "Detalle de Conflictos",
-        "base_table": "conflictos",
-        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
-    },
     "comprobar_link_pisos_bloques": {
         "display_name": "Comprobar Vínculo Pisos-Bloques",
         "base_table": "pisos",
-    },
-    "v_facturacion": {
-        "display_name": "Vista extendida de facturación",
-        "base_table": "afiliadas",
-        "hidden_fields": ["id"],
     },
     "v_consolidar_pisos_bloques": {
         "display_name": "Vista consolidada de Pisos-Bloques",
@@ -375,6 +375,18 @@ VIEW_INFO = {
         "hidden_fields": ["id"],
     },
 }
+
+# Define the desired order for the views dropdown
+VIEW_ORDER = [
+    "v_afiliadas_detalle",
+    "v_conflictos_detalle",
+    "v_facturacion",
+    "v_resumen_nodos",
+    "v_resumen_bloques",
+    "v_resumen_entramados_empresas",
+    "comprobar_link_pisos_bloques",
+    "v_consolidar_pisos_bloques",
+]
 
 # =====================================================================
 #  UI METADATA (HEADER MAPPINGS)

@@ -54,10 +54,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(AuthMiddleware)
 
-# for security user session expires after 3 hours
-app.storage.user.lifetime = timedelta(hours=3)
-log.info(f"User session lifetime set to {app.storage.user.lifetime}")
-
 # =====================================================================
 # MAIN APPLICATION CLASS
 # =====================================================================
@@ -240,17 +236,18 @@ app_instance: Optional[Application] = None
 
 
 # =====================================================================
-# MAIN APP ENTRY POINT
+# MAIN APP USER ENTRY POINT
 # =====================================================================
 
 
 @ui.page("/")
 def main_page_entry():
+    # Entry point for a new user session. (configure session-specific settings)
+    app.storage.user.lifetime = timedelta(hours=3)
+    log.info(f"User session lifetime set to {app.storage.user.lifetime}")
     global app_instance
     app_instance = Application(api_client=api_singleton, state=app_state_init)
-
     ui.timer(0.2, app_instance.initialize_global_data, once=True)
-
     app_instance.create_header()
     app_instance.create_views()
 
@@ -271,13 +268,10 @@ if __name__ in {"__main__", "__mp_main__"}:
     except locale.Error:
         print("Spanish locale not found, falling back to default.")
 
-    storage_secret = os.environ.get(
-        "NICEGUI_STORAGE_SECRET", "a-secure-secret-key-here"
-    )
     ui.run(
         host=config.APP_HOST,
         port=config.APP_PORT,
         title=config.APP_TITLE,
-        storage_secret=storage_secret,
+        storage_secret=os.environ.get("NICEGUI_STORAGE_SECRET", "a-key-here"),
         favicon="🎯",
     )

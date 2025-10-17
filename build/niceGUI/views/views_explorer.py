@@ -10,7 +10,7 @@ from components.filters import FilterPanel
 from components.exporter import export_to_csv
 from components.relationship_explorer import RelationshipExplorer
 from components.base_view import BaseView
-from config import VIEW_INFO, TABLE_INFO
+from config import VIEW_INFO, TABLE_INFO, VIEW_ORDER
 
 
 class ViewsExplorerView(BaseView):
@@ -40,8 +40,16 @@ class ViewsExplorerView(BaseView):
         with container:
             ui.label("Explorador de Vistas").classes("text-h6 font-italic")
             with ui.row().classes("w-full gap-4 items-center"):
+                # Create a dictionary mapping view names to their display names, in the desired order
+                view_options = {
+                    view_name: VIEW_INFO.get(view_name, {}).get(
+                        "display_name", view_name
+                    )
+                    for view_name in VIEW_ORDER
+                }
+
                 self.select_view = ui.select(
-                    options=list(VIEW_INFO.keys()),
+                    options=view_options,
                     label="Seleccionar Vista",
                     value=self.state.selected_entity_name.value,
                     on_change=lambda e: ui.timer(
@@ -183,7 +191,7 @@ class ViewsExplorerView(BaseView):
 
     async def _refresh_data(self):
         if self.state.selected_entity_name.value:
-            await self._load_view_data(self.state.selected_entity_name.value)
+            await self.load_view_data(self.state.selected_entity_name.value)
 
     def _export_data(self):
         if self.state.selected_entity_name.value:

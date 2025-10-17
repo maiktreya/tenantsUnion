@@ -1,6 +1,7 @@
 from typing import List, Optional, Callable
 from nicegui import ui, events
 from state.base import BaseTableState
+from .utils import format_date_es  # Import the date formatting function
 
 
 class DataTable:
@@ -40,8 +41,7 @@ class DataTable:
             records = self.state.get_paginated_records()
 
             if not self.state.records:
-                ui.label("No se encontraron registros").classes(
-                    "text-gray-500")
+                ui.label("No se encontraron registros").classes("text-gray-500")
                 return
 
             ui.label(
@@ -57,8 +57,7 @@ class DataTable:
 
             if records:
                 all_columns = list(records[0].keys())
-                columns = [
-                    col for col in all_columns if col not in self.hidden_columns]
+                columns = [col for col in all_columns if col not in self.hidden_columns]
 
                 with ui.card().classes("w-full"):
                     with ui.row().classes("w-full bg-gray-100 p-2 items-center"):
@@ -88,16 +87,13 @@ class DataTable:
                                     ui.icon(icon, size="sm")
                                     if len(self.state.sort_criteria) > 1:
                                         sort_index = (
-                                            self.state.sort_criteria.index(
-                                                sort_info)
+                                            self.state.sort_criteria.index(sort_info)
                                             + 1
                                         )
-                                        ui.label(f"({sort_index})").classes(
-                                            "text-xs")
+                                        ui.label(f"({sort_index})").classes("text-xs")
 
                         if self.show_actions:
-                            ui.label("Acciones").classes(
-                                "font-bold w-32 text-center")
+                            ui.label("Acciones").classes("font-bold w-32 text-center")
 
                     for record in records:
                         row_classes = (
@@ -109,15 +105,23 @@ class DataTable:
                         with ui.row().classes(row_classes) as row:
                             for column in columns:
                                 value = record.get(column, "")
-                                display_value = (
-                                    value if value is not None and value != "" else "-"
-                                )
-                                display_value = (
+
+                                # If the column is a date, format it
+                                if "fecha" in column.lower() and isinstance(value, str):
+                                    display_value = format_date_es(value)
+                                else:
+                                    display_value = (
+                                        value
+                                        if value is not None and value != ""
+                                        else "-"
+                                    )
+
+                                display_value_str = (
                                     str(display_value)[:75] + "..."
                                     if len(str(display_value)) > 75
                                     else str(display_value)
                                 )
-                                ui.label(display_value).classes("flex-1").tooltip(
+                                ui.label(display_value_str).classes("flex-1").tooltip(
                                     str(value)
                                 )
 
@@ -126,14 +130,12 @@ class DataTable:
                                     if self.on_edit:
                                         ui.button(
                                             icon="edit",
-                                            on_click=lambda r=record: self.on_edit(
-                                                r),
+                                            on_click=lambda r=record: self.on_edit(r),
                                         ).props("size=sm flat dense color=orange-600")
                                     if self.on_delete:
                                         ui.button(
                                             icon="delete",
-                                            on_click=lambda r=record: self.on_delete(
-                                                r),
+                                            on_click=lambda r=record: self.on_delete(r),
                                         ).props("size=sm flat dense color=negative")
 
                         if self.on_row_click:
@@ -155,8 +157,7 @@ class DataTable:
         else:
             if existing_criterion:
                 idx = self.state.sort_criteria.index(existing_criterion)
-                self.state.sort_criteria[idx] = (
-                    column, not existing_criterion[1])
+                self.state.sort_criteria[idx] = (column, not existing_criterion[1])
             else:
                 self.state.sort_criteria.append((column, True))
 

@@ -94,8 +94,7 @@ SELECT
     a.id,
     a.piso_id,
     a.num_afiliada AS "Num.Afiliada",
-    a.nombre AS "Nombre",
-    a.apellidos AS "Apellidos",
+    CONCAT(a.nombre, ' ', a.apellidos) AS "Nombre Completo",
     a.cif AS "CIF",
     a.email AS "Correo",
     a.telefono AS "Teléfono",
@@ -149,7 +148,7 @@ DROP VIEW IF EXISTS v_facturacion CASCADE;
 CREATE OR REPLACE VIEW v_facturacion AS
 SELECT
     a.id AS id,
-    CONCAT(a.nombre, ' ', a.apellidos) AS afiliada_nombre_completo,
+    CONCAT(a.nombre, ' ', a.apellidos) AS "Nombre Completo",
     a.email AS "Email",
     a.cif AS "NIF",
     p.direccion AS "Direccion",
@@ -277,10 +276,11 @@ SELECT
     p.id,
     p.bloque_id,
     b.empresa_id,
+    p.prop_vertical AS "Prop. Vertical",
     p.direccion AS "Dirección Piso",
     b.direccion AS "Dirección Bloque",
     p.propiedad AS "Propiedad Piso",
-    e.nombre AS "Empresa Propietaria",
+    e.nombre AS "Propiedad Bloque",
     CASE
         WHEN b.empresa_id IS NULL THEN 'Falta empresa Bloque'
         WHEN COALESCE(NULLIF(LOWER(TRIM(p.propiedad)), ''), '') =
