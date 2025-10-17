@@ -1,0 +1,6 @@
+[run]
+omit =
+    # Exclude the test directory
+    tests/*
+    # Exclude config files
+    */__init__.py

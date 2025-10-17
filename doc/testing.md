@@ -19,7 +19,7 @@ pip install -r tests/requirements.txt
 Run every test (unit, integration-style, and UI) with:
 
 ```bash
-pytest
+pytest --cov
 ```
 
 Useful selections:
