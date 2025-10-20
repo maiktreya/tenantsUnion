@@ -205,4 +205,4 @@ Planes de mejora y futuras implementaciones:
 
 Este proyecto está licenciado bajo la [GNU General Public License v3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.html). Además, el contenido y la documentación asociada se distribuyen bajo una licencia [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).
 
-**Autor:** Miguel García-Duch (@maiktreya)
+21-10-2025 @maiktreya
