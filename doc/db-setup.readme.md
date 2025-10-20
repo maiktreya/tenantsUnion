@@ -14,15 +14,15 @@ Este documento describe el proceso paso a paso utilizado para construir y poblar
 
 Este es el script fundamental que establece la estructura de la base de datos y realiza la migración inicial de datos desde los archivos CSV heredados. Desde la antigua base de datos
 
-1.  **Creación del Esquema**: Comienza creando el esquema principal, `sindicato_inq`, para encapsular todos los objetos de la base de datos.
-2.  **Definición de Tablas**: El script define las tablas finales y normalizadas para la aplicación, incluyendo `empresas`, `bloques`, `pisos`, `afiliadas`, `conflictos` y `usuarios`. La integridad referencial se establece mediante el uso de claves foráneas.
-3.  **Área de Staging (Temporal)**: Se crean tablas temporales de `staging` para replicar la estructura de los archivos CSV de origen (`Afiliadas.csv`, `Empresas.csv`, etc.).
-4.  **Ingesta de Datos**: El comando `COPY` se utiliza para cargar de manera eficiente los datos en bloque desde los archivos CSV a sus correspondientes tablas de staging.
-5.  **Migración y Transformación de Datos**: Se utilizan sentencias `INSERT INTO ... SELECT` para migrar los datos desde las tablas de staging a las tablas finales y normalizadas. Este paso incluye:
+1. **Creación del Esquema**: Comienza creando el esquema principal, `sindicato_inq`, para encapsular todos los objetos de la base de datos.
+2. **Definición de Tablas**: El script define las tablas finales y normalizadas para la aplicación, incluyendo `empresas`, `bloques`, `pisos`, `afiliadas`, `conflictos` y `usuarios`. La integridad referencial se establece mediante el uso de claves foráneas.
+3. **Área de Staging (Temporal)**: Se crean tablas temporales de `staging` para replicar la estructura de los archivos CSV de origen (`Afiliadas.csv`, `Empresas.csv`, etc.).
+4. **Ingesta de Datos**: El comando `COPY` se utiliza para cargar de manera eficiente los datos en bloque desde los archivos CSV a sus correspondientes tablas de staging.
+5. **Migración y Transformación de Datos**: Se utilizan sentencias `INSERT INTO ... SELECT` para migrar los datos desde las tablas de staging a las tablas finales y normalizadas. Este paso incluye:
     * Transformar y limpiar datos (por ejemplo, convertir representaciones de texto de números a tipos numéricos).
     * Resolver relaciones buscando los IDs de las claves foráneas en los registros recién insertados.
-6.  **Limpieza**: Las tablas de staging temporales se eliminan una vez que se completa la migración de datos.
-7.  **Indexación**: Para garantizar el rendimiento de las consultas, se crean índices en todas las columnas de clave foránea.
+6. **Limpieza**: Las tablas de staging temporales se eliminan una vez que se completa la migración de datos.
+7. **Indexación**: Para garantizar el rendimiento de las consultas, se crean índices en todas las columnas de clave foránea.
 
 ---
 
@@ -30,12 +30,12 @@ Este es el script fundamental que establece la estructura de la base de datos y 
 
 Esta etapa introduce el concepto de "Nodos" (agrupaciones territoriales) para organizar los datos geográficamente.
 
-1.  **Tablas de Nodos**: El script `02-init-nodos.sql` crea dos nuevas tablas:
+1. **Tablas de Nodos**: El script `02-init-nodos.sql` crea dos nuevas tablas:
     * `nodos`: Almacena los nombres y descripciones de los nodos territoriales (ej. 'Centro-Arganzuela-Retiro', 'Latina').
     * `nodos_cp_mapping`: Mapea códigos postales (`cp`) a un `nodo_id` específico.
-2.  **Optimización de Rendimiento**: Se añade una columna `nodo_id` directamente a la tabla `bloques`. Esta desnormalización es una decisión deliberada para mejorar el rendimiento y evitar uniones complejas en consultas comunes.
-3.  **Sincronización Automática**: Una característica clave es una función `trigger` (`sync_bloque_nodo`). Esta función actualiza automáticamente el `nodo_id` en un `bloque` cada vez que un `piso` vinculado a él se inserta o actualiza su código postal, asegurando la consistencia de los datos.
-4.  **Población de Datos**: El script `05-populate-nodes-cps.sql` luego rellena estas tablas con los nodos específicos y sus correspondientes mapeos de códigos postales para la Comunidad de Madrid.
+2. **Optimización de Rendimiento**: Se añade una columna `nodo_id` directamente a la tabla `bloques`. Esta desnormalización es una decisión deliberada para mejorar el rendimiento y evitar uniones complejas en consultas comunes.
+3. **Sincronización Automática**: Una característica clave es una función `trigger` (`sync_bloque_nodo`). Esta función actualiza automáticamente el `nodo_id` en un `bloque` cada vez que un `piso` vinculado a él se inserta o actualiza su código postal, asegurando la consistencia de los datos.
+4. **Población de Datos**: El script `05-populate-nodes-cps.sql` luego rellena estas tablas con los nodos específicos y sus correspondientes mapeos de códigos postales para la Comunidad de Madrid.
 
 ---
 
@@ -43,11 +43,11 @@ Esta etapa introduce el concepto de "Nodos" (agrupaciones territoriales) para or
 
 Este script construye la infraestructura necesaria para la gestión de usuarios y el control de acceso.
 
-1.  **Tablas de Autenticación**: Se crean tres tablas dentro del esquema `sindicato_inq`:
+1. **Tablas de Autenticación**: Se crean tres tablas dentro del esquema `sindicato_inq`:
     * `usuario_credenciales`: Almacena los IDs de usuario y sus correspondientes contraseñas hasheadas.
     * `roles`: Una tabla simple para definir los roles de usuario disponibles (ej. `admin`, `gestor`).
     * `usuario_roles`: Una tabla de mapeo que vincula a los usuarios con los roles que tienen asignados, permitiendo una relación de muchos a muchos.
-2.  **Datos por Defecto**: El script inserta roles por defecto ('admin', 'gestor') y establece una contraseña hasheada por defecto para el usuario administrador inicial, permitiendo el inicio de sesión inmediato después de configurar el sistema.
+2. **Datos por Defecto**: El script inserta roles por defecto ('admin', 'gestor') y establece una contraseña hasheada por defecto para el usuario administrador inicial, permitiendo el inicio de sesión inmediato después de configurar el sistema.
 
 ---
 
@@ -55,9 +55,9 @@ Este script construye la infraestructura necesaria para la gestión de usuarios 
 
 Para simplificar las consultas del frontend y mejorar el rendimiento, este script crea varias vistas de base de datos.
 
-1.  **Creación de Vistas**: Se ejecuta una serie de sentencias `CREATE OR REPLACE VIEW`.
-2.  **Desnormalización**: Estas vistas unen múltiples tablas para proporcionar una visión aplanada y completa de los datos. Por ejemplo, `v_afiliadas_detalle` combina información de `afiliadas`, `pisos`, `bloques` y `empresas` para presentar un registro completo de cada afiliada.
-3.  **Propósito**: El objetivo principal es proporcionar fuentes de datos listas para usar para el "Explorador de Vistas" de la aplicación y otros módulos, reduciendo la necesidad de agregaciones de datos complejas en el lado del cliente.
+1. **Creación de Vistas**: Se ejecuta una serie de sentencias `CREATE OR REPLACE VIEW`.
+2. **Desnormalización**: Estas vistas unen múltiples tablas para proporcionar una visión aplanada y completa de los datos. Por ejemplo, `v_afiliadas_detalle` combina información de `afiliadas`, `pisos`, `bloques` y `empresas` para presentar un registro completo de cada afiliada.
+3. **Propósito**: El objetivo principal es proporcionar fuentes de datos listas para usar para el "Explorador de Vistas" de la aplicación y otros módulos, reduciendo la necesidad de agregaciones de datos complejas en el lado del cliente.
 
 ---
 
@@ -65,7 +65,7 @@ Para simplificar las consultas del frontend y mejorar el rendimiento, este scrip
 
 Finalmente, este script puebla tablas de consulta esenciales que fueron creadas en los pasos anteriores.
 
-2.  **Datos de Nodos y CPs**: Como se mencionó en el Paso 2, este script es responsable de rellenar las tablas `nodos` y `nodos_cp_mapping` con los datos geográficos reales.
+2. **Datos de Nodos y CPs**: Como se mencionó en el Paso 2, este script es responsable de rellenar las tablas `nodos` y `nodos_cp_mapping` con los datos geográficos reales.
 
 ---
 
@@ -73,9 +73,9 @@ Finalmente, este script puebla tablas de consulta esenciales que fueron creadas 
 
 Este script introduce lógica de negocio directamente en la base de datos a través de funciones y procedimientos almacenados en PL/pgSQL, lo que centraliza y automatiza tareas complejas.
 
-1.  **Función de Coincidencia de Direcciones**: Se crea la función `find_best_match_bloque_id` que utiliza la extensión `pg_trgm` para realizar una comparación difusa (fuzzy matching) de cadenas de texto. Su objetivo es encontrar el `bloque` más probable para un `piso` determinado comparando sus campos de `direccion` y devolviendo el ID del bloque si la similitud supera un umbral del 88%.
-2.  **Sincronización de Nodos en Bloques**: Se define el procedimiento `sync_all_bloques_to_nodos`, que asigna un `nodo_id` a los bloques basándose en el nodo más común entre los códigos postales de sus pisos asociados.
-3.  **Trigger de Actualización Automática**: Se establece el trigger `trigger_sync_bloque_nodo` que se dispara automáticamente al insertar o actualizar un `piso`, llamando a la función `sync_bloque_nodo` para mantener la consistencia geográfica del `bloque` padre.
+1. **Función de Coincidencia de Direcciones**: Se crea la función `find_best_match_bloque_id` que utiliza la extensión `pg_trgm` para realizar una comparación difusa (fuzzy matching) de cadenas de texto. Su objetivo es encontrar el `bloque` más probable para un `piso` determinado comparando sus campos de `direccion` y devolviendo el ID del bloque si la similitud supera un umbral del 88%.
+2. **Sincronización de Nodos en Bloques**: Se define el procedimiento `sync_all_bloques_to_nodos`, que asigna un `nodo_id` a los bloques basándose en el nodo más común entre los códigos postales de sus pisos asociados.
+3. **Trigger de Actualización Automática**: Se establece el trigger `trigger_sync_bloque_nodo` que se dispara automáticamente al insertar o actualizar un `piso`, llamando a la función `sync_bloque_nodo` para mantener la consistencia geográfica del `bloque` padre.
 
 ---
 
@@ -83,8 +83,8 @@ Este script introduce lógica de negocio directamente en la base de datos a trav
 
 Una vez que los datos y la lógica de negocio están en su lugar, este script ejecuta las rutinas iniciales para vincular los registros existentes.
 
-1.  **Vinculación de Pisos a Bloques**: El script ejecuta una sentencia `UPDATE` masiva sobre la tabla `pisos`. Para cada piso que no tiene un `bloque_id` asignado, invoca a la función `find_best_match_bloque_id` para intentar encontrar y asignar el bloque correspondiente de forma automática.
-2.  **Sincronización de Nodos**: Inmediatamente después, se llama al procedimiento `sync_all_bloques_to_nodos()` para asegurar que todos los bloques queden correctamente asociados a su nodo territorial correspondiente, basándose en la información de los pisos recién vinculados.
+1. **Vinculación de Pisos a Bloques**: El script ejecuta una sentencia `UPDATE` masiva sobre la tabla `pisos`. Para cada piso que no tiene un `bloque_id` asignado, invoca a la función `find_best_match_bloque_id` para intentar encontrar y asignar el bloque correspondiente de forma automática.
+2. **Sincronización de Nodos**: Inmediatamente después, se llama al procedimiento `sync_all_bloques_to_nodos()` para asegurar que todos los bloques queden correctamente asociados a su nodo territorial correspondiente, basándose en la información de los pisos recién vinculados.
 
 ---
 
@@ -92,8 +92,8 @@ Una vez que los datos y la lógica de negocio están en su lugar, este script ej
 
 El último paso del proceso está dedicado a la evaluación y presentación de los resultados del algoritmo de vinculación, proporcionando una visión clara de su efectividad.
 
-1.  **Análisis Detallado**: El script utiliza la vista `comprobar_link_pisos_bloques` para mostrar una lista detallada de cada `piso`, el `bloque` al que ha sido vinculado y el índice de similitud (`score`) que obtuvo en el proceso de matching. Esto permite una revisión manual de la calidad de las vinculaciones.
-2.  **Resumen Estadístico en Consola**: Se ejecuta una consulta de agregación que calcula y muestra en la consola un resumen final del proceso:
+1. **Análisis Detallado**: El script utiliza la vista `comprobar_link_pisos_bloques` para mostrar una lista detallada de cada `piso`, el `bloque` al que ha sido vinculado y el índice de similitud (`score`) que obtuvo en el proceso de matching. Esto permite una revisión manual de la calidad de las vinculaciones.
+2. **Resumen Estadístico en Consola**: Se ejecuta una consulta de agregación que calcula y muestra en la consola un resumen final del proceso:
     * **Total de registros** en la tabla `pisos`.
     * **Número de registros vinculados** exitosamente a un `bloque`.
     * **Número de registros no vinculados**.

@@ -1,18 +1,18 @@
 # prepare for secured SSL run
 
-### 1. **Environment Setup**
+## 1. **Environment Setup**
 
 Update your `.env` file with the template above, using your specific values:
 
-- `HOSTNAME=inquilinato.duckdns.org`
-- `DUCKDNS_TOKEN=566ab832-c328-4750-865e-6cd9d979f68d`
-- `EMAIL=maiktreya@example.com` (replace with your actual email)
+- `HOSTNAME=`
+- `DUCKDNS_TOKEN=`
+- `EMAIL=`
 
-### 2. **Security Improvements**
+## 2. **Security Improvements**
 
 Your Docker Compose now exposes only nginx externally (ports 80/443), while keeping database and API services internal-only using `expose` instead of `ports`.
 
-### 3. **SSL Certificate Process**
+## 3. **SSL Certificate Process**
 
 **Initial Setup:**
 
@@ -33,7 +33,7 @@ bash utils/init-letsencrypt-duckdns.sh
 4. Requests real certificates via DNS-01 challenge
 5. Reloads nginx with real certificates
 
-### 4. **Automatic  cert Renewal**
+## 4. **Automatic  cert Renewal**
 
 Add to your system crontab for automatic renewal & backupp:
 
@@ -47,7 +47,7 @@ crontab -e
 
 ```
 
-### 4. **Automatic DB backup**
+## 4. **Automatic DB backup**
 
 Add to your system  backup of the DB storage folder ever 24 h at 3am. The script automatizes holding just a max of the 3 latest scripts:
 
@@ -60,7 +60,7 @@ crontab -e
 
 ```
 
-### 6. **Deployment Commands**
+## 6. **Deployment Commands**
 
 **First-time deployment:**
 
@@ -81,7 +81,7 @@ docker compose --profile Secured up -d
 docker compose --profile Secured up -d
 ```
 
-### 7. **Troubleshooting**
+## 7. **Troubleshooting**
 
 **Test with staging first:**
 Edit the script and set `staging=1` to test with Let's Encrypt's staging environment to avoid rate limits.
@@ -98,7 +98,7 @@ docker compose run --rm --entrypoint "certbot certificates" certbot
 bash utils/renew-certificates.sh
 ```
 
-### 8. **Directory Structure**
+## 8. **Directory Structure**
 
 Your project should have:
 
@@ -117,7 +117,7 @@ project/
             └── www/
 ```
 
-### Key Differences from HTTP-01 Challenge
+## Key Differences from HTTP-01 Challenge
 
 - Uses DNS-01 challenge (required for DuckDNS)
 - No need for `.well-known/acme-challenge` directory

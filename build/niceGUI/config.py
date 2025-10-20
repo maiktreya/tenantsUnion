@@ -125,6 +125,9 @@ TABLE_INFO = {
             "fecha_alta",
             "fecha_baja",
         ],
+        "field_options": {
+            "estado": sorted(["Alta", "Baja"]),
+        },
         "relations": {
             "piso_id": {
                 "view": "pisos",
@@ -177,7 +180,6 @@ TABLE_INFO = {
             {"table": "usuario_roles", "foreign_key": "usuario_id"},
             {"table": "asesorias", "foreign_key": "tecnica_id"},
             {"table": "diario_conflictos", "foreign_key": "usuario_id"},
-            {"table": "nodos", "foreign_key": "usuario_responsable_id"},
         ],
     },
     "nodos_cp_mapping": {
@@ -354,7 +356,11 @@ VIEW_INFO = {
         "base_table": "afiliadas",
         "hidden_fields": ["id"],
     },
-    "v_resumen_nodos": {"display_name": "Resumen de Nodos", "base_table": "nodos"},
+    "v_resumen_nodos": {
+        "display_name": "Resumen de Nodos",
+        "base_table": "nodos",
+        "hidden_fields": ["id", "nodo_id"],
+    },
     "v_resumen_bloques": {
         "display_name": "Resumen de Bloques",
         "base_table": "bloques",

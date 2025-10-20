@@ -364,15 +364,15 @@ INSERT INTO
     usuario_credenciales (usuario_id, password_hash)
 VALUES (
         1,
-        '$2b$12$met2aIuPW5YLXdsDmx8VwucCKhFxxt6d0EqA3N1P3OS0Y4N3UofP6'
+        '$2b$12$gVMWfDAGD3K7cG0IgaAmxOLsa9hBDN2FK3iFU96R7JZ7d6t.tzrBC'
     ),
     (
         2,
-        '$2b$12$J23QHdoGZ434MQIZH7FwEew.VMDftluCBEugd8LKLIE3B8NCuGKy6'
+        '$2b$12$Vr5p/mTdYLOxjSzCj0bdV.YpJCQAz5mkYZBS/8wSX5HAwf8etbzUe'
     ),
     (
         3,
-        '$2b$12$.2k0jdsNjg6J/lcZL1WBkej85pFdSTq2NWdFBjPgfZ7EXjAbjoSei'
+        '$2b$12$fUC/WbD0gQMAyAvpPveD5.AZSh9uTQWmHScILf8jl00L5lH7uSTAK'
     );
 
 INSERT INTO

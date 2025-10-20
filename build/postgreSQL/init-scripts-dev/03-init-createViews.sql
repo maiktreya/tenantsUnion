@@ -49,9 +49,12 @@ SELECT
     n.id,
     n.nombre AS "Nodo Territorial",
     n.descripcion AS "Descripcion",
+    COUNT(DISTINCT p.id) AS "Num. Pisos",
     COUNT(DISTINCT b.id) AS "Num. Bloques",
-    COUNT(DISTINCT e.id) AS "Num. Empresas Activas",
-    COUNT(DISTINCT a.id) AS "Num. Afiliadas",
+    COUNT(DISTINCT a.id) FILTER (
+        WHERE a.estado = 'Alta') AS "Afiliadas Alta",
+    COUNT(DISTINCT a.id) FILTER (
+        WHERE a.estado = 'Alta' AND f.cuota > 0) AS "Afiliadas con Cuota",
     COUNT(DISTINCT c.id) AS "Total Conflictos",
     COUNT(DISTINCT c.id) FILTER (
         WHERE a.estado = 'Alta' AND c.estado = 'Abierto'
@@ -60,12 +63,11 @@ FROM nodos n
     LEFT JOIN nodos_cp_mapping ncm ON n.id = ncm.nodo_id
     LEFT JOIN pisos p ON p.cp = ncm.cp
     LEFT JOIN bloques b ON p.bloque_id = b.id
-    LEFT JOIN empresas e ON b.empresa_id = e.id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN conflictos c ON a.id = c.afiliada_id
+    LEFT JOIN facturacion f ON a.id = f.afiliada_id
 GROUP BY n.id, n.nombre, n.descripcion
-ORDER BY "Num. Afiliadas" DESC;
-
+ORDER BY "Afiliadas Alta" DESC;
 -- ---------------------------------------------------------------------
 -- VISTA: v_conflictos_detalle
 -- ---------------------------------------------------------------------
