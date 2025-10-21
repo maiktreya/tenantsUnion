@@ -63,7 +63,6 @@ TABLE_INFO = {
         "fields": ["direccion", "empresa_id"],
         "relations": {
             "empresa_id": {"view": "empresas", "display_field": "nombre"},
-            "nodo_id": {"view": "nodos", "display_field": "nombre"},
         },
         "child_relations": [
             {
