@@ -1,4 +1,4 @@
-# Sistema de Gestión para el Sindicato de Inquilinas de Madrid
+# Sistema de Gestión para el Sindicato de Inquilinas
 
 [<img src="https://img.shields.io/badge/English-1f425f.svg" alt="Read in English">](./readme.en.md)
 
