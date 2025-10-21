@@ -23,4 +23,7 @@ htmlcov/
 # other local folders & files
 back
 dev
+build/nginx
 build/nginx/certbot/
+# BUT, do NOT ignore the nginx.conf.template file inside it
+!build/nginx/nginx.conf.template
