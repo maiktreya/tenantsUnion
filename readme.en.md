@@ -1,4 +1,4 @@
-# Management System for the Madrid Tenants' Union
+# Management System for a Tenants Union
 
 [<img src="https://img.shields.io/badge/Español-1f425f.svg" alt="Leer en Español">](./readme.md)
 
