@@ -1,6 +1,6 @@
 # Sistema de Gestión para el Sindicato de Inquilinas de Madrid
 
-[](https://www.google.com/search?q=https://github.com/maiktreya/tenantsUnion/actions/workflows/ci.yml)
+[<img src="https://img.shields.io/badge/English-1f425f.svg" alt="Read in English">](./readme.en.md)
 
 Este proyecto es una aplicación web de escritorio desarrollada para facilitar la gestión interna de la información del **Sindicato de Inquilinas e Inquilinos**. La interfaz, construida con **NiceGUI**, ofrece una experiencia de usuario rápida y reactiva para interactuar con una base de datos PostgreSQL a través de una API RESTful generada automáticamente con **PostgREST**.
 
@@ -185,6 +185,18 @@ Para más información, consulta la [documentación oficial de PostgREST](https:
 - **Contraseñas Seguras:** Las contraseñas se almacenan hasheadas utilizando bcrypt.
 - **Gestión de Secretos:** No hay claves ni secretos hardcodeados. Todo se gestiona a través de `.env`, que está excluido por `.gitignore`.
 
+## 🧪 Pruebas
+
+El proyecto cuenta con una suite de pruebas automatizadas para garantizar la calidad y estabilidad del código. Las pruebas cubren desde la consistencia entre la BBDD y el metadata de config.py hasta flujos completos de la interfaz de usuario. Para ejecutar la suite de pruebas completa, utiliza el siguiente comando:
+
+```bash
+pytest --cov
+```
+
+Para obtener una guía detallada sobre cómo configurar el entorno de pruebas y ejecutar diferentes tipos de tests, consulta el documento [guía de testeo](https://github.com/maiktreya/tenantsUnion/blob/main/doc/testing.md).
+
+---
+
 ## 🗺️ Hoja de Ruta (Roadmap)
 
 Planes de mejora y futuras implementaciones:
@@ -205,4 +217,4 @@ Planes de mejora y futuras implementaciones:
 
 Este proyecto está licenciado bajo la [GNU General Public License v3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.html). Además, el contenido y la documentación asociada se distribuyen bajo una licencia [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).
 
-21-10-2025 @maiktreya
+2025-10-21 @maiktreya
