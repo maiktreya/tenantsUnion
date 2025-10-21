@@ -11,8 +11,6 @@
 
 SET search_path TO sindicato_inq, public;
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
 -- =====================================================================
 -- LISTADO DE VISTAS DISPONIBLES EN LA INTERFAZ NICEGUI
 -- (Definidas en build/niceGUI/config.py)
