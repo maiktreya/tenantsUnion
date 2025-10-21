@@ -1,29 +1,30 @@
-# Python bytecode
+# Production environment single file
+.env
+
+# Python bytecode and caches
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.pyc.*
-*.pyo.*
-*.pyd.*
+.pytest_cache/
+.coverage
 
-# Environment and IDE
-.venv
-.vscode
-.pytest_cache
-.env
+# Environment and IDE specific
+.venv/
+.vscode/
 
 # Application storage and generated data
 .nicegui/
 storage/
 screenshots/
 htmlcov/
-.coverage
 
-# other local folders & files
-back
-dev
-build/nginx
-build/nginx/certbot/
-# BUT, do NOT ignore the nginx.conf.template file inside it
+# Other local folders & files
+back/
+dev/
+
+# Ignore the build/nginx directory...
+build/nginx/
+
+# ...BUT keep the template file inside it.
 !build/nginx/nginx.conf.template
