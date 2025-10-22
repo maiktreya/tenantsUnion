@@ -18,14 +18,10 @@ class ViewsExplorerView(BaseView):
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-
-        # --- STATE REFACTOR ---
         # Get or create the state from the client's (per-tab) storage.
         if "views_explorer_state" not in app.storage.client:
             app.storage.client["views_explorer_state"] = GenericViewState()
         self.state: GenericViewState = app.storage.client["views_explorer_state"]
-        # --- END REFACTOR ---
-
         self.select_view = None
         self.data_table_container = None
         self.detail_container = None
