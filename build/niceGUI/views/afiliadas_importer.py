@@ -46,14 +46,9 @@ class AfiliadasImporterView:
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-
-        # --- STATE REFACTOR ---
-        # Get or create the state from the client's (per-tab) storage.
         if "afiliadas_importer_state" not in app.storage.client:
             app.storage.client["afiliadas_importer_state"] = GenericViewState()
         self.state: GenericViewState = app.storage.client["afiliadas_importer_state"]
-        # --- END REFACTOR ---
-
         self.status_service = ImporterRecordStatusService(api_client)
 
         # UI-specific state and elements
@@ -179,9 +174,7 @@ class AfiliadasImporterView:
 
         self._failed_records = import_result.failed_snapshots
         self._last_import_log = import_result.log
-
         self._show_summary_dialog(import_result)
-
         self.state.set_records([])
         self._render_all_panels()
 
@@ -243,8 +236,6 @@ class AfiliadasImporterView:
 
             ui.button("Cerrar", on_click=summary_dialog.close).classes("mt-4 self-end")
         summary_dialog.open()
-
-    # ====================================================================
 
     def _open_failed_records_preview(self):
         """Open dialog listing failed records from the last import attempt."""
