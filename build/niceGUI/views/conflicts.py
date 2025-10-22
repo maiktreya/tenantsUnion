@@ -18,16 +18,12 @@ class ConflictsView(BaseView):
     def __init__(self, api_client: APIClient, state: AppState):
         self.api = api_client
         self.global_state = state  # For read-only global data like nodos
-
-        # Get or create the state from the client's (per-tab) storage.
         if "conflicts_view_state" not in app.storage.client:
             # Initialize the state object for this tab
             client_state = GenericViewState()
             client_state.history = []  # Add custom attribute for this view
             app.storage.client["conflicts_view_state"] = client_state
         self.state: GenericViewState = app.storage.client["conflicts_view_state"]
-
-        # UI elements
         self.history_container = None
         self.info_container = None
         self.conflict_select = None
