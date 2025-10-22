@@ -20,15 +20,9 @@ class AdminView(BaseView):
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-
-        # --- STATE REFACTOR ---
-        # Instead of using a global singleton, we get or create the state
-        # from the client's (per-tab) storage.
         if 'admin_view_state' not in app.storage.client:
             app.storage.client['admin_view_state'] = GenericViewState()
         self.state: GenericViewState = app.storage.client['admin_view_state']
-        # --- END REFACTOR ---
-
         self.select_table = None
         self.data_table_container = None
         self.detail_container = None
