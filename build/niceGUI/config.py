@@ -16,7 +16,7 @@ class Config:
 
     def __post_init__(self):
         if self.PAGE_SIZE_OPTIONS is None:
-            self.PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100]
+               self.PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100]
 
 
 # =====================================================================
