@@ -1,5 +1,3 @@
-# build/niceGUI/main.py (Corrected)
-
 import os
 import logging
 import locale
@@ -264,7 +262,7 @@ async def shutdown_handler():
 if __name__ in {"__main__", "__mp_main__"}:
     # Set the locale for the entire application to Spanish
     try:
-        locale.setlocale(locale.LC_ALL, "es_ES.UTF-8")  # <-- ADD THIS LINE
+        locale.setlocale(locale.LC_ALL, "es_ES.UTF-8")
     except locale.Error:
         print("Spanish locale not found, falling back to default.")
 
