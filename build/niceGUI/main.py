@@ -1,52 +1,66 @@
 import os
 import logging
 import locale
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+
 from nicegui import ui, app
-
-from logging_config import setup_logging
-from config import config
-
-setup_logging()
-
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from logging_config import setup_logging
+from config import config
 from api.client import APIClient
-
 from state.app_state import AppState
-
 from views.home import HomeView
 from views.admin import AdminView
 from views.views_explorer import ViewsExplorerView
 from views.conflicts import ConflictsView
 from views.afiliadas_importer import AfiliadasImporterView
-
 from auth.login import create_login_page
 from auth.user_management import UserManagementView
 from auth.user_profile import UserProfileView
 
+setup_logging()
 log = logging.getLogger(__name__)
+
 unrestricted_page_routes = {"/login"}
 
-
 # =====================================================================
-# AUTHENTICATION MIDDLEWARE
+# AUTHENTICATION MIDDLEWARE WITH EXPIRATION CHECK
 # =====================================================================
-
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Allow static and unrestricted routes
         if (
             request.url.path.startswith("/_nicegui")
             or request.url.path in unrestricted_page_routes
         ):
             return await call_next(request)
-        if not app.storage.user.get("authenticated", False):
+
+        user = app.storage.user
+
+        # User not logged in → redirect
+        if not user.get("authenticated", False):
             return RedirectResponse(f"/login?redirect_to={request.url.path}")
+
+        # Check session expiration
+        login_time_str = user.get("login_time")
+        if login_time_str:
+            try:
+                login_time = datetime.fromisoformat(login_time_str)
+                if datetime.now(timezone.utc) - login_time > timedelta(hours=3):
+                    log.info(f"Session expired for user {user.get('username')}")
+                    user.clear()
+                    return RedirectResponse("/login?session_expired=1")
+            except Exception as e:
+                log.warning(f"Invalid login_time format: {e}")
+                user.clear()
+                return RedirectResponse("/login")
+
         return await call_next(request)
 
 
@@ -55,7 +69,6 @@ app.add_middleware(AuthMiddleware)
 # =====================================================================
 # MAIN APPLICATION CLASS
 # =====================================================================
-
 
 class Application:
     def __init__(self, api_client: APIClient, state: AppState):
@@ -80,9 +93,7 @@ class Application:
                 "v_afiliadas_detalle", limit=5000
             )
             self.state.all_afiliadas_options = {
-                r[
-                    "id"
-                ]: f'{r.get("Nombre", "")} {r.get("Apellidos", "")} (ID: {r.get("id")})'
+                r["id"]: f'{r.get("Nombre", "")} {r.get("Apellidos", "")} (ID: {r.get("id")})'
                 for r in records
             }
             log.info("Global application state initialized successfully.")
@@ -115,7 +126,6 @@ class Application:
                     "text-xl font-italic text-gray-400"
                 )
                 ui.space()
-
                 with ui.row().classes("gap-2"):
                     if self.has_role("admin", "sistemas"):
                         ui.button(
@@ -137,9 +147,7 @@ class Application:
                         ui.button(
                             "Conflictos", on_click=lambda: self.show_view("conflicts")
                         ).props("flat color=red-600")
-
                 ui.space()
-
                 with ui.row().classes("items-center"):
                     username = app.storage.user.get("username", "...")
                     roles = ", ".join(app.storage.user.get("roles", []))
@@ -161,6 +169,7 @@ class Application:
                         "flat dense round color=red-600"
                     ).tooltip("Cerrar sesión")
 
+        # Sticky header + hide-on-scroll effect
         ui.add_head_html(
             """
             <style>
@@ -223,7 +232,6 @@ class Application:
         if self.api_client:
             await self.api_client.close()
 
-
 # =====================================================================
 # INITIALIZATION OF GLOBAL INSTANCES
 # =====================================================================
@@ -232,15 +240,13 @@ api_singleton = APIClient(config.API_BASE_URL)
 app_state_init = AppState()
 app_instance: Optional[Application] = None
 
-
 # =====================================================================
 # MAIN APP USER ENTRY POINT
 # =====================================================================
 
-
 @ui.page("/")
 def main_page_entry():
-    # Entry point for a new user session. (configure session-specific settings)
+    # Entry point for a new user session
     app.storage.user.lifetime = timedelta(hours=3)
     log.info(f"User session lifetime set to {app.storage.user.lifetime}")
     global app_instance
@@ -248,19 +254,37 @@ def main_page_entry():
     ui.timer(0.2, app_instance.initialize_global_data, once=True)
     app_instance.create_header()
     app_instance.create_views()
+    
+def custom_create_login_page(api_client: APIClient):
+    """Wraps your existing login logic to also record login time."""
+    page = create_login_page(api_client=api_client)
 
+    @ui.page("/login")
+    def login_page(request: Request):
+        from urllib.parse import parse_qs, urlparse
+        params = parse_qs(urlparse(str(request.url)).query)
+        if "session_expired" in params:
+            ui.notify("Tu sesión ha expirado por inactividad.", type="warning")
+        page(request)
+        ui.timer(1.0, lambda: _set_login_time_if_authenticated(), once=True)
 
-create_login_page(api_client=api_singleton)
+    def _set_login_time_if_authenticated():
+        if app.storage.user.get("authenticated"):
+            app.storage.user["login_time"] = datetime.now(timezone.utc).isoformat()
+            log.info(f"Login time set for user {app.storage.user.get('username')}")
 
+custom_create_login_page(api_singleton)
 
 @app.on_shutdown
 async def shutdown_handler():
     if app_instance:
         await app_instance.cleanup()
 
+# =====================================================================
+# APP STARTUP
+# =====================================================================
 
 if __name__ in {"__main__", "__mp_main__"}:
-    # Set the locale for the entire application to Spanish
     try:
         locale.setlocale(locale.LC_ALL, "es_ES.UTF-8")
     except locale.Error:
