@@ -34,7 +34,7 @@ unrestricted_page_routes = {"/login"}
 
 
 # =====================================================================
-# AUTHENTICATION MIDDLEWARE  (adds server-side 3h expiration)
+# AUTHENTICATION MIDDLEWARE  (restricts routes & adds server-side 3h expiration)
 # =====================================================================
 
 
