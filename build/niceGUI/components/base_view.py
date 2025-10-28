@@ -38,7 +38,6 @@ class BaseView:
         if hasattr(self, "detail_container") and self.detail_container:
             self.detail_container.clear()
 
-        # --- THIS IS THE FIX ---
         # Programmatically set the value to None. This will trigger the on_change event,
         # which correctly handles clearing the view.
         if hasattr(self, "select_view") and self.select_view:
