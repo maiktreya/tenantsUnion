@@ -96,9 +96,7 @@ class Application:
                 "v_afiliadas_detalle", limit=5000
             )
             self.state.all_afiliadas_options = {
-                r[
-                    "id"
-                ]: f'{r.get("Nombre", "")} {r.get("Apellidos", "")} (ID: {r.get("id")})'
+                r["id"]: f'{r.get("Nombre Completo", "")} (ID: {r.get("id")})'
                 for r in records
             }
             log.info("Global application state initialized successfully.")
