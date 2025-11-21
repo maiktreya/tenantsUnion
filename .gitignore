@@ -22,6 +22,7 @@ htmlcov/
 # Other local folders & files
 back/
 dev/
+logs/
 
 # Ignore the build/nginx directory...
 build/nginx/
