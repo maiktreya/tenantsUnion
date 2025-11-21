@@ -10,17 +10,36 @@
 # 3. Or run manually: ./renew-certificates.sh
 # ========================================================================================
 
-# Change to script directory
-cd "$(dirname "$0")"
+# Resolve script and repo paths
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+repo_root="$(cd "$script_dir/../.." && pwd)"
 
-# Load environment variables
-if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+# Load HOSTNAME and DUCKDNS_TOKEN from repository .env (if present)
+# We extract only the keys we need to avoid executing any command substitutions
+if [ -f "$repo_root/.env" ]; then
+    # extract HOSTNAME
+    hn=$(grep -E '^HOSTNAME=' "$repo_root/.env" | sed 's/^HOSTNAME=//') || hn=''
+    # extract DUCKDNS_TOKEN
+    dt=$(grep -E '^DUCKDNS_TOKEN=' "$repo_root/.env" | sed 's/^DUCKDNS_TOKEN=//') || dt=''
+
+    # remove optional surrounding quotes
+    hn="${hn%\"}"
+    hn="${hn#\"}"
+    hn="${hn%\'}"
+    hn="${hn#\'}"
+    dt="${dt%\"}"
+    dt="${dt#\"}"
+    dt="${dt%\'}"
+    dt="${dt#\'}"
+
+    [ -n "$hn" ] && export HOSTNAME="$hn"
+    [ -n "$dt" ] && export DUCKDNS_TOKEN="$dt"
 fi
 
 domain="${HOSTNAME:-inquilinato.duckdns.org}"
 duckdns_token="${DUCKDNS_TOKEN}"
-data_path="/home/other/github/prod/tenantsUnion/build/nginx/certbot"
+# data_path should be absolute to the certbot files in the repo
+data_path="$repo_root/build/nginx/certbot"
 
 echo "$(date): Starting certificate renewal check for $domain"
 
@@ -35,13 +54,15 @@ echo "dns_duckdns_token = $duckdns_token" > "$data_path/duckdns_credentials.ini"
 chmod 600 "$data_path/duckdns_credentials.ini"
 
 # Attempt renewal
+# Run docker compose from repository root so compose file and mounts resolve
+cd "$repo_root"
 docker compose run --rm --entrypoint "\
     certbot renew \
-    --dns-duckdns \
+    --authenticator dns-duckdns \
     --dns-duckdns-credentials /etc/letsencrypt/duckdns_credentials.ini \
     --dns-duckdns-propagation-seconds 120 \
     --non-interactive" \
-    -v "$PWD/$data_path/duckdns_credentials.ini:/etc/letsencrypt/duckdns_credentials.ini:ro" \
+    -v "$data_path/duckdns_credentials.ini:/etc/letsencrypt/duckdns_credentials.ini:ro" \
     certbot
 
 if [ $? -eq 0 ]; then
