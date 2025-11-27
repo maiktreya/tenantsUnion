@@ -6,16 +6,16 @@ This guide explains how to run the application on your local machine for develop
 
 Before running the application, configure your .env file for a development environment. This ensures you're using the correct database scripts and port settings.
 
-Open your  `.env` file and make sure the following variables are set:
+Open your `.env` file and make sure the following variables are set:
 
-* For development data (artificial, from a single SQL file):
-`INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev`
+- For development data (artificial, from a single SQL file):
+  `INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev`
 
-* For direct access on <http://localhost:8081>:
+- For direct access on <http://localhost:8081>:
 
-* `INIT_SCRIPTS_PATH`: This points to the directory containing the artificial_data.sql script, which will populate the database with safe, fictional data.
+- `INIT_SCRIPTS_PATH`: This points to the directory containing the artificial_data.sql script, which will populate the database with safe, fictional data.
 
-* `DEV_MODE`: If set to true makes niceGUI bind mount "rw". If left blank the default for the folder is a more secure "ro".
+- `DEV_MODE`: If set to true makes niceGUI bind mount "rw". If left blank the default for the folder is a more secure "ro".
 
 ## 2. Exposing ports externally
 
@@ -44,7 +44,7 @@ Build the necessary Docker images if they don't exist.
 
 Start the **db**, **server**, and **nicegui-app** services in the background (-d). exposing DB/Frontend ports.
 
-The db service will automatically run the script specified by  `INIT_SCRIPTS_PATH`, creating the schema and populating it with artificial data in case `build/postgreSQL/init-scripts-dev/artificial_data.sql` is used.
+The db service will automatically run the script specified by `INIT_SCRIPTS_PATH`, creating the schema and populating it with artificial data in case `build/postgreSQL/init-scripts-dev/artificial_data.sql` is used.
 
 ## 4. Accessing the Application layers
 
@@ -70,6 +70,14 @@ postgresql://app_user:password@localhost:5432/mydb?search_path=sindicato_inq
 
 There are three three basic roles available. The user credentials are the role name itself and the password "inquidb2025":
 
-* **admin**: Full access to all tables and functions.
-* **gestor**: Access to conflicts, afiliadas_importer & views module.
-* **actas**: Access limited to the conflicts module.
+- **admin**: Full access to all tables and functions.
+- **gestor**: Access to conflicts, afiliadas_importer & views module.
+- **actas**: Access limited to the conflicts module.
+
+## 6. Forcing stop and cleaning
+
+From your project´s root run the following to stop & remove all the containers and images afterwads:
+
+```bash
+docker compose --profile Frontend down -v && docker system prune -a --volumes -f
+```
