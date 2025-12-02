@@ -1,5 +1,6 @@
 # Production environment single file
 .env
+.wsl_env
 
 # Python bytecode and caches
 __pycache__/
