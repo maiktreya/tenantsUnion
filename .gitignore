@@ -19,6 +19,7 @@ __pycache__/
 storage/
 screenshots/
 htmlcov/
+unittest-cpp/
 
 # Other local folders & files
 back/
