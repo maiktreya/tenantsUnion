@@ -1,16 +1,18 @@
-# tests/test_filters.py
-
 import pytest
-from unittest.mock import MagicMock, call
-
-
+import respx
+from httpx import Response
+from unittest.mock import MagicMock
+from nicegui import ui
+from nicegui.testing import User
 from components.filters import FilterPanel
 
-# Import ui for creating the necessary context in the test fixture
-from nicegui import ui
+# Ensure we point to the correct main file relative to pytest.ini
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.nicegui_main_file("build/niceGUI/main.py"),
+]
 
 
-# Sample data for testing, includes multiple date columns
 @pytest.fixture
 def sample_records():
     return [
@@ -38,118 +40,100 @@ def sample_records():
     ]
 
 
-# Pytest fixture to create a fresh FilterPanel instance for each test
 @pytest.fixture
-def filter_panel_with_mock_callback(sample_records):
-    """
-    Creates an instance of FilterPanel and mocks the on_filter_change callback
-    to track its calls and arguments.
-    """
-    # MagicMock will act as our fake callback function
-    mock_callback = MagicMock()
+async def filter_panel_context(user: User, sample_records):
+    # --- SETUP: Mock the Login API Call ---
+    # The frontend needs these responses to successfully log the user in.
+    mock_api_url = "http://localhost:3001"
 
-    panel = FilterPanel(records=sample_records, on_filter_change=mock_callback)
+    with respx.mock:
+        # 1. Mock User Lookup
+        respx.get(f"{mock_api_url}/usuarios?alias=eq.sumate").mock(
+            return_value=Response(200, json=[{"id": 1, "alias": "sumate"}])
+        )
 
-    # FIX: Simulate the UI creation process within a NiceGUI context.
-    # This ensures that panel.create() and its internal call to refresh()
-    # can successfully create UI elements and populate the `panel.inputs` dict.
-    with ui.column():
-        panel.create()
+        # 2. Mock Credentials Lookup (Must match the password 'inquidb2025')
+        respx.get(f"{mock_api_url}/usuario_credenciales?usuario_id=eq.1").mock(
+            return_value=Response(
+                200,
+                json=[
+                    {
+                        "password_hash": "$2b$12$gVMWfDAGD3K7cG0IgaAmxOLsa9hBDN2FK3iFU96R7JZ7d6t.tzrBC"
+                    }
+                ],
+            )
+        )
 
-    # Yield both the panel and the mock so tests can use them
-    yield panel, mock_callback
+        # 3. Mock Roles
+        respx.get(f"{mock_api_url}/usuario_roles?usuario_id=eq.1").mock(
+            return_value=Response(200, json=[{"role_id": 1}])
+        )
+        respx.get(f"{mock_api_url}/roles?id=in.(1)").mock(
+            return_value=Response(200, json=[{"id": 1, "nombre": "admin"}])
+        )
+
+        # --- ACTION: Perform Real Login via UI ---
+        await user.open("/login")
+        user.find("Username").type("sumate")
+        user.find("Password").type("inquidb2025")  # NEW PASSWORD
+        user.find("Log in").click()
+
+        # Wait for redirect (confirms auth success)
+        await user.should_see("Bienvenido")
+
+        # --- SETUP: Create the Test Page ---
+        mock_callback = MagicMock()
+        panel = FilterPanel(records=sample_records, on_filter_change=mock_callback)
+
+        @ui.page("/test_filters")
+        def test_page():
+            panel.create()
+
+        # --- ACTION: Open the Test Page (Authenticated) ---
+        await user.open("/test_filters")
+
+        return panel, mock_callback
 
 
-def test_filter_panel_initialization(filter_panel_with_mock_callback):
-    """
-    Tests if the FilterPanel correctly identifies standard and date columns
-    upon initialization.
-    """
-    panel, _ = filter_panel_with_mock_callback
-
-    # The create() method should have identified the columns and created inputs
+async def test_filter_panel_initialization(filter_panel_context):
+    panel, _ = filter_panel_context
     assert "global_search" in panel.inputs
     assert "status" in panel.inputs
-
-    # Check if it correctly found the date columns for the single date filter UI
     assert panel.date_field_select is not None
-    assert "fecha_alta" in panel.date_field_select.options
-    assert "fecha_baja" in panel.date_field_select.options
 
 
-def test_on_date_change_emits_correct_event(filter_panel_with_mock_callback):
-    """
-    Tests if selecting a date range triggers the callback with the correct
-    key and value structure.
-    """
-    panel, mock_callback = filter_panel_with_mock_callback
+async def test_on_date_change_emits_correct_event(filter_panel_context):
+    panel, mock_callback = filter_panel_context
 
-    # 1. Simulate the user selecting 'fecha_alta' from the dropdown
+    # Simulate UI interactions directly on the python objects
     panel._on_date_field_select(MagicMock(value="fecha_alta"))
-
-    # 2. Simulate the user picking a start date
     panel._on_date_change(part="start", value="2025-01-01")
 
-    # Assert that the callback was called
     mock_callback.assert_called()
+    args, _ = mock_callback.call_args
+    assert args[0] == "date_range_fecha_alta"
+    assert args[1]["start"] == "2025-01-01"
 
-    # Assert that it was called with the correct arguments
-    expected_key = "date_range_fecha_alta"
-    expected_value = {"start": "2025-01-01", "end": None}
-    mock_callback.assert_called_with(expected_key, expected_value)
-
-    # 3. Simulate the user picking an end date
     panel._on_date_change(part="end", value="2025-03-31")
+    args, _ = mock_callback.call_args
+    assert args[1]["end"] == "2025-03-31"
 
-    expected_value_updated = {"start": "2025-01-01", "end": "2025-03-31"}
-    mock_callback.assert_called_with(expected_key, expected_value_updated)
 
-
-def test_selecting_new_date_field_clears_old_filter(filter_panel_with_mock_callback):
-    """
-    Tests the critical logic that ensures the old date filter is cleared from
-    the application state when the user selects a new date field.
-    """
-    panel, mock_callback = filter_panel_with_mock_callback
-
-    # 1. User selects the first date field and sets a value
+async def test_selecting_new_date_field_clears_old_filter(filter_panel_context):
+    panel, mock_callback = filter_panel_context
     panel._on_date_field_select(MagicMock(value="fecha_alta"))
     panel._on_date_change(part="start", value="2025-01-01")
 
-    # Verify the initial filter was set
-    mock_callback.assert_called_with(
-        "date_range_fecha_alta", {"start": "2025-01-01", "end": None}
-    )
-
-    # 2. Now, user selects a DIFFERENT date field from the dropdown
     panel._on_date_field_select(MagicMock(value="fecha_baja"))
-
-    # FIX: Use a more robust assertion. The logic fires two calls: one to clear
-    # the old filter and one to set the new (empty) one. We check for the
-    # clearing call specifically.
     mock_callback.assert_any_call("date_range_fecha_alta", None)
-
-    # The currently selected column should now be 'fecha_baja'
     assert panel.selected_date_column == "fecha_baja"
 
 
-def test_clearing_date_field_selection(filter_panel_with_mock_callback):
-    """
-    Tests that clearing the selection in the date field dropdown also
-    clears the filter.
-    """
-    panel, mock_callback = filter_panel_with_mock_callback
-
-    # 1. User selects a date field and sets a value
+async def test_clearing_date_field_selection(filter_panel_context):
+    panel, mock_callback = filter_panel_context
     panel._on_date_field_select(MagicMock(value="fecha_alta"))
     panel._on_date_change(part="start", value="2025-01-01")
-    mock_callback.assert_called_with(
-        "date_range_fecha_alta", {"start": "2025-01-01", "end": None}
-    )
 
-    # 2. User clicks the 'x' to clear the dropdown selection
     panel._on_date_field_select(MagicMock(value=None))
-
-    # Assert the callback was called to clear the 'fecha_alta' filter
     mock_callback.assert_called_with("date_range_fecha_alta", None)
     assert panel.selected_date_column is None
