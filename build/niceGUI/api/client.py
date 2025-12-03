@@ -120,76 +120,24 @@ class APIClient:
         addresses: List[Dict[str, Any]],
         score_limit: float = 0.88,
     ) -> List[Dict[str, Any]]:
-        """Batch fuzzy matching of piso addresses to bloques."""
+        """
+        Batch fuzzy matching of addresses.
+        Delegates strictly to the DB RPC function. No local python fallback.
+        """
         if not addresses:
             return []
-
+    
         payload = {"p_addresses": addresses, "p_score_limit": score_limit}
-        result = await self.call_rpc("rpc_get_bloque_suggestions", payload, timeout=5.0)
-
+        # Direct call to the "Brain" (PostgreSQL)
+        result = await self.call_rpc("rpc_get_bloque_suggestions", payload, timeout=10.0)
+    
         if result:
-            if isinstance(result, list):
-                return result
-            if isinstance(result, dict):
-                return [result]
-
-        try:
-            bloques = await self.get_records("bloques", limit=2000)
-            if not bloques:
-                return []
-
-            def _normalize(addr: Optional[str]) -> str:
-                if not addr:
-                    return ""
-                parts = [p.strip() for p in str(addr).split(",") if p.strip()]
-                norm = ", ".join(parts[:2]).lower()
-                return norm
-
-            normalized_bloques = [
-                {
-                    "id": b.get("id"),
-                    "direccion": b.get("direccion", ""),
-                    "norm": _normalize(b.get("direccion")),
-                }
-                for b in bloques
-            ]
-
-            suggestions: List[Dict[str, Any]] = []
-            for item in addresses:
-                idx = item.get("index") if "index" in item else item.get("piso_id")
-                direccion = item.get("direccion")
-                norm_src = _normalize(direccion)
-                best = None
-                best_score = 0.0
-                for b in normalized_bloques:
-                    s = SequenceMatcher(None, norm_src, b["norm"]).ratio()
-                    if s > best_score:
-                        best_score = s
-                        best = b
-                if best and best_score >= float(score_limit):
-                    suggestions.append(
-                        {
-                            "piso_id": idx,
-                            "piso_direccion": direccion,
-                            "suggested_bloque_id": best["id"],
-                            "suggested_bloque_direccion": best["direccion"],
-                            "suggested_score": best_score,
-                        }
-                    )
-                else:
-                    suggestions.append(
-                        {
-                            "piso_id": idx,
-                            "piso_direccion": direccion,
-                            "suggested_bloque_id": None,
-                            "suggested_bloque_direccion": None,
-                            "suggested_score": None,
-                        }
-                    )
-            return suggestions
-        except Exception:
-            return []
-
+            return result if isinstance(result, list) else [result]
+        
+        # If the DB doesn't answer, the feature is unavailable. 
+        # Do not attempt to replicate DB logic in Python memory.
+        return []
+    
     async def guess_bloque(
         self, direccion: str, score_limit: float = 0.88
     ) -> Optional[int]:
