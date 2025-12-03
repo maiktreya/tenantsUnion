@@ -252,13 +252,13 @@ app_instance: Optional[Application] = None
 
 
 @ui.page("/")
-def main_page_entry():
+async def main_page_entry():
     # Entry point for a new user session. (configure session-specific settings)
     app.storage.user.lifetime = timedelta(hours=3)
     log.info(f"User session lifetime set to {app.storage.user.lifetime}")
     global app_instance
     app_instance = Application(api_client=api_singleton, state=app_state_init)
-    ui.timer(0.2, app_instance.initialize_global_data, once=True)
+    await app_instance.initialize_global_data()
     app_instance.create_header()
     app_instance.create_views()
 
