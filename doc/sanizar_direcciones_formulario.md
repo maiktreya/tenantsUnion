@@ -1,26 +1,30 @@
 # 🛠️ Guía de Implementación: "Autocompletado Limpio"
 
----
----
+## Objetivo
 
-Objetivo: Evitar que Google rellene el Distrito (ej: "Centro", "Chamberí") en el campo de dirección para prevenir duplicados en la base de datos. Resultado UX: Cuando la usuaria selecciona una dirección sugerida, el campo se reescribe instantáneamente mostrando solo Calle y Número.
+Evitar que Google rellene el Distrito (ej: "Centro", "Chamberí") en el campo de dirección para prevenir duplicados en la base de datos. 
+
+**Resultado UX:** Cuando la usuaria selecciona una dirección sugerida, el campo se reescribe instantáneamente mostrando solo Calle y Número.
+
+---
 
 ## Paso 1: La Herramienta (Sin tocar archivos)
+
 Dado que usáis Avada y WordPress, la forma más segura y ordenada de añadir este comportamiento sin romper la web es usar un plugin de gestión de scripts.
 
-En el panel de WordPress, ve a Plugins > Añadir nuevo.
+1. En el panel de WordPress, ve a **Plugins > Añadir nuevo**
+2. Busca e instala: **WPCode** (antes conocido como "Insert Headers and Footers")
+3. Actívalo
 
-Busca e instala: WPCode (antes conocido como "Insert Headers and Footers").
+> **Nota:** Si ya tenéis una herramienta para insertar código en el "Header/Footer" o usáis las opciones de "Custom JS" de Avada, podéis saltar este paso, pero WPCode es más seguro para gestionar esto.
 
-Actívalo.
-
-(Nota: Si ya tenéis una herramienta para insertar código en el "Header/Footer" o usáis las opciones de "Custom JS" de Avada, podéis saltar este paso, pero WPCode es más seguro para gestionar esto).
+---
 
 ## Paso 2: El Código (Copiar y Pegar)
+
 Este es el bloque de Javascript listo para usar. No necesita modificación. Detecta automáticamente cuando Google intenta rellenar el campo y "limpia" la dirección antes de que la usuaria se dé cuenta.
 
-```{js}
-<script type="text/javascript">
+```javascript
 /**
  * Sindicato de Inquilinas - Sanitización de Direcciones en Frontend
  * Objetivo: Eliminar el 'Distrito' (ej: Centro) de la sugerencia de Google Maps.
@@ -76,47 +80,47 @@ jQuery(document).on('gform_post_render', function(event, form_id, current_page){
         }
     }, 500); // Medio segundo de espera para asegurar carga
 });
+```
+
+---
+
+## Paso 3: Configuración Visual
+
+1. Ve al menú **Code Snippets** (o WPCode) en la barra lateral izquierda del admin
+2. Haz clic en **+ Add New** (Añadir nuevo)
+3. Selecciona **"Add Your Custom Code (New Snippet)"**
+4. **Título:** Ponle algo reconocible, ej: `JS - Limpieza Direcciones Google Maps`
+5. **Code Type:** Selecciona **HTML Snippet** a la derecha (porque el código incluye las etiquetas `<script>`)
+6. **Code Preview:** Pega el código del Paso 2 **completo**, envuelto en etiquetas `<script>`:
+
+```html
+<script type="text/javascript">
+// Pega aquí todo el código JavaScript del Paso 2
 </script>
 ```
 
+7. **Insertion (Importante):**
+   - **Location:** Site Wide Footer (Pie de página)
+   - **Razón UX/Perf:** Esto asegura que el formulario ya existe antes de intentar modificarlo, evitando errores de carga
 
-## Paso 3: Configuración Visual
-Ve al menú Code Snippets (o WPCode) en la barra lateral izquierda del admin.
+8. Dale al interruptor de **"Inactive"** a **Active** y guarda
 
-Haz clic en + Add New (Añadir nuevo).
-
-Selecciona "Add Your Custom Code (New Snippet)".
-
-Título: Ponle algo reconocible, ej: JS - Limpieza Direcciones Google Maps.
-
-Code Type: Selecciona HTML Snippet a la derecha (porque el código incluye las etiquetas <script>).
-
-Code Preview: Pega el código del Paso 2 en la caja negra.
-
-Insertion (Importante):
-
-Location: Site Wide Footer (Pie de página).
-
-Razón UX/Perf: Esto asegura que el formulario ya existe antes de intentar modificarlo, evitando errores de carga.
-
-Dale al interruptor de "Inactive" a Active y guarda.
+---
 
 ## Paso 4: Test de Calidad (QA)
+
 Para que la responsable de UX verifique que funciona, solo tiene que hacer esta prueba:
 
-Abrir el formulario de afiliación en modo incógnito.
+1. Abrir el formulario de afiliación en **modo incógnito**
+2. En el campo "Dirección", escribir: `Calle del Pez 3`
+3. Google sugerirá: **"Calle del Pez, 3, Centro, 28004 Madrid"**
+4. Hacer clic en esa sugerencia
+5. **Resultado esperado:** En el campo de texto, la palabra "Centro" debe desaparecer mágicamente y quedar solo: **"Calle del Pez, 3"**
 
-En el campo "Dirección", escribir: Calle del Pez 3.
+---
 
-Google sugerirá: "Calle del Pez, 3, Centro, 28004 Madrid".
+## ¿Por qué esto es mejor para UX?
 
-Hacer clic en esa sugerencia.
-
-Resultado esperado: En el campo de texto, la palabra "Centro" debe desaparecer mágicamente y quedar solo: "Calle del Pez, 3".
-
-¿Por qué esto es mejor para UX?
-Feedback Inmediato: La usuaria ve exactamente qué dirección se va a guardar.
-
-Menos Confusión: Al quitar el distrito, la dirección se ve más corta y "limpia", reduciendo la carga cognitiva visual.
-
-Consistencia: Todas las direcciones entrarán con el mismo formato estándar, facilitando la vida al equipo de datos después.
+- **Feedback Inmediato:** La usuaria ve exactamente qué dirección se va a guardar
+- **Menos Confusión:** Al quitar el distrito, la dirección se ve más corta y "limpia", reduciendo la carga cognitiva visual
+- **Consistencia:** Todas las direcciones entrarán con el mismo formato estándar, facilitando la vida al equipo de datos después
