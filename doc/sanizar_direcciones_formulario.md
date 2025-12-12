@@ -19,7 +19,7 @@ Actívalo.
 ## Paso 2: El Código (Copiar y Pegar)
 Este es el bloque de Javascript listo para usar. No necesita modificación. Detecta automáticamente cuando Google intenta rellenar el campo y "limpia" la dirección antes de que la usuaria se dé cuenta.
 
-```{javascript}
+```{js}
 <script type="text/javascript">
 /**
  * Sindicato de Inquilinas - Sanitización de Direcciones en Frontend
