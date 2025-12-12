@@ -5,7 +5,7 @@
 
 Objetivo: Evitar que Google rellene el Distrito (ej: "Centro", "Chamberí") en el campo de dirección para prevenir duplicados en la base de datos. Resultado UX: Cuando la usuaria selecciona una dirección sugerida, el campo se reescribe instantáneamente mostrando solo Calle y Número.
 
-Paso 1: La Herramienta (Sin tocar archivos)
+## Paso 1: La Herramienta (Sin tocar archivos)
 Dado que usáis Avada y WordPress, la forma más segura y ordenada de añadir este comportamiento sin romper la web es usar un plugin de gestión de scripts.
 
 En el panel de WordPress, ve a Plugins > Añadir nuevo.
@@ -16,10 +16,10 @@ Actívalo.
 
 (Nota: Si ya tenéis una herramienta para insertar código en el "Header/Footer" o usáis las opciones de "Custom JS" de Avada, podéis saltar este paso, pero WPCode es más seguro para gestionar esto).
 
-Paso 2: El Código (Copiar y Pegar)
+## Paso 2: El Código (Copiar y Pegar)
 Este es el bloque de Javascript listo para usar. No necesita modificación. Detecta automáticamente cuando Google intenta rellenar el campo y "limpia" la dirección antes de que la usuaria se dé cuenta.
 
-´´´JavaScript
+```{javascript}
 <script type="text/javascript">
 /**
  * Sindicato de Inquilinas - Sanitización de Direcciones en Frontend
@@ -77,9 +77,10 @@ jQuery(document).on('gform_post_render', function(event, form_id, current_page){
     }, 500); // Medio segundo de espera para asegurar carga
 });
 </script>
-´´´
+```
 
-Paso 3: Configuración Visual
+
+## Paso 3: Configuración Visual
 Ve al menú Code Snippets (o WPCode) en la barra lateral izquierda del admin.
 
 Haz clic en + Add New (Añadir nuevo).
@@ -100,7 +101,7 @@ Razón UX/Perf: Esto asegura que el formulario ya existe antes de intentar modif
 
 Dale al interruptor de "Inactive" a Active y guarda.
 
-Paso 4: Test de Calidad (QA)
+## Paso 4: Test de Calidad (QA)
 Para que la responsable de UX verifique que funciona, solo tiene que hacer esta prueba:
 
 Abrir el formulario de afiliación en modo incógnito.
