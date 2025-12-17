@@ -1,16 +1,16 @@
 # build/niceGUI/services/federation_courier.py
-import httpx
-
+import os
 from api.client import APIClient
 from config import config
+
+SATELLITE_URL = os.environ.get("SATELLITE_URL", "default-secret")
 
 api_singleton = APIClient(config.API_BASE_URL)
 
 
-async def run_sync_job(satellite_url, credentials):
-    async with httpx.AsyncClient() as client:
-        # 1. Transport: Get the raw data
-        # (Assuming you handle auth here briefly)
+async def run_sync_job(satellite_url):
+    # 1. Call Api Client
+    async with api_singleton as client:
         response = await client.get(f"{satellite_url}/rpc/get_public_companies")
         if response.status_code != 200:
             return
