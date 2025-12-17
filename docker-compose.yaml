@@ -27,6 +27,7 @@ services:
       PGRST_OPENAPI_MODE: disabled
       PGRST_DB_ANON_ROLE: ${POSTGRES_USER}
       PGRST_DB_SCHEMA: ${POSTGRES_DB_SCHEMA}
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET} # <--- Add this
     depends_on:
       db:
         condition: service_healthy

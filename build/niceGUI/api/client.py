@@ -1,7 +1,7 @@
 import httpx
 import logging
 from typing import Dict, List, Optional, Any, Tuple
-from nicegui import ui
+from nicegui import ui, app
 from api.validate import validator
 from difflib import SequenceMatcher
 
@@ -14,8 +14,8 @@ log = logging.getLogger(__name__)
 
 class APIClient:
     """
-    Enhanced PostgREST API client with config-driven validation and detailed error reporting.
-    Uses TABLE_INFO from config.py as the single source of truth.
+    Enhanced PostgREST API client with JWT injection, config-driven validation,
+    and detailed error reporting.
     """
 
     def __init__(self, base_url: str):
@@ -27,6 +27,31 @@ class APIClient:
         if self.client is None:
             self.client = httpx.AsyncClient(timeout=30.0)
         return self.client
+
+    def _get_auth_headers(self) -> Dict[str, str]:
+        """
+        Retrieves the JWT from the current user session to inject into the request.
+        
+        ROBUSTNESS STRATEGY:
+        - Tries to access 'app.storage.user', which is thread-local to the 
+          current websocket/request.
+        - Catches RuntimeError: If called from a background task or startup script 
+          (outside a user context), this fails safely.
+        - Returns: A dict with the Authorization header, or empty dict if no user.
+        """
+        try:
+            # "db_token" must match the key you set in your login logic
+            token = app.storage.user.get("db_token")
+            if token:
+                return {"Authorization": f"Bearer {token}"}
+        except RuntimeError:
+            # We are running outside of a page/request context (e.g., background job)
+            pass
+        except Exception as e:
+            # Log unexpected auth errors but don't crash the app
+            log.warning(f"Error retrieving auth token: {e}")
+            
+        return {}
 
     async def get_records(
         self,
@@ -49,8 +74,11 @@ class APIClient:
         if offset:
             params["offset"] = offset
 
+        # Inject Auth Headers
+        headers = self._get_auth_headers()
+
         try:
-            response = await client.get(url, params=params)
+            response = await client.get(url, params=params, headers=headers)
             response.raise_for_status()
             records = response.json()
 
@@ -91,8 +119,16 @@ class APIClient:
         client = self._ensure_client()
         url = f"{self.base_url}/rpc/{fn_name}"
 
+        # Inject Auth Headers
+        headers = self._get_auth_headers()
+
         try:
-            response = await client.post(url, json=payload or {}, timeout=timeout)
+            response = await client.post(
+                url, 
+                json=payload or {}, 
+                headers=headers, 
+                timeout=timeout
+            )
             response.raise_for_status()
             if response.text == "":
                 return None
@@ -122,20 +158,18 @@ class APIClient:
     ) -> List[Dict[str, Any]]:
         """
         Batch fuzzy matching of addresses.
-        Delegates strictly to the DB RPC function. No local python fallback.
+        Delegates strictly to the DB RPC function.
         """
         if not addresses:
             return []
     
         payload = {"p_addresses": addresses, "p_score_limit": score_limit}
-        # Direct call to the "Brain" (PostgreSQL)
+        # Direct call to the "Brain" (PostgreSQL) - Auth is handled inside call_rpc
         result = await self.call_rpc("rpc_get_bloque_suggestions", payload, timeout=10.0)
     
         if result:
             return result if isinstance(result, list) else [result]
         
-        # If the DB doesn't answer, the feature is unavailable. 
-        # Do not attempt to replicate DB logic in Python memory.
         return []
     
     async def guess_bloque(
@@ -165,8 +199,6 @@ class APIClient:
         """
         Create a new record.
         Returns a tuple: (record_data, error_message).
-        On success, error_message is None.
-        On failure, record_data is None.
         """
         if validate:
             is_valid, errors = validator.validate_record(table, data, "create")
@@ -179,7 +211,10 @@ class APIClient:
 
         client = self._ensure_client()
         url = f"{self.base_url}/{table}"
-        headers = {"Prefer": "return=representation"}
+        
+        # Inject Auth Headers and Merge with Required PostgREST Headers
+        headers = self._get_auth_headers()
+        headers["Prefer"] = "return=representation"
 
         try:
             response = await client.post(url, json=data, headers=headers)
@@ -195,6 +230,9 @@ class APIClient:
                 error_details = e.response.json()
                 message = error_details.get("message", "No details provided.")
                 code = error_details.get("code", "")
+
+                if code == "42501": # RLS Violation / Insufficient Privilege
+                    return None, "Acceso Denegado: No tienes permiso para crear este registro."
 
                 if code == "23505":  # PostgreSQL unique_violation code
                     if "cif" in message:
@@ -249,7 +287,10 @@ class APIClient:
             pk_filter = f"usuario_id=eq.{record_id}"
 
         url = f"{self.base_url}/{table}?{pk_filter}"
-        headers = {"Prefer": "return=representation"}
+        
+        # Inject Auth Headers and Merge
+        headers = self._get_auth_headers()
+        headers["Prefer"] = "return=representation"
 
         try:
             response = await client.patch(url, json=data, headers=headers)
@@ -267,6 +308,15 @@ class APIClient:
                         type="warning",
                     )
             return updated_record
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                # If 404/Empty result on update, it might be RLS hiding the row
+                ui.notify("No se pudo actualizar. Es posible que no tengas permisos.", type="warning")
+            elif e.response.status_code == 403: # Forbidden
+                ui.notify("Permiso denegado por políticas de seguridad.", type="negative")
+            else:
+                 ui.notify(f"Error HTTP {e.response.status_code}: {e.response.text}", type="negative")
+            return None
         except Exception as e:
             log.error(
                 f"Error updating record ID '{record_id}' in '{table}'", exc_info=True
@@ -279,10 +329,19 @@ class APIClient:
         client = self._ensure_client()
         url = f"{self.base_url}/{table}?id=eq.{record_id}"
 
+        # Inject Auth Headers
+        headers = self._get_auth_headers()
+
         try:
-            response = await client.delete(url)
+            response = await client.delete(url, headers=headers)
             response.raise_for_status()
             return True
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 403 or e.response.status_code == 401:
+                 ui.notify("No tienes permiso para eliminar este registro.", type="negative")
+            else:
+                 ui.notify(f"Error HTTP {e.response.status_code}: {e.response.text}", type="negative")
+            return False
         except Exception as e:
             log.error(
                 f"Error deleting record ID '{record_id}' from '{table}'", exc_info=True
@@ -418,13 +477,3 @@ class APIClient:
             return None
 
         return await self.get_record_by_id(parent_table, parent_id)
-
-    # =====================================================================
-    #  RESOURCE CLEANUP
-    # =====================================================================
-
-    async def close(self):
-        """Close the HTTP client."""
-        if self.client:
-            await self.client.aclose()
-            self.client = None

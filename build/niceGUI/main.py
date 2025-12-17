@@ -26,8 +26,10 @@ from views.conflicts import ConflictsView
 from views.afiliadas_importer import AfiliadasImporterView
 
 from auth.login import create_login_page
+from auth.token_utils import create_db_token
 from auth.user_management import UserManagementView
 from auth.user_profile import UserProfileView
+
 
 log = logging.getLogger(__name__)
 unrestricted_page_routes = {"/login"}
@@ -255,6 +257,9 @@ app_instance: Optional[Application] = None
 async def main_page_entry():
     # Entry point for a new user session. (configure session-specific settings)
     app.storage.user.lifetime = timedelta(hours=3)
+    user_roles = app.storage.user.get("roles", [])
+    token = create_db_token(app.storage.user["username"], user_roles)
+    app.storage.user["db_token"] = token  # Store it in the session!
     log.info(f"User session lifetime set to {app.storage.user.lifetime}")
     global app_instance
     app_instance = Application(api_client=api_singleton, state=app_state_init)

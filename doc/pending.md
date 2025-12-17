@@ -2,5 +2,5 @@
 
 @(16/09/2025 @maiktreya)
 
-- postgresql db level user & permission review
-- granularize ARBAC access management
+- postgresql db level user through postgre ARBC
+- Spider deployment
