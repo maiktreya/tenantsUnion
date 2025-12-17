@@ -1,16 +1,24 @@
-# /build/nginx/nginx.conf.template
-
 events {}
 
 http {
+    # =====================================================================
+    # SECURITY: Rate Limiting Zone
+    # =====================================================================
+    # Define a zone named 'login_limit' based on the client IP ($binary_remote_addr).
+    # Allocate 10MB of memory (enough to track ~160,000 IPs).
+    # Limit strict requests to 10 per minute (1 request every 6 seconds).
+    limit_req_zone $binary_remote_addr zone=login_limit:10m rate=10r/m;
+
     server {
         listen 80;
         server_name ${HOSTNAME};
-
+        
+        # Allow Let's Encrypt Certbot verification
         location /.well-known/acme-challenge/ {
             root /var/www/certbot;
         }
 
+        # Force redirect HTTP -> HTTPS
         location / {
             return 301 https://$host$request_uri;
         }
@@ -23,13 +31,34 @@ http {
         ssl_certificate /etc/letsencrypt/live/${HOSTNAME}/fullchain.pem;
         ssl_certificate_key /etc/letsencrypt/live/${HOSTNAME}/privkey.pem;
 
-        # CORRECTED PATHS
+        # SSL Configuration (Best Practices from Certbot)
         include /etc/letsencrypt/conf/options-ssl-nginx.conf;
         ssl_dhparam /etc/letsencrypt/conf/ssl-dhparams.pem;
 
+        # =====================================================================
+        # SECURITY: Hardening Headers
+        # =====================================================================
+        # HSTS: Tell browsers to ALWAYS use HTTPS for the next year (prevents downgrade attacks).
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        
+        # Prevent your site from being framed by other sites (Clickjacking protection).
+        add_header X-Frame-Options "SAMEORIGIN";
+        
+        # Prevent the browser from trying to guess the MIME type (Sniffing protection).
+        add_header X-Content-Type-Options "nosniff";
 
-        location / {
+        # =====================================================================
+        # ROUTE: Protected Login Endpoint
+        # =====================================================================
+        location /login {
+            # Apply the rate limit defined above.
+            # 'burst=5' allows a user to make 5 quick attempts without error.
+            # 'nodelay' ensures legitimate requests are not artificially slowed down.
+            limit_req zone=login_limit burst=5 nodelay;
+
             proxy_pass http://nicegui-app:8081;
+
+            # Necessary headers for NiceGUI
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection "upgrade";
@@ -37,13 +66,34 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # =====================================================================
+        # ROUTE: Main Application
+        # =====================================================================
+        location / {
+            proxy_pass http://nicegui-app:8081;
+            
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Long timeouts for WebSocket connections (NiceGUI specific)
             proxy_read_timeout 1d;
             proxy_send_timeout 1d;
         }
 
+        # =====================================================================
+        # ROUTE: Internal API (PostgREST)
+        # =====================================================================
         location /api/ {
             rewrite ^/api/(.*)$ /$1 break;
             proxy_pass http://server:3000;
+            
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
