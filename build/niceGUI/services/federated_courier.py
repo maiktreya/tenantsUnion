@@ -1,6 +1,10 @@
 # build/niceGUI/services/federation_courier.py
 import httpx
-from api.client import api_singleton
+
+from api.client import APIClient
+from config import config
+
+api_singleton = APIClient(config.API_BASE_URL)
 
 
 async def run_sync_job(satellite_url, credentials):
