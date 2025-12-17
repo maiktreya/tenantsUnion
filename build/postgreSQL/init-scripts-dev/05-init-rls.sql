@@ -13,8 +13,8 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA sindicato_inq TO web_user;
 
 -- 4. Switch the Authenticator (The Login User)
 -- Ensure the user defined in your docker-compose POSTGRES_USER has permission to switch to these roles.
-GRANT web_anon TO postgres; -- Assuming 'postgres' is your connection user
-GRANT web_user TO postgres;
+GRANT web_anon TO app_user; -- Assuming 'postgres' is your connection user
+GRANT web_user TO app_user;
 
 
 -- Example: Secure the 'afiliadas' table

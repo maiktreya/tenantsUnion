@@ -25,7 +25,7 @@ services:
     environment:
       PGRST_DB_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PGRST_OPENAPI_MODE: disabled
-      PGRST_DB_ANON_ROLE: ${POSTGRES_USER}
+      PGRST_DB_ANON_ROLE: web_anon
       PGRST_DB_SCHEMA: ${POSTGRES_DB_SCHEMA}
       PGRST_JWT_SECRET: ${PGRST_JWT_SECRET} # <--- Add this
     depends_on:
@@ -43,6 +43,7 @@ services:
       PYTHONUNBUFFERED: 1
       POSTGREST_API_URL: ${POSTGRES_API_URL}
       NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET}
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET} 
     volumes:
       - ./build/niceGUI:/app${DEV_MODE:+:rw}${DEV_MODE:-:ro}
     working_dir: /app
