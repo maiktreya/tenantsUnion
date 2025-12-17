@@ -323,3 +323,57 @@ BEGIN
 END;
 $$;
 
+
+-- =====================================================================
+-- FUNCTION: This function takes a raw JSON array of companies and merges it into the local DB
+-- =====================================================================
+
+DROP FUNCTION IF EXISTS rpc_ingest_federated_data(JSONB) CASCADE;
+CREATE OR REPLACE FUNCTION rpc_ingest_federated_data(p_payload JSONB)
+RETURNS JSONB AS $$
+DECLARE
+    r_company JSONB;
+    v_stats JSONB;
+    v_inserted INT := 0;
+    v_updated INT := 0;
+BEGIN
+    -- Iterate through the JSON array
+    FOR r_company IN SELECT * FROM jsonb_array_elements(p_payload)
+    LOOP
+        -- 1. Insert/Update the Network (Entramado) if present
+        -- We use ON CONFLICT to handle duplicates automatically
+        IF (r_company->>'entramado') IS NOT NULL THEN
+            INSERT INTO sindicato_inq.entramado_empresas (nombre)
+            VALUES (r_company->>'entramado')
+            ON CONFLICT (nombre) DO NOTHING;
+        END IF;
+
+        -- 2. Insert/Update the Company
+        -- Validations (Unique CIF, Foreign Keys) happen here automatically.
+        -- If data is invalid, the transaction will fail (safe).
+        INSERT INTO sindicato_inq.empresas (
+            nombre, 
+            cif_nif_nie, 
+            entramado_id, 
+            directivos, 
+            direccion_fiscal
+        )
+        VALUES (
+            r_company->>'nombre',
+            r_company->>'cif_nif_nie',
+            (SELECT id FROM sindicato_inq.entramado_empresas WHERE nombre = r_company->>'entramado'),
+            r_company->>'directivos',
+            r_company->>'direccion_fiscal'
+        )
+        ON CONFLICT (cif_nif_nie) 
+        DO UPDATE SET
+            nombre = EXCLUDED.nombre,
+            entramado_id = EXCLUDED.entramado_id,
+            directivos = EXCLUDED.directivos;
+            
+        IF FOUND THEN v_updated := v_updated + 1; ELSE v_inserted := v_inserted + 1; END IF;
+    END LOOP;
+
+    RETURN jsonb_build_object('status', 'success', 'inserted', v_inserted, 'updated', v_updated);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
