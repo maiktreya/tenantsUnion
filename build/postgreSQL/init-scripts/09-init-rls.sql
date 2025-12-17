@@ -37,46 +37,52 @@ GRANT web_user TO app_user;
 -- Secure target tables with RLS
 -- ===================================================================== 
 
-ALTER TABLE sindicato_inq.afiliadas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sindicato_inq.facturacion ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sindicato_inq.usuario_credenciales ENABLE ROW LEVEL SECURITY;
+-- Apply Admin and Gestor policies ONLY to the 3 specific tables declared
+DO $$
+DECLARE
+    t text;
+    tables text[] := ARRAY['afiliadas', 'facturacion'];
+BEGIN
+    FOREACH t IN ARRAY tables
+    LOOP
+        -- Enable RLS
+        EXECUTE format('ALTER TABLE sindicato_inq.%I ENABLE ROW LEVEL SECURITY', t);
 
--- Policy 1: Admins can do ANYTHING
-DROP POLICY IF EXISTS admin_all ON sindicato_inq.*;
-CREATE POLICY admin_all ON sindicato_inq.*
-    FOR ALL
-    TO web_user
-    USING (
-        current_setting('request.jwt.claims', true)::jsonb -> 'roles' ? 'admin'
-    );
+        -- Policy 1: Admins can do ANYTHING
+        EXECUTE format('DROP POLICY IF EXISTS admin_all ON sindicato_inq.%I', t);
+        EXECUTE format('CREATE POLICY admin_all ON sindicato_inq.%I FOR ALL TO web_user USING (current_setting(''request.jwt.claims'', true)::jsonb -> ''roles'' ? ''admin'')', t, t);
+        
+        -- Policy 2: Gestors can READ everything
+        EXECUTE format('DROP POLICY IF EXISTS gestor_read ON sindicato_inq.%I', t);
+        EXECUTE format('CREATE POLICY gestor_read ON sindicato_inq.%I FOR SELECT TO web_user USING (current_setting(''request.jwt.claims'', true)::jsonb -> ''roles'' ? ''gestor'')', t, t);
+    END LOOP;
+END
+$$;
 
--- Policy 2: Gestors can READ everything but only UPDATE specific fields?
-DROP POLICY IF EXISTS gestor_read ON sindicato_inq.*;
-CREATE POLICY gestor_read ON sindicato_inq.*
-    FOR SELECT
-    TO web_user
-    USING (
-        current_setting('request.jwt.claims', true)::jsonb -> 'roles' ? 'gestor'
-    );
+-- Policy 3: "actas" role - SELECT specific tables
+DO $$
+DECLARE
+    t text;
+    tables text[] := ARRAY['afiliadas', 'pisos', 'bloques', 'usuarios', 'empresas', 'entramado_empresas'];
+BEGIN
+    FOREACH t IN ARRAY tables
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS toma_actas ON sindicato_inq.%I', t);
+        EXECUTE format('CREATE POLICY toma_actas ON sindicato_inq.%I FOR SELECT TO web_user USING (current_setting(''request.jwt.claims'', true)::jsonb -> ''roles'' ? ''actas'')', t, t);
+    END LOOP;
+END
+$$;
 
--- Policies 3 & 4: Policies associated to less privileged role "actas"
-DROP POLICY IF EXISTS toma_actas ON sindicato_inq.*;
-CREATE POLICY toma_actas ON sindicato_inq.afiliadas, 
-                            sindicato_inq.pisos, 
-                            sindicato_inq.bloques, 
-                            sindicato_inq.usuarios, 
-                            sindicato_inq.empresas, 
-                            sindicato_inq.entramado_empresas
-    FOR SELECT
-    TO web_user
-    USING (
-        current_setting('request.jwt.claims', true)::jsonb -> 'roles' ? 'actas'
-    );
-
-DROP POLICY IF EXISTS toma_actas ON sindicato_inq.afiliadas;
-CREATE POLICY toma_actas ON sindicato_inq.conflictos, sindicato_inq.diario_conflictos
-    FOR ALL
-    TO web_user
-    USING (
-        current_setting('request.jwt.claims', true)::jsonb -> 'roles' ? 'actas'
-    );
+-- Policy 4: "actas" role - ALL permissions on conflict tables
+DO $$
+DECLARE
+    t text;
+    tables text[] := ARRAY['conflictos', 'diario_conflictos'];
+BEGIN
+    FOREACH t IN ARRAY tables
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS toma_actas ON sindicato_inq.%I', t);
+        EXECUTE format('CREATE POLICY toma_actas ON sindicato_inq.%I FOR ALL TO web_user USING (current_setting(''request.jwt.claims'', true)::jsonb -> ''roles'' ? ''actas'')', t, t);
+    END LOOP;
+END
+$$;
