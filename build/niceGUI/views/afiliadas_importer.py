@@ -11,9 +11,9 @@ from state.app_state import GenericViewState
 from services.import_service import AfiliadasImportService, ImportResult
 from components.importer_panels import render_preview_tabs
 from components.exporter import export_to_csv
-from components.importer_normalization import normalize_for_sorting, normalize_address_key
+from components.importer_normalization import normalize_for_sorting
 from components.upload_event_utils import read_upload_event_bytes
-from config import FAILED_EXPORT_FIELD_MAP, DUPLICATE_NIF_WARNING
+from config import FAILED_EXPORT_FIELD_MAP
 
 log = logging.getLogger(__name__)
 

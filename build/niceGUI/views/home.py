@@ -5,7 +5,7 @@ from nicegui import ui, app
 from components.base_view import BaseView
 
 
-class HomeView(BaseView):  # MODIFIED: Inherit from BaseView
+class HomeView(BaseView):  # Inherit from BaseView
     """Home page view with role-based card visibility"""
 
     def __init__(self, navigate: Callable[[str], None]):

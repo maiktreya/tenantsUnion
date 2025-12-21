@@ -4,7 +4,7 @@ from typing import Dict, Any
 from nicegui import ui, app
 
 from api.client import APIClient
-from state.app_state import GenericViewState  # We still use the class for its logic
+from state.app_state import GenericViewState
 from components.data_table import DataTable
 from components.dialogs import EnhancedRecordDialog, ConfirmationDialog
 from components.exporter import export_to_csv
@@ -20,9 +20,9 @@ class AdminView(BaseView):
 
     def __init__(self, api_client: APIClient):
         self.api = api_client
-        if 'admin_view_state' not in app.storage.client:
-            app.storage.client['admin_view_state'] = GenericViewState()
-        self.state: GenericViewState = app.storage.client['admin_view_state']
+        if "admin_view_state" not in app.storage.client:
+            app.storage.client["admin_view_state"] = GenericViewState()
+        self.state: GenericViewState = app.storage.client["admin_view_state"]
         self.select_table = None
         self.data_table_container = None
         self.detail_container = None

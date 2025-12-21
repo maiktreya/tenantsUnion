@@ -19,8 +19,7 @@ class ConflictsView(BaseView):
         self.api = api_client
         self.global_state = state  # For read-only global data like nodos
         if "conflicts_view_state" not in app.storage.client:
-            # Initialize the state object for this tab
-            client_state = GenericViewState()
+            client_state = GenericViewState()  # Initialize the state object on tab
             client_state.history = []  # Add custom attribute for this view
             app.storage.client["conflicts_view_state"] = client_state
         self.state: GenericViewState = app.storage.client["conflicts_view_state"]
@@ -113,7 +112,6 @@ class ConflictsView(BaseView):
                 )
                 ui.button(icon="refresh", on_click=self._load_conflicts).props("flat")
 
-            # This is the key fix: 'items-start' aligns the columns to the top.
             # Two-column layout that collapses to a single column on small screens
             with ui.row().classes("w-full gap-4 items-start flex-wrap md:flex-nowrap"):
                 # Left panel: fixed width on desktop, full width on mobile
