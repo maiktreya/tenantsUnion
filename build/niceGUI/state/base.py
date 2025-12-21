@@ -157,9 +157,7 @@ class BaseTableState:
                         return lowered_term in str(value).lower()
 
                     filtered = [
-                        r
-                        for r in filtered
-                        if any(matches(v) for v in r.values())
+                        r for r in filtered if any(matches(v) for v in r.values())
                     ]
 
             elif isinstance(filter_value, list):
@@ -180,6 +178,10 @@ class BaseTableState:
         if self.sort_criteria:
             for column, ascending in reversed(self.sort_criteria):
                 actual_sort_key = field_to_display_map.get(column, column)
+                if self.records and column in self.records[0]:
+                    actual_sort_key = column
+                else:
+                    actual_sort_key = field_to_display_map.get(column, column)
                 self.filtered_records.sort(
                     key=lambda x: (
                         x.get(actual_sort_key) is None,

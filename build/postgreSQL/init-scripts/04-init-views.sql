@@ -11,8 +11,6 @@
 
 SET search_path TO sindicato_inq, public;
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
 -- =====================================================================
 -- LISTADO DE VISTAS DISPONIBLES EN LA INTERFAZ NICEGUI
 -- (Definidas en build/niceGUI/config.py)
@@ -107,8 +105,9 @@ SELECT
     a.fecha_baja AS "Fecha Baja",
     p.fecha_firma AS "Fecha Firma",
     p.inmobiliaria AS "Inmob.",
-    e.nombre AS "Propiedad",
-    p.prop_vertical AS "Prop. Vertical",
+    p.prop_vertical AS "Prop. Vert.",
+    e.nombre AS "Prop. (afiliada)",
+    p.propiedad AS "Prop. (piso)",
     COALESCE(ee.nombre, 'Sin Entramado') AS "Entramado",
     COALESCE(n.nombre, 'Sin Nodo Asignado') AS "Nodo"
 FROM afiliadas a
