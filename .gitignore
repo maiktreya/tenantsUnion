@@ -25,6 +25,7 @@ unittest-cpp/
 back/
 dev/
 logs/
+doc/working-notes.md
 
 # Ignore the build/nginx directory...
 build/nginx/

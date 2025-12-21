@@ -37,7 +37,7 @@ GRANT web_user TO app_user;
 -- Secure target tables with RLS
 -- ===================================================================== 
 
--- Apply Admin and Gestor policies ONLY to the 3 specific tables declared
+-- Apply Admin and Gestor policies ONLY to the 2 specific tables declared
 DO $$
 DECLARE
     t text;
@@ -73,7 +73,6 @@ BEGIN
 END
 $$;
 
--- Policy 4: "actas" role - ALL permissions on conflict tables
 DO $$
 DECLARE
     t text;
@@ -81,8 +80,13 @@ DECLARE
 BEGIN
     FOREACH t IN ARRAY tables
     LOOP
+        -- Policy 4: "actas" role - ALL permissions on conflict tables
         EXECUTE format('DROP POLICY IF EXISTS toma_actas ON sindicato_inq.%I', t);
         EXECUTE format('CREATE POLICY toma_actas ON sindicato_inq.%I FOR ALL TO web_user USING (current_setting(''request.jwt.claims'', true)::jsonb -> ''roles'' ? ''actas'')', t, t);
+
+        -- Policy 5: "gestor" role - ALL permissions on conflict tables
+        EXECUTE format('DROP POLICY IF EXISTS toma_actas ON sindicato_inq.%I', t);
+        EXECUTE format('CREATE POLICY toma_actas ON sindicato_inq.%I FOR ALL TO web_user USING (current_setting(''request.jwt.claims'', true)::jsonb -> ''roles'' ? ''gestor'')', t, t);
     END LOOP;
 END
 $$;
