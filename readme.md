@@ -164,9 +164,7 @@ Este proyecto utiliza **PostgREST**, que convierte tu base de datos en una API R
 - **Endpoints:** Cada tabla y vista de tu esquema `sindicato_inq` se convierte en un endpoint. Por ejemplo, la tabla `afiliadas` es accesible en `/afiliadas`.
 - **Consultas:** Puedes usar parámetros de URL para filtrar, ordenar y paginar. Por ejemplo, para obtener las afiliadas del estado "Alta":
 
-`
-http://localhost:3001/afiliadas?estado=eq.Alta
-`
+`http://localhost:3001/afiliadas?estado=eq.Alta`
 
 Para más información, consulta la [documentación oficial de PostgREST](https://postgrest.org/en/stable/api.html).
 
@@ -184,6 +182,7 @@ Para más información, consulta la [documentación oficial de PostgREST](https:
 - **Firewall:** `ufw` restringe el acceso a los puertos 22 (SSH), 80 (HTTP) y 443 (HTTPS).
 - **Contraseñas Seguras:** Las contraseñas se almacenan hasheadas utilizando bcrypt.
 - **Gestión de Secretos:** No hay claves ni secretos hardcodeados. Todo se gestiona a través de `.env`, que está excluido por `.gitignore`.
+- **RLS (Seguridad a nivel de fila):** Seguridad a nivel de base de datos implementada con tokens JWT.
 
 ## 🧪 Pruebas
 
@@ -194,14 +193,6 @@ pytest --cov
 ```
 
 Para obtener una guía detallada sobre cómo configurar el entorno de pruebas y ejecutar diferentes tipos de tests, consulta el documento [guía de testeo](https://github.com/maiktreya/tenantsUnion/blob/main/doc/testing.md).
-
----
-
-## 🗺️ Hoja de Ruta (Roadmap)
-
-Planes de mejora y futuras implementaciones:
-
-- [ ] **Revisión de Permisos en BBDD:** Auditar y granularizar los permisos a nivel de base de datos en PostgreSQL para un control de acceso más estricto @maiktreya 01-10-2025
 
 ---
 

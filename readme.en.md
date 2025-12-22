@@ -60,16 +60,16 @@ The application is organized into key functional modules, accessible according t
 
 ## 🚀 Technologies Used
 
-| Component          | Technology                                     | Purpose                                                 |
-| ------------------ | ---------------------------------------------- | ------------------------------------------------------- |
-| **Frontend**       | NiceGUI (on FastAPI)    | Fast and reactive web user interface in Python.         |
-| **API**            | PostgREST             | Automatic generation of RESTful API from the DB.        |
-| **Database**       | PostgreSQL                                     | Relational data storage and business logic.             |
-| **Containerization** | Docker and Docker Compose                        | Service orchestration for consistent deployment.        |
-| **Reverse Proxy**  | Nginx                                          | Single entry point, SSL termination, and security.      |
-| **SSL Certificates** | Let's Encrypt with Certbot                      | Free and automated HTTPS encryption.                    |
-| **Dynamic DNS**    | DuckDNS                                        | Domain management for the SSL certificate.              |
-| **Firewall**       | UFW                                            | Firewall to restrict port access.                       |
+| Component            | Technology                 | Purpose                                            |
+| -------------------- | -------------------------- | -------------------------------------------------- |
+| **Frontend**         | NiceGUI (on FastAPI)       | Fast and reactive web user interface in Python.    |
+| **API**              | PostgREST                  | Automatic generation of RESTful API from the DB.   |
+| **Database**         | PostgreSQL                 | Relational data storage and business logic.        |
+| **Containerization** | Docker and Docker Compose  | Service orchestration for consistent deployment.   |
+| **Reverse Proxy**    | Nginx                      | Single entry point, SSL termination, and security. |
+| **SSL Certificates** | Let's Encrypt with Certbot | Free and automated HTTPS encryption.               |
+| **Dynamic DNS**      | DuckDNS                    | Domain management for the SSL certificate.         |
+| **Firewall**         | UFW                        | Firewall to restrict port access.                  |
 
 ---
 
@@ -81,29 +81,29 @@ This method exposes the database and API ports to facilitate development.
 
 1. **Clone the repository:**
 
-    ```bash
-    git clone https://github.com/maiktreya/tenantsUnion.git
-    cd tenantsUnion
-    ```
+   ```bash
+   git clone https://github.com/maiktreya/tenantsUnion.git
+   cd tenantsUnion
+   ```
 
 2. **Configure the development environment:**
-    Copy `.env.example` to `.env`. Ensure the following variable is set to use test data:
+   Copy `.env.example` to `.env`. Ensure the following variable is set to use test data:
 
-    ```dotenv
-    INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev
-    ```
+   ```dotenv
+   INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev
+   ```
 
 3. **Start the services:**
 
-    ```bash
-    # Local development
-    docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml up -d --build --renew-anon-volumes
-    ```
+   ```bash
+   # Local development
+   docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml up -d --build --renew-anon-volumes
+   ```
 
 4. **Access the application:**
-    - **Frontend:** `http://localhost:8081`
-    - **API (example):** `http://localhost:3001/afiliadas`
-    - **Database:** `postgresql://app_user:password@localhost:5432/mydb`
+   - **Frontend:** `http://localhost:8081`
+   - **API (example):** `http://localhost:3001/afiliadas`
+   - **Database:** `postgresql://app_user:password@localhost:5432/mydb`
 
 ### Production Deployment (Secure with SSL)
 
@@ -111,46 +111,46 @@ Follow these steps for a single-host deployment with security and HTTPS enabled.
 
 1. **Clone the repository:**
 
-    ```bash
-    git clone https://github.com/maiktreya/tenantsUnion.git
-    cd tenantsUnion
-    ```
+   ```bash
+   git clone https://github.com/maiktreya/tenantsUnion.git
+   cd tenantsUnion
+   ```
 
 2. **Configure environment variables:**
-    Create a copy of `.env.example` and rename it to `.env`. **Adjust the following mandatory values**:
+   Create a copy of `.env.example` and rename it to `.env`. **Adjust the following mandatory values**:
 
-    ```dotenv
-    # Ensure you use the production scripts
-    INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts
+   ```dotenv
+   # Ensure you use the production scripts
+   INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts
 
-    # --- MANDATORY SSL CONFIGURATION ---
-    HOSTNAME=your-domain.duckdns.org
-    DUCKDNS_TOKEN=your-duckdns-token
-    EMAIL=your-email@example.com
-    ```
+   # --- MANDATORY SSL CONFIGURATION ---
+   HOSTNAME=your-domain.duckdns.org
+   DUCKDNS_TOKEN=your-duckdns-token
+   EMAIL=your-email@example.com
+   ```
 
 3. **Run the initial SSL setup script:**
-    This script automates obtaining certificates. **You only need to run it the first time.**
+   This script automates obtaining certificates. **You only need to run it the first time.**
 
-    ```bash
-    chmod +x utils/init-letsencrypt.sh
-    ./utils/init-letsencrypt.sh
-    ```
+   ```bash
+   chmod +x utils/init-letsencrypt.sh
+   ./utils/init-letsencrypt.sh
+   ```
 
 4. **Start all services:**
-    Once the certificates are generated, start the complete application.
+   Once the certificates are generated, start the complete application.
 
-    ```bash
-    docker compose --profile Secured --profile Frontend up -d
-    ```
+   ```bash
+   docker compose --profile Secured --profile Frontend up -d
+   ```
 
 5. **Configure the Firewall (Recommended):**
-    Secure your server by allowing only necessary traffic.
+   Secure your server by allowing only necessary traffic.
 
-    ```bash
-    chmod +x utils/setup_firewall.sh
-    sudo ./utils/setup_firewall.sh
-    ```
+   ```bash
+   chmod +x utils/setup_firewall.sh
+   sudo ./utils/setup_firewall.sh
+   ```
 
 Done! The application will be available at `https://your-domain.duckdns.org`.
 
@@ -164,7 +164,7 @@ This project uses **PostgREST**, which turns your database into a RESTful API. Y
 - **Endpoints:** Each table and view in your `sindicato_inq` schema becomes an endpoint. For example, the `afiliadas` table is accessible at `/afiliadas`.
 - **Queries:** You can use URL parameters to filter, sort, and paginate. For example, to get members with the "Alta" status:
 
-    `http://localhost:3001/afiliadas?estado=eq.Alta`
+  `http://localhost:3001/afiliadas?estado=eq.Alta`
 
 For more information, check the official PostgREST documentation.
 
@@ -182,6 +182,7 @@ For more information, check the official PostgREST documentation.
 - **Firewall:** `ufw` restricts access to ports 22 (SSH), 80 (HTTP), and 443 (HTTPS).
 - **Secure Passwords:** Passwords are stored hashed using bcrypt.
 - **Secret Management:** No hardcoded keys or secrets. Everything is managed via `.env`, which is excluded by `.gitignore`.
+- **RLS (Row-Level Security):** DB level securization implemented with JWT tokens.
 
 ## 🧪 Testing
 
@@ -192,14 +193,6 @@ pytest --cov
 ```
 
 For a detailed guide on how to set up the testing environment and run different types of tests, refer to the [testing guide](https://github.com/maiktreya/tenantsUnion/blob/main/doc/testing.md).
-
----
-
-## 🗺️ Roadmap
-
-Improvement plans and future implementations:
-
-- [ ] **DB Permission Review:** Audit and granularize permissions at the PostgreSQL database level for stricter access control @maiktreya 2025-10-01
 
 ---
 
