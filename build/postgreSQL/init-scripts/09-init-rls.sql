@@ -1,6 +1,9 @@
 -- =====================================================================
 -- 1. BASE PERMISSIONS (Re-applying to be safe)
 -- =====================================================================
+CREATE ROLE web_anon nologin;
+CREATE ROLE web_user nologin;
+
 GRANT USAGE ON SCHEMA sindicato_inq TO web_anon, web_user;
 GRANT ALL ON ALL TABLES IN SCHEMA sindicato_inq TO web_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA sindicato_inq TO web_anon;
