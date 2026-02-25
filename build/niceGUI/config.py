@@ -121,6 +121,7 @@ TABLE_INFO = {
             "telefono",
             "estado",
             "regimen",
+            "afiliacion",  # <--- AÑADIDO SOLO AQUÍ PARA LA VISTA/EDICIÓN EN UI
             "fecha_alta",
             "fecha_baja",
         ],
