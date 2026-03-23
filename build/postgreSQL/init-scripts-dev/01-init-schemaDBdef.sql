@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS afiliadas (
     fecha_alta DATE,
     fecha_baja DATE,
     nivel_participacion TEXT,
-    afiliacion BOOLEAN DEFAULT TRUE;
+    afiliacion BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE IF NOT EXISTS facturacion (
