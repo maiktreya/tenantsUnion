@@ -81,7 +81,8 @@ CREATE TABLE afiliadas (
     regimen TEXT,
     fecha_alta DATE,
     fecha_baja DATE,
-    nivel_participacion TEXT
+    nivel_participacion TEXT,
+    afiliacion BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE facturacion (
