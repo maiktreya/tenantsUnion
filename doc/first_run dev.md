@@ -68,7 +68,7 @@ postgresql://app_user:password@localhost:5432/mydb?search_path=sindicato_inq
 
 ## 5. ARBC and available roles for testing
 
-There are three three basic roles available. The user credentials are the role name itself and the password "inquidb2025":
+There are three three basic roles available. The user credentials are "sumate" and the password "inquidb2025":
 
 - **admin**: Full access to all tables and functions.
 - **gestor**: Access to conflicts, afiliadas_importer & views module.
