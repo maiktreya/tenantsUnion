@@ -1,4 +1,4 @@
-# build/niceGUI/components/dialogs.py (Corrected)
+# build/niceGUI/components/dialogs.py
 
 from typing import Dict, Optional, Callable, Awaitable, Any
 from nicegui import ui
@@ -152,7 +152,6 @@ class EnhancedRecordDialog:
         table_info = TABLE_INFO.get(self.table, {})
         pk_field = table_info.get("id_field", "id")
 
-        # --- FIX #1: Check for the admin view FIRST ---
         if self.calling_view == "admin":
             visible_fields = table_info.get("fields", [])
             hidden_fields = table_info.get("hidden_fields", [])
@@ -185,14 +184,10 @@ class EnhancedRecordDialog:
         field_options = table_info.get("field_options", {})
         fields = self._get_fields()
 
-        # --- FIX #2: Hiding logic is now context-aware ---
         pk_field = table_info.get("id_field", "id")
         if self.calling_view == "admin":
-            # The admin view should only hide the primary key and any specifically passed 'extra' fields.
-            # It IGNORES the 'hidden_fields' from config.py.
             fields_to_hide = self.extra_hidden_fields.union({pk_field})
         else:
-            # All other views respect the 'hidden_fields' list from config.py.
             configured_hidden = set(table_info.get("hidden_fields", []))
             fields_to_hide = configured_hidden.union(self.extra_hidden_fields)
 
@@ -204,7 +199,6 @@ class EnhancedRecordDialog:
             label = self.custom_labels.get(field, field.replace("_", " ").title())
             lower_field = field.lower()
 
-            # The corrected hiding logic is applied here.
             if field in fields_to_hide:
                 self.inputs[field] = ui.input(value=value).style("display: none")
                 continue
@@ -342,6 +336,13 @@ class EnhancedRecordDialog:
                 self.inputs[field] = ui.textarea(label=label, value=value).classes(
                     "w-full"
                 )
+            # --- NEW BOOLEAN HANDLER ---
+            elif isinstance(value, bool) or field in ["afiliacion", "is_active", "vpo", "por_habitaciones"]:
+                # Safely evaluates None to False, while keeping True as True
+                self.inputs[field] = ui.checkbox(text=label, value=(value == True)).classes(
+                    "w-full mt-2"
+                )
+            # ---------------------------
             else:
                 self.inputs[field] = ui.input(label=label, value=value or "").classes(
                     "w-full"
