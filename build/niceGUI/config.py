@@ -242,7 +242,7 @@ TABLE_INFO = {
         ],
         "field_options": {
             "estado": sorted(["Abierto", "Victoria", "Cerrado"]),
-            "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"],
+            "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques", "Bienvenida"],
             "causa": sorted(
                 [
                     "No renovación",
@@ -280,6 +280,7 @@ TABLE_INFO = {
         "id_field": "id",
         "hidden_fields": ["id", "created_at"],
         "fields": [
+            "ambito",
             "accion",
             "notas",
             "tarea_actual",
