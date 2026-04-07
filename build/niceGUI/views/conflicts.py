@@ -30,6 +30,7 @@ class ConflictsView(BaseView):
         self.filter_nodo = None
         self.filter_estado = None
         self.filter_causa = None
+        self.filter_ambito = None  # Added filter variable for 'ambito'
         self.filter_text = None
 
     def create(self) -> ui.column:
@@ -49,6 +50,8 @@ class ConflictsView(BaseView):
             conflict_options = TABLE_INFO.get("conflictos", {}).get("field_options", {})
             estado_opts_list = conflict_options.get("estado", [])
             causa_opts_list = conflict_options.get("causa", [])
+            ambito_opts_list = conflict_options.get("ambito", [])  # Fetched 'ambito' options
+            
             estado_options = {
                 "": "Todos los estados",
                 **{opt: opt for opt in estado_opts_list},
@@ -56,6 +59,10 @@ class ConflictsView(BaseView):
             causa_options = {
                 "": "Todas las causas",
                 **{opt: opt for opt in causa_opts_list},
+            }
+            ambito_options = {  # Created dropdown options for 'ambito'
+                "": "Todos los ámbitos",
+                **{opt: opt for opt in ambito_opts_list},
             }
 
             with ui.expansion("Filtros", icon="filter_list").classes(
@@ -82,6 +89,13 @@ class ConflictsView(BaseView):
                         on_change=self._apply_filters,
                         clearable=True,
                     ).classes("w-64")
+                    self.filter_ambito = ui.select(  # Added UI element for 'ambito'
+                        options=ambito_options,
+                        label="Filtrar por Ámbito",
+                        value=self.state.filters.get("ambito"),
+                        on_change=self._apply_filters,
+                        clearable=True,
+                    ).classes("w-48")
                     self.filter_text = (
                         ui.input(
                             label="Búsqueda global",
@@ -150,10 +164,22 @@ class ConflictsView(BaseView):
             ui.notify(f"Error loading conflicts: {str(e)}", type="negative")
 
     def _get_conflict_options(self, conflicts: List[Dict]) -> Dict[int, str]:
-        return {
-            c["id"]: c.get("conflict_label", f"ID {c.get('id', 'N/A')}")
-            for c in conflicts
-        }
+        options = {}
+        for c in conflicts:
+            # Extract fields, providing fallbacks if they are missing
+            ambito = c.get("ambito") or "Sin ámbito"
+            nodo = c.get("nodo_nombre") or "Sin nodo"  # <-- Added nodo extraction
+            nombre = c.get("afiliada_nombre_completo") or "Sin afiliada"
+            direccion = c.get("piso_direccion") or c.get("bloque_direccion") or "Sin dirección"
+            
+            # Extract the opening date (fecha_apertura) and grab just the YYYY-MM-DD part
+            fecha_raw = c.get("fecha_apertura")
+            fecha = str(fecha_raw).split("T")[0] if fecha_raw else "Sin fecha"
+            
+            # Format the string: "[Ámbito] [Nodo] (Fecha) Nombre, Dirección"
+            options[c["id"]] = f"[{ambito}] [{nodo}] ({fecha}) {nombre}, {direccion}"
+            
+        return options
 
     async def _apply_filters(self, _=None):
         filters = {
@@ -170,6 +196,11 @@ class ConflictsView(BaseView):
             "causa": (
                 self.filter_causa.value
                 if self.filter_causa and self.filter_causa.value
+                else None
+            ),
+            "ambito": (  # Included 'ambito' in the filter logic payload
+                self.filter_ambito.value
+                if self.filter_ambito and self.filter_ambito.value
                 else None
             ),
             "global_search": (
@@ -200,6 +231,7 @@ class ConflictsView(BaseView):
         self.filter_nodo.value = None
         self.filter_estado.value = ""
         self.filter_causa.value = None
+        self.filter_ambito.value = None  # Included 'ambito' in the UI reset logic
         self.filter_text.value = ""
         ui.timer(0.1, self._apply_filters, once=True)
 
