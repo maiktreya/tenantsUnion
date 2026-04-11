@@ -232,6 +232,7 @@ SELECT
     b.direccion AS bloque_direccion,
     ncm.nodo_id AS nodo_id,
     n.nombre AS nodo_nombre,
+    ult_act.ultima_actualizacion,  
     CONCAT(
         '(', c.id, '-', ') ',
         COALESCE(a.nombre || ' ' || a.apellidos, 'Sin afiliada'),
@@ -243,8 +244,13 @@ FROM sindicato_inq.conflictos c
     LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
     LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
     LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id;
-
+    LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id
+    LEFT JOIN (
+        SELECT conflicto_id, MAX(created_at) as ultima_actualizacion
+        FROM sindicato_inq.diario_conflictos
+        GROUP BY conflicto_id
+    ) ult_act ON c.id = ult_act.conflicto_id;
+    
 -- ---------------------------------------------------------------------
 -- VISTA: comprobar_link_pisos_bloques
 -- ---------------------------------------------------------------------
