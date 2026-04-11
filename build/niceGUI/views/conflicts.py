@@ -168,16 +168,20 @@ class ConflictsView(BaseView):
         for c in conflicts:
             # Extract fields, providing fallbacks if they are missing
             ambito = c.get("ambito") or "Sin ámbito"
-            nodo = c.get("nodo_nombre") or "Sin nodo"  # <-- Added nodo extraction
+            nodo = c.get("nodo_nombre") or "Sin nodo"
             nombre = c.get("afiliada_nombre_completo") or "Sin afiliada"
             direccion = c.get("piso_direccion") or c.get("bloque_direccion") or "Sin dirección"
             
-            # Extract the opening date (fecha_apertura) and grab just the YYYY-MM-DD part
+            # Extract the opening date
             fecha_raw = c.get("fecha_apertura")
             fecha = str(fecha_raw).split("T")[0] if fecha_raw else "Sin fecha"
             
-            # Format the string: "[Ámbito] [Nodo] (Fecha) Nombre, Dirección"
-            options[c["id"]] = f"[{ambito}] [{nodo}] ({fecha}) {nombre}, {direccion}"
+            # Extract the last updated date (from our new SQL join)
+            act_raw = c.get("ultima_actualizacion")
+            actualizado = str(act_raw).split("T")[0] if act_raw else "Sin act."
+            
+            # Format the string: "[Ámbito] [Nodo] (Apertura | Act: Fecha) Nombre, Dirección"
+            options[c["id"]] = f"[{ambito}] [{nodo}] (Apertura: {fecha} | Act: {actualizado}) {nombre}, {direccion}"
             
         return options
 
