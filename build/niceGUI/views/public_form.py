@@ -21,6 +21,7 @@ class PublicJoinForm:
 
             with form_container:
                 with ui.card().classes("shadow-24 p-8 w-96"):
+                    ui.image("/assets/images/logo.png")
                     ui.label("Formulario de Inscripción").classes(
                         "text-2xl mb-4 text-red-600 font-bold text-center w-full"
                     )
@@ -32,7 +33,7 @@ class PublicJoinForm:
                         "telefono": ui.input("Teléfono").classes("w-full"),
                         "cif": ui.input("DNI / CIF / NIE *").classes("w-full"),
                     }
-
+                    
                     async def submit():
                         # Basic frontend validation
                         if not all(
@@ -63,8 +64,9 @@ class PublicJoinForm:
                             ui.notify("¡Registro completado!", type="positive")
                             form_container.clear()
                             with form_container:
+                                ui.image("/assets/images/logo.png").classes("shadow-24 w-96")
                                 ui.label(
-                                    "Gracias. Nos pondremos en contacto pronto."
+                                    "Gracias por rellenar el formulario de bienvenida. Esperamos que la reunión empiece a resolver tus dudas. Nos pondremos en contacto contigo pronto"
                                 ).classes("text-xl mt-10 text-center")
                         else:
                             # This will display your existing duplicate CIF error from client.py
