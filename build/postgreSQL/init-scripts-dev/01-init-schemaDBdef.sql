@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS afiliadas (
     fecha_alta DATE,
     fecha_baja DATE,
     nivel_participacion TEXT,
-    afiliacion BOOLEAN DEFAULT TRUE
+    afiliacion TEXT DEFAULT 'TRUE'
 );
 
 CREATE TABLE IF NOT EXISTS facturacion (
@@ -129,10 +129,12 @@ CREATE TABLE IF NOT EXISTS facturacion (
     forma_pago TEXT,
     iban TEXT
 );
+
+--  Relax the IBAN format constraint to allow non-Spanish EU formats 
 ALTER TABLE facturacion
 ADD CONSTRAINT chk_iban_format CHECK (
     iban IS NULL
-    OR iban ~ '^ES[0-9]{22}$'
+    OR iban ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$'
 ) NOT VALID;
 
 

@@ -82,7 +82,7 @@ CREATE TABLE afiliadas (
     fecha_alta DATE,
     fecha_baja DATE,
     nivel_participacion TEXT,
-    afiliacion BOOLEAN DEFAULT TRUE
+    afiliacion TEXT DEFAULT 'TRUE'
 );
 
 CREATE TABLE facturacion (
@@ -504,11 +504,11 @@ FROM
     LEFT JOIN usuarios u ON s.tecnica_alias = u.alias
 ON CONFLICT (id) DO NOTHING;
 
--- Añade la restricción pero no la valida en los datos existentes
-ALTER TABLE sindicato_inq.facturacion
+--  Relax the IBAN format constraint to allow non-Spanish EU formats 
+ALTER TABLE facturacion
 ADD CONSTRAINT chk_iban_format CHECK (
     iban IS NULL
-    OR iban ~ '^ES[0-9]{22}$'
+    OR iban ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$'
 ) NOT VALID;
 
 -- 2.4. Limpiar tablas Staging
