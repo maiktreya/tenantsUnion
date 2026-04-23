@@ -1,46 +1,14 @@
 -- =====================================================================
--- PASO 2-init: Procedures, functions and triggers (Business logic)
+-- Business logic initialization script (safe + consistent PL/pgSQL)
 -- =====================================================================
 
 SET search_path TO public;
 
--- Ensure trigram and unaccent extensions are available for similarity()
-CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+-- Ensure required extensions exist
+CREATE EXTENSION IF NOT EXISTS pg_trgm   WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 
 SET search_path TO sindicato_inq, public;
-
--- =====================================================================
--- FUNCTION: extract_cp_from_direccion
--- =====================================================================
-
-DROP FUNCTION IF EXISTS extract_cp_from_direccion() CASCADE;
-
-CREATE OR REPLACE FUNCTION extract_cp_from_direccion()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    matches TEXT[];
-BEGIN
-    -- Only run if 'direccion' is new or has changed
-    IF (TG_OP = 'INSERT' OR NEW.direccion IS DISTINCT FROM OLD.direccion) THEN
-        -- Find the first 5-digit number in the direccion string
-        matches := regexp_matches(NEW.direccion, '\m([0-9]{5})\M');
-        IF array_length(matches, 1) > 0 THEN
-            NEW.cp := matches[1]::INTEGER;
-        END IF;
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS trigger_a_extract_cp ON sindicato_inq.pisos;
-
-CREATE TRIGGER trigger_a_extract_cp
-BEFORE INSERT OR UPDATE ON sindicato_inq.pisos
-FOR EACH ROW EXECUTE FUNCTION extract_cp_from_direccion();
 
 -- =====================================================================
 -- FUNCTION: normalize_address_for_match
@@ -96,6 +64,57 @@ BEGIN
     cleaned := regexp_replace(cleaned, '\s+', ' ', 'g');
     RETURN cleaned;
 END;
+$$;
+
+-- =====================================================================
+-- FUNCTION: find_best_match_bloque_id
+-- =====================================================================
+
+DROP FUNCTION IF EXISTS find_best_match_bloque_id(TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION find_best_match_bloque_id(piso_direccion TEXT)
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    best_match_id INTEGER;
+    similarity_threshold REAL := 0.88;
+    normalized_piso_address TEXT;
+BEGIN
+    normalized_piso_address := normalize_address_for_match(piso_direccion);
+
+    SELECT b.id
+    INTO best_match_id
+    FROM sindicato_inq.bloques b
+    WHERE similarity(
+              normalize_address_for_match(b.direccion),
+              normalized_piso_address
+          ) >= similarity_threshold
+    ORDER BY similarity(
+              normalize_address_for_match(b.direccion),
+              normalized_piso_address
+          ) DESC
+    LIMIT 1;
+
+    RETURN best_match_id;
+END;
+$$;
+
+-- =====================================================================
+-- API SCHEMA + WRAPPER FUNCTION
+-- =====================================================================
+
+CREATE SCHEMA IF NOT EXISTS api;
+
+DROP FUNCTION IF EXISTS api.find_best_match_bloque_id(TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION api.find_best_match_bloque_id(piso_direccion TEXT)
+RETURNS INTEGER
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+AS $$
+    SELECT sindicato_inq.find_best_match_bloque_id(piso_direccion);
 $$;
 
 -- =====================================================================
@@ -166,7 +185,9 @@ RETURNS TABLE(
     suggested_bloque_direccion TEXT,
     suggested_score REAL
 )
-LANGUAGE plpgsql STABLE SECURITY DEFINER
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
 SET search_path = sindicato_inq, public
 AS $$
 BEGIN
@@ -182,19 +203,20 @@ BEGIN
             CASE WHEN v.top_match_score >= p_score_limit THEN v.top_match_score ELSE NULL END
         FROM sindicato_inq.v_bloque_suggestion_scores v
         ORDER BY v.top_match_score DESC NULLS LAST, v.piso_id;
-
     ELSE
         RETURN QUERY
         WITH input_rows AS (
             SELECT
                 COALESCE(
                     CASE
-                        WHEN value ? 'index' AND (value->>'index') ~ '^[0-9]+$'
-                            THEN (value->>'index')::INT
+                        WHEN value ? 'index'
+                             AND (value->>'index') ~ '^[0-9]+$'
+                             THEN (value->>'index')::INT
                     END,
                     CASE
-                        WHEN value ? 'piso_id' AND (value->>'piso_id') ~ '^[0-9]+$'
-                            THEN (value->>'piso_id')::INT
+                        WHEN value ? 'piso_id'
+                             AND (value->>'piso_id') ~ '^[0-9]+$'
+                             THEN (value->>'piso_id')::INT
                     END,
                     (ord::INT - 1)
                 ) AS idx,
@@ -265,7 +287,58 @@ $$;
 DROP INDEX IF EXISTS idx_bloques_normalized_trgm;
 
 CREATE INDEX idx_bloques_normalized_trgm
-ON sindicato_inq.bloques USING gin (normalize_address_for_match(direccion) gin_trgm_ops);
+ON sindicato_inq.bloques
+USING gin (normalize_address_for_match(direccion) gin_trgm_ops);
+
+-- =====================================================================
+-- FUNCTION + TRIGGER: extract_cp_from_direccion
+-- =====================================================================
+
+DROP FUNCTION IF EXISTS extract_cp_from_direccion() CASCADE;
+
+CREATE OR REPLACE FUNCTION extract_cp_from_direccion()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    matches TEXT[];
+BEGIN
+    IF (TG_OP = 'INSERT' OR NEW.direccion IS DISTINCT FROM OLD.direccion) THEN
+        matches := regexp_matches(NEW.direccion, '\m([0-9]{5})\M');
+        IF array_length(matches, 1) > 0 THEN
+            NEW.cp := matches[1]::INTEGER;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trigger_a_extract_cp ON sindicato_inq.pisos;
+
+CREATE TRIGGER trigger_a_extract_cp
+BEFORE INSERT OR UPDATE ON sindicato_inq.pisos
+FOR EACH ROW EXECUTE FUNCTION extract_cp_from_direccion();
+
+-- =====================================================================
+-- SEQUENCE SETUP FOR afiliadas.num_afiliada
+-- =====================================================================
+
+DO $$
+DECLARE
+    max_id_num INTEGER;
+BEGIN
+    SELECT COALESCE(MAX(CAST(regexp_replace(num_afiliada, '[^0-9]+', '', 'g') AS INTEGER)), 0)
+    INTO max_id_num
+    FROM sindicato_inq.afiliadas;
+
+    CREATE SEQUENCE IF NOT EXISTS sindicato_inq.afiliadas_num_afiliada_seq;
+    PERFORM setval('sindicato_inq.afiliadas_num_afiliada_seq', max_id_num, TRUE);
+
+    ALTER TABLE sindicato_inq.afiliadas
+    ALTER COLUMN num_afiliada
+    SET DEFAULT 'A' || nextval('sindicato_inq.afiliadas_num_afiliada_seq'::regclass);
+END;
+$$;
 
 -- =====================================================================
 -- PROCEDURE: sync_all_bloques_to_nodos
@@ -301,7 +374,7 @@ END;
 $$;
 
 -- =====================================================================
--- FUNCTION: sync_bloque_nodo (trigger)
+-- FUNCTION: sync_bloque_nodo (trigger helper)
 -- =====================================================================
 
 DROP FUNCTION IF EXISTS sync_bloque_nodo() CASCADE;
@@ -323,57 +396,49 @@ BEGIN
 END;
 $$;
 
+-- ==============================================================================
+-- NORMALIZACIÓN DE AFILIADAS (CIF/NIF)
+-- ==============================================================================
 
--- =====================================================================
--- FUNCTION: This function takes a raw JSON array of companies and merges it into the local DB
--- =====================================================================
-
-DROP FUNCTION IF EXISTS rpc_ingest_federated_data(JSONB) CASCADE;
-CREATE OR REPLACE FUNCTION rpc_ingest_federated_data(p_payload JSONB)
-RETURNS JSONB AS $$
-DECLARE
-    r_company JSONB;
-    v_stats JSONB;
-    v_inserted INT := 0;
-    v_updated INT := 0;
+-- Crear la función interceptora
+CREATE OR REPLACE FUNCTION fn_normalize_afiliada_data()
+RETURNS TRIGGER AS $$
 BEGIN
-    -- Iterate through the JSON array
-    FOR r_company IN SELECT * FROM jsonb_array_elements(p_payload)
-    LOOP
-        -- 1. Insert/Update the Network (Entramado) if present
-        -- We use ON CONFLICT to handle duplicates automatically
-        IF (r_company->>'entramado') IS NOT NULL THEN
-            INSERT INTO sindicato_inq.entramado_empresas (nombre)
-            VALUES (r_company->>'entramado')
-            ON CONFLICT (nombre) DO NOTHING;
-        END IF;
-
-        -- 2. Insert/Update the Company
-        -- Validations (Unique CIF, Foreign Keys) happen here automatically.
-        -- If data is invalid, the transaction will fail (safe).
-        INSERT INTO sindicato_inq.empresas (
-            nombre, 
-            cif_nif_nie, 
-            entramado_id, 
-            directivos, 
-            direccion_fiscal
-        )
-        VALUES (
-            r_company->>'nombre',
-            r_company->>'cif_nif_nie',
-            (SELECT id FROM sindicato_inq.entramado_empresas WHERE nombre = r_company->>'entramado'),
-            r_company->>'directivos',
-            r_company->>'direccion_fiscal'
-        )
-        ON CONFLICT (cif_nif_nie) 
-        DO UPDATE SET
-            nombre = EXCLUDED.nombre,
-            entramado_id = EXCLUDED.entramado_id,
-            directivos = EXCLUDED.directivos;
-            
-        IF FOUND THEN v_updated := v_updated + 1; ELSE v_inserted := v_inserted + 1; END IF;
-    END LOOP;
-
-    RETURN jsonb_build_object('status', 'success', 'inserted', v_inserted, 'updated', v_updated);
+    -- Si el NIF no es nulo, le quita espacios y lo fuerza a mayúsculas
+    IF NEW.cif IS NOT NULL THEN
+        NEW.cif := UPPER(TRIM(NEW.cif));
+    END IF;
+    RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
+
+-- Enganchar la función a la tabla afiliadas
+DROP TRIGGER IF EXISTS trg_normalize_afiliada ON afiliadas;
+CREATE TRIGGER trg_normalize_afiliada
+BEFORE INSERT OR UPDATE ON afiliadas
+FOR EACH ROW
+EXECUTE FUNCTION fn_normalize_afiliada_data();
+
+
+-- ==============================================================================
+-- NORMALIZACIÓN DE PISOS (MUNICIPIO)
+-- ==============================================================================
+
+-- Crear la función interceptora
+CREATE OR REPLACE FUNCTION fn_normalize_piso_data()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Si el municipio no es nulo, aplica capitalización (ej. "mAdRiD" -> "Madrid")
+    IF NEW.municipio IS NOT NULL THEN
+        NEW.municipio := INITCAP(LOWER(TRIM(NEW.municipio)));
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Enganchar la función a la tabla pisos
+DROP TRIGGER IF EXISTS trg_normalize_piso ON pisos;
+CREATE TRIGGER trg_normalize_piso
+BEFORE INSERT OR UPDATE ON pisos
+FOR EACH ROW
+EXECUTE FUNCTION fn_normalize_piso_data();

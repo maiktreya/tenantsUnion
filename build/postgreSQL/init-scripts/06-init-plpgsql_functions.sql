@@ -395,3 +395,50 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+-- ==============================================================================
+-- NORMALIZACIÓN DE AFILIADAS (CIF/NIF)
+-- ==============================================================================
+
+-- Crear la función interceptora
+CREATE OR REPLACE FUNCTION fn_normalize_afiliada_data()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Si el NIF no es nulo, le quita espacios y lo fuerza a mayúsculas
+    IF NEW.cif IS NOT NULL THEN
+        NEW.cif := UPPER(TRIM(NEW.cif));
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Enganchar la función a la tabla afiliadas
+DROP TRIGGER IF EXISTS trg_normalize_afiliada ON afiliadas;
+CREATE TRIGGER trg_normalize_afiliada
+BEFORE INSERT OR UPDATE ON afiliadas
+FOR EACH ROW
+EXECUTE FUNCTION fn_normalize_afiliada_data();
+
+
+-- ==============================================================================
+-- NORMALIZACIÓN DE PISOS (MUNICIPIO)
+-- ==============================================================================
+
+-- Crear la función interceptora
+CREATE OR REPLACE FUNCTION fn_normalize_piso_data()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Si el municipio no es nulo, aplica capitalización (ej. "mAdRiD" -> "Madrid")
+    IF NEW.municipio IS NOT NULL THEN
+        NEW.municipio := INITCAP(LOWER(TRIM(NEW.municipio)));
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Enganchar la función a la tabla pisos
+DROP TRIGGER IF EXISTS trg_normalize_piso ON pisos;
+CREATE TRIGGER trg_normalize_piso
+BEFORE INSERT OR UPDATE ON pisos
+FOR EACH ROW
+EXECUTE FUNCTION fn_normalize_piso_data();
