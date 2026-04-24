@@ -327,12 +327,22 @@ DO $$
 DECLARE
     max_id_num INTEGER;
 BEGIN
-    SELECT COALESCE(MAX(CAST(regexp_replace(num_afiliada, '[^0-9]+', '', 'g') AS INTEGER)), 0)
+    -- Do not use COALESCE to 0 here, let it be NULL if the table is empty
+    SELECT MAX(CAST(regexp_replace(num_afiliada, '[^0-9]+', '', 'g') AS INTEGER))
     INTO max_id_num
     FROM sindicato_inq.afiliadas;
 
     CREATE SEQUENCE IF NOT EXISTS sindicato_inq.afiliadas_num_afiliada_seq;
-    PERFORM setval('sindicato_inq.afiliadas_num_afiliada_seq', max_id_num, TRUE);
+    
+    -- Check if we actually found a maximum value
+    IF max_id_num IS NOT NULL THEN
+        -- Table has data, set sequence to the highest number
+        PERFORM setval('sindicato_inq.afiliadas_num_afiliada_seq', max_id_num, TRUE);
+    ELSE
+        -- Table is empty, initialize sequence to 1, and mark it as NOT called yet (FALSE)
+        -- so the very first insert gets exactly '1'
+        PERFORM setval('sindicato_inq.afiliadas_num_afiliada_seq', 1, FALSE);
+    END IF;
 
     ALTER TABLE sindicato_inq.afiliadas
     ALTER COLUMN num_afiliada

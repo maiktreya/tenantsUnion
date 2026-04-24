@@ -1,9 +1,14 @@
 from nicegui import ui
 from api.client import APIClient
 import logging
+from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+# Calculamos la ruta absoluta del archivo en el disco duro.
+# __file__ es views/public_form.py
+# .parent.parent nos lleva a la carpeta raíz 'niceGUI'
+LOGO_PATH = Path(__file__).parent.parent / "assets" / "images" / "logo.png"
 
 class PublicJoinForm:
     def __init__(self, api_client: APIClient):
@@ -20,8 +25,10 @@ class PublicJoinForm:
             form_container = ui.column().classes("w-full items-center mt-10")
 
             with form_container:
-                with ui.card().classes("shadow-24 p-8 w-96"):
-                    ui.image("/assets/images/logo.png")
+                with ui.card().classes("shadow-24 p-8 w-96 items-center"):
+                    # PASAMOS LA RUTA DEL ARCHIVO FÍSICO (LOGO_PATH)
+                    ui.image(LOGO_PATH).classes("w-48 mb-4")
+                    
                     ui.label("Formulario de Inscripción").classes(
                         "text-2xl mb-4 text-red-600 font-bold text-center w-full"
                     )
@@ -50,15 +57,10 @@ class PublicJoinForm:
                             )
                             return
 
-                        # Collect values directly matching the DB schema
                         data = {k: v.value for k, v in fields.items()}
-
-                        # Hardcode afiliacion to False since this is a public pre-registration
                         data["afiliacion"] = False
 
-                        # API Call using the centralized client
-                        # If the CIF already exists, this will cleanly fail and return the duplicate error
-                        # FIXED: Ask PostgREST to NOT return the inserted representation to avoid RLS SELECT blocks on anonymous users
+                        # API Call usando return_representation=False
                         record, error = await self.api.create_record(
                             "afiliadas", 
                             data,
@@ -68,13 +70,20 @@ class PublicJoinForm:
                         if record:
                             ui.notify("¡Registro completado!", type="positive")
                             form_container.clear()
+                            
                             with form_container:
-                                ui.image("/assets/images/logo.png").classes("shadow-24 w-96")
-                                ui.label(
-                                    "Gracias por rellenar el formulario de bienvenida. Esperamos que la reunión empiece a resolver tus dudas. Nos pondremos en contacto contigo pronto"
-                                ).classes("text-xl mt-10 text-center")
+                                with ui.card().classes("shadow-24 p-8 w-96 items-center"):
+                                    # USAMOS DE NUEVO LA RUTA DEL ARCHIVO FÍSICO
+                                    ui.image(LOGO_PATH).classes("w-48 mb-6")
+                                    
+                                    ui.label("¡Gracias por registrarte!").classes(
+                                        "text-2xl text-red-600 font-bold text-center w-full mb-4"
+                                    )
+                                    ui.label(
+                                        "Esperamos que la reunión de bienvenida empiece a resolver tus dudas. "
+                                        "Nos pondremos en contacto contigo pronto."
+                                    ).classes("text-lg text-center text-gray-700")
                         else:
-                            # This will display your existing duplicate CIF error from client.py
                             ui.notify(f"{error}", type="negative")
 
                     ui.button("Enviar Registro", on_click=submit).classes(
