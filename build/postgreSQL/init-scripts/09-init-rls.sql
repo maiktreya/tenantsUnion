@@ -9,6 +9,11 @@ GRANT ALL ON ALL TABLES IN SCHEMA sindicato_inq TO web_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA sindicato_inq TO web_anon;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA sindicato_inq TO web_user;
 
+-- ======= INICIO DEL PARCHE APLICADO EN CONSOLA =======
+GRANT INSERT ON sindicato_inq.afiliadas TO web_anon;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA sindicato_inq TO web_anon;
+-- ======= FIN DEL PARCHE =======
+
 GRANT web_anon TO app_user;
 GRANT web_user TO app_user;
 
@@ -44,6 +49,14 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- ======= INICIO DEL PARCHE APLICADO EN CONSOLA =======
+-- Política RLS para permitir inserciones públicas (formulario de registro)
+DROP POLICY IF EXISTS anon_insert_afiliadas ON sindicato_inq.afiliadas;
+CREATE POLICY anon_insert_afiliadas ON sindicato_inq.afiliadas 
+    FOR INSERT TO web_anon 
+    WITH CHECK (true);
+-- ======= FIN DEL PARCHE =======
 
 -- BLOCK B: General Data (Pisos, Bloques, etc)
 -- Note: We EXCLUDED 'usuarios' from this list to prevent the login crash.

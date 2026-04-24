@@ -195,6 +195,7 @@ class APIClient:
         data: Dict,
         validate: bool = True,
         show_validation_errors: bool = True,
+        return_representation: bool = True,
     ) -> Tuple[Optional[Dict], Optional[str]]:
         """
         Create a new record.
@@ -214,11 +215,23 @@ class APIClient:
         
         # Inject Auth Headers and Merge with Required PostgREST Headers
         headers = self._get_auth_headers()
-        headers["Prefer"] = "return=representation"
+        
+        # Determine if we want the inserted row back.
+        # False allows "blind inserts" which avoids triggering RLS SELECT policies on public forms.
+        if return_representation:
+            headers["Prefer"] = "return=representation"
+        else:
+            headers["Prefer"] = "return=minimal"
 
         try:
             response = await client.post(url, json=data, headers=headers)
             response.raise_for_status()
+            
+            if not return_representation:
+                # When minimal, response is usually empty (201 Created). 
+                # Return a dummy dict so caller knows it succeeded.
+                return {"status": "success"}, None
+                
             result = response.json()
             created_record = (
                 result[0] if isinstance(result, list) and result else result

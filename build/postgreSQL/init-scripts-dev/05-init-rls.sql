@@ -1,7 +1,6 @@
 -- =====================================================================
 -- 1. BASE PERMISSIONS (Re-applying to be safe)
 -- =====================================================================
--- Create the web_anon role required by PostgREST
 CREATE ROLE web_anon nologin;
 CREATE ROLE web_user nologin;
 
@@ -10,9 +9,10 @@ GRANT ALL ON ALL TABLES IN SCHEMA sindicato_inq TO web_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA sindicato_inq TO web_anon;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA sindicato_inq TO web_user;
 
--- NUEVO: Permisos para que el usuario anónimo (formulario público) pueda insertar
+-- ======= INICIO DEL PARCHE APLICADO EN CONSOLA =======
 GRANT INSERT ON sindicato_inq.afiliadas TO web_anon;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA sindicato_inq TO web_anon;
+-- ======= FIN DEL PARCHE =======
 
 GRANT web_anon TO app_user;
 GRANT web_user TO app_user;
@@ -50,11 +50,13 @@ BEGIN
 END
 $$;
 
--- NUEVO: Política RLS para permitir inserciones públicas (formulario de registro QR)
+-- ======= INICIO DEL PARCHE APLICADO EN CONSOLA =======
+-- Política RLS para permitir inserciones públicas (formulario de registro)
 DROP POLICY IF EXISTS anon_insert_afiliadas ON sindicato_inq.afiliadas;
 CREATE POLICY anon_insert_afiliadas ON sindicato_inq.afiliadas 
     FOR INSERT TO web_anon 
     WITH CHECK (true);
+-- ======= FIN DEL PARCHE =======
 
 -- BLOCK B: General Data (Pisos, Bloques, etc)
 -- Note: We EXCLUDED 'usuarios' from this list to prevent the login crash.

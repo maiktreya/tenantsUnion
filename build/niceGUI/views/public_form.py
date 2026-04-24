@@ -58,7 +58,12 @@ class PublicJoinForm:
 
                         # API Call using the centralized client
                         # If the CIF already exists, this will cleanly fail and return the duplicate error
-                        record, error = await self.api.create_record("afiliadas", data)
+                        # FIXED: Ask PostgREST to NOT return the inserted representation to avoid RLS SELECT blocks on anonymous users
+                        record, error = await self.api.create_record(
+                            "afiliadas", 
+                            data,
+                            return_representation=False
+                        )
 
                         if record:
                             ui.notify("¡Registro completado!", type="positive")
