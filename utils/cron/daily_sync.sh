@@ -1,6 +1,7 @@
 #!/bin/bash
 # daily_sync.sh
 # Extracts last 24h Gravity Forms data over SSH tunnel and pipes into Sindicato PostgreSQL.
+# include as crontab -e: 0 2 * * * /home/other/github/prod/tenantsUnion/utils/cron/daily_sync.sh >> /home/other/github/prod/tenantsUnion/utils/cron/cron_errors.log 2>&1
 
 set -e # Exit immediately if a command exits with a non-zero status
 
