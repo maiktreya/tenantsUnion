@@ -57,6 +57,7 @@ The application is organized into key functional modules, accessible according t
   - Role-Based Access Control (RBAC) for `admin`, `gestor`, etc.
   - Interface for administrators to manage users and assign roles.
   - User profile for self-management of personal data and password.
+- **ETL for automated import of new "afiliadas" from a mariaDB source with cronjob**
 
 ## 🚀 Technologies Used
 

@@ -57,6 +57,7 @@ La aplicación se organiza en módulos funcionales clave, accesibles según los 
   - Control de Acceso Basado en Roles (RBAC) para `admin`, `gestor`, etc.
   - Interfaz para que los administradores gestionen usuarios y asignen roles.
   - Perfil de usuario para auto-gestión de datos personales y contraseña.
+- **ETL de importación de afiliadas de DB externa automatizado e integrado como cronjob**.
 
 ## 🚀 Tecnologías Utilizadas
 
