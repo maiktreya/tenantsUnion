@@ -155,8 +155,28 @@ class AdminView(BaseView):
             self.data_table_instance.refresh()
 
     async def _refresh_data(self):
-        if self.state.selected_entity_name.value:
-            await self._load_table_data(self.state.selected_entity_name.value)
+        """Refreshes table data while preserving client-side filters and sorting."""
+        table = self.state.selected_entity_name.value
+        if not table:
+            return
+
+        try:
+            # 1. Fetch fresh data from the API
+            records = await self.api.get_records(table, limit=5000)
+
+            # 2. Update the raw records explicitly 
+            # (We intentionally bypass self.state.set_records() to avoid clearing filters)
+            self.state.records = records
+
+            # 3. Re-apply the existing filters and sort criteria to the fresh data
+            self.state.apply_filters_and_sort()
+
+            # 4. Trigger a redraw of ONLY the data table rows
+            if self.data_table_instance:
+                self.data_table_instance.refresh()
+                
+        except Exception as e:
+            ui.notify(f"Error al refrescar datos: {str(e)}", type="negative")
 
     def _open_import_dialog(self):
         if not self.state.selected_entity_name.value:
