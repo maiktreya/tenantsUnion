@@ -16,7 +16,8 @@ TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 ENV_FILE="${PROJECT_DIR}/.env"
 if [ -f "$ENV_FILE" ]; then
     set -o allexport
-    source "$ENV_FILE"
+    # Filter out read-only Bash variables (like UID) before sourcing
+    source <(grep -vE '^(UID|EUID|PPID)=' "$ENV_FILE")
     set +o allexport
 else
     echo "[$TIMESTAMP] ERROR: .env file not found at $ENV_FILE" >> "$LOG_FILE"
