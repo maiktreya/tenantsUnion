@@ -3,7 +3,7 @@
 -- =====================================================================
 
 SET search_path TO sindicato_inq, public;
-SET datestyle = 'ISO, DMY';  -- Prevents DD/MM/YYYY inversion errors
+SET datestyle = 'ISO, DMY';  
 
 -- 1. Crear tabla temporal de staging
 CREATE TEMP TABLE staging_gravity (
@@ -18,7 +18,7 @@ CREATE TEMP TABLE staging_gravity (
     computed_address TEXT
 );
 
--- 2. Cargar datos del CSV generado por el Cron Bash Script
+-- 2. Cargar datos del CSV
 COPY staging_gravity (
     entry_id, date_created, first_name, last_name, nif_dni, birth_date, gender, 
     phone, email, address_full_google, address_street, address_number, 
@@ -28,6 +28,40 @@ COPY staging_gravity (
 )
 FROM '/csv-data/mariadb_export.csv'
 WITH (FORMAT csv, DELIMITER ',', HEADER true);
+
+-- ====================================================================================
+-- 2.5 SANITIZACIÓN DE NULOS LITERALES (LA SOLUCIÓN AL ERROR DEL CRONJOB)
+-- Convierte el texto "NULL" exportado por bash/mysql en verdaderos valores nulos de SQL
+-- ====================================================================================
+UPDATE staging_gravity
+SET
+    first_name = NULLIF(first_name, 'NULL'),
+    last_name = NULLIF(last_name, 'NULL'),
+    nif_dni = NULLIF(nif_dni, 'NULL'),
+    birth_date = NULLIF(birth_date, 'NULL'),
+    gender = NULLIF(gender, 'NULL'),
+    phone = NULLIF(phone, 'NULL'),
+    email = NULLIF(email, 'NULL'),
+    address_full_google = NULLIF(address_full_google, 'NULL'),
+    address_street = NULLIF(address_street, 'NULL'),
+    address_number = NULLIF(address_number, 'NULL'),
+    address_floor = NULLIF(address_floor, 'NULL'),
+    address_door = NULLIF(address_door, 'NULL'),
+    address_city = NULLIF(address_city, 'NULL'),
+    address_postcode = NULLIF(address_postcode, 'NULL'),
+    num_people_in_home = NULLIF(num_people_in_home, 'NULL'),
+    tenure_type = NULLIF(tenure_type, 'NULL'),
+    contract_start_date = NULLIF(contract_start_date, 'NULL'),
+    landlord_contact_type = NULLIF(landlord_contact_type, 'NULL'),
+    field_41 = NULLIF(field_41, 'NULL'),
+    field_46 = NULLIF(field_46, 'NULL'),
+    field_48 = NULLIF(field_48, 'NULL'),
+    field_49_1 = NULLIF(field_49_1, 'NULL'),
+    membership_type = NULLIF(membership_type, 'NULL'),
+    fee_amount = NULLIF(fee_amount, 'NULL'),
+    fee_period = NULLIF(fee_period, 'NULL'),
+    fee_formatted = NULLIF(fee_formatted, 'NULL'),
+    bank_iban = NULLIF(bank_iban, 'NULL');
 
 -- 3. Normalizar la Dirección
 UPDATE staging_gravity
@@ -44,7 +78,6 @@ WHERE NULLIF(TRIM(field_48), '') IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM empresas WHERE nombre = TRIM(staging_gravity.field_48));
 
 -- 5. Poblar Pisos 
--- (Confiando en el Trigger trg_normalize_piso para capitalización)
 INSERT INTO pisos (
     direccion, municipio, cp, inmobiliaria, propiedad, prop_vertical, n_personas, fecha_firma
 )
@@ -66,7 +99,7 @@ WHERE afiliada_id IN (
       AND cif IN (SELECT UPPER(TRIM(nif_dni)) FROM staging_gravity)
 );
 
--- 6. Poblar Afiliadas (UPSERT CONFIANDO EN EL TRIGGER trg_normalize_afiliada)
+-- 6. Poblar Afiliadas
 INSERT INTO afiliadas (
     piso_id, num_afiliada, nombre, apellidos, cif, fecha_nac, genero, 
     email, telefono, estado, regimen, fecha_alta, nivel_participacion, afiliacion
@@ -107,7 +140,7 @@ ON CONFLICT (cif) DO UPDATE SET
     afiliacion = 'Importado'
 WHERE UPPER(afiliadas.afiliacion) = 'FALSE';
 
--- 7. Poblar Facturación (Con limpieza de espacios en IBAN)
+-- 7. Poblar Facturación 
 INSERT INTO facturacion (afiliada_id, cuota, periodicidad, forma_pago, iban)
 SELECT 
     a.id,
