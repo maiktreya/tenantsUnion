@@ -99,7 +99,7 @@ class Application:
                 "nodos", order="nombre.asc"
             )
             records = await self.api_client.get_records(
-                "v_afiliadas_detalle", limit=5000
+                "v_afiliadas_detalle", limit=20000
             )
             self.state.all_afiliadas_options = {
                 r["id"]: f'{r.get("Nombre Completo", "")} (ID: {r.get("id")})'

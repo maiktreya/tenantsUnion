@@ -134,7 +134,7 @@ TABLE_INFO = {
                 "display_field": "direccion",
                 "label_template": "[{id}] {direccion}",
                 "search_fields": ["direccion", "municipio", "cp", "id"],
-                "options_limit": 5000,
+                "options_limit": 20000,
                 "order_by": "direccion",
                 "value_field": "id",
             }
@@ -224,7 +224,7 @@ TABLE_INFO = {
                 "view": "afiliadas",
                 "display_field": "nombre,apellidos",
                 "label_template": "[{id}] {nombre} {apellidos}",
-                "options_limit": 5000,
+                "options_limit": 20000,
             },
             "tecnica_id": {"view": "usuarios", "display_field": "alias"},
         },
@@ -268,7 +268,7 @@ TABLE_INFO = {
                 "view": "afiliadas",
                 "display_field": "nombre,apellidos",
                 "label_template": "[{id}] {nombre} {apellidos}",
-                "options_limit": 5000,
+                "options_limit": 20000,
             }
         },
         "child_relations": [
@@ -326,7 +326,7 @@ TABLE_INFO = {
                 "view": "afiliadas",
                 "display_field": "nombre,apellidos",
                 "label_template": "[{id}] {nombre} {apellidos}",
-                "options_limit": 5000,
+                "options_limit": 20000,
             }
         },
         "field_patterns": {

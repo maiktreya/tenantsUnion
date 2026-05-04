@@ -114,7 +114,7 @@ class ViewsExplorerView(BaseView):
                 "absolute-center"
             )
             try:
-                records = await self.api.get_records(view, limit=5000)
+                records = await self.api.get_records(view, limit=20000)
 
                 view_config = VIEW_INFO.get(view, {})
                 base_table_name = view_config.get("base_table")

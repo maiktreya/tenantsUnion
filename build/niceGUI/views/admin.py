@@ -108,7 +108,7 @@ class AdminView(BaseView):
                 "absolute-center"
             )
             try:
-                records = await self.api.get_records(table, limit=5000)
+                records = await self.api.get_records(table, limit=20000)
                 self.state.set_records(records, table_config)
                 self._setup_filters(table_config)
 
@@ -162,7 +162,7 @@ class AdminView(BaseView):
 
         try:
             # 1. Fetch fresh data from the API
-            records = await self.api.get_records(table, limit=5000)
+            records = await self.api.get_records(table, limit=20000)
 
             # 2. Update the raw records explicitly 
             # (We intentionally bypass self.state.set_records() to avoid clearing filters)
