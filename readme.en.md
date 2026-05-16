@@ -49,9 +49,14 @@ The application is organized into key functional modules, accessible according t
   - Specialized module for detailed conflict tracking.
   - Allows adding notes, actions, and tracking the history of each case.
   - Automated status and date updates when logging notes.
-- **Member Importer (`IMPORTAR AFILIADAS`):**
-  - Tool for bulk uploading new members from a CSV file.
-  - Real-time data validation and editable preview before final import.
+- **Automated ETL Import Pipeline (WordPress Synchronization):**
+  - Autonomous data pipeline integrated as a nightly cronjob.
+  - Periodically extracts new records and updates from the MariaDB database (WordPress / Gravity Forms).
+  - Automatically transforms, sanitizes (whitespace cleanup, address normalization), and loads data into PostgreSQL, handling new memberships and fee updates with zero human intervention.
+- **Manual Member Importer (Fallback):**
+  - Contingency tool for bulk uploading new members from a CSV file.
+  - Offers real-time data validation and an editable preview before final import.
+  - *Note: Thanks to the new automated ETL system, this tool is now primarily relegated to a last-resort option for exceptional use cases or isolated data migrations.*
 - **Security and User Management:**
   - Secure authentication with hashed passwords (bcrypt).
   - Role-Based Access Control (RBAC) for `admin`, `gestor`, etc.

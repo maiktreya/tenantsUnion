@@ -49,9 +49,13 @@ La aplicación se organiza en módulos funcionales clave, accesibles según los 
   - Módulo especializado para el seguimiento detallado de conflictos.
   - Permite añadir notas, acciones y seguir el historial de cada caso.
   - Actualización de estado y fechas automatizada al registrar notas.
-- **Importador de Afiliadas (`IMPORTAR AFILIADAS`):**
-  - Herramienta para la carga masiva de nuevas afiliadas desde un archivo CSV.
-  - Validación de datos en tiempo real y previsualización editable antes de la importación.
+- **ETL de Importación Automatizado (Sincronización con WordPress):** - Pipeline de datos autónomo integrado como *cronjob* nocturno.
+  - Extrae periódicamente los nuevos registros y actualizaciones desde la base de datos MariaDB (formularios de Gravity Forms en WordPress).
+  - Transforma, sanea (limpieza de espacios, normalización de direcciones) y carga automáticamente los datos en PostgreSQL, gestionando altas de afiliación y cuotas sin intervención humana.
+- **Importador Manual de Afiliadas (Fallback):**
+  - Herramienta de contingencia para la carga masiva de afiliadas desde un archivo CSV.
+  - Ofrece validación de datos en tiempo real y previsualización editable antes de la importación.
+  - *Nota: Gracias al nuevo sistema ETL automatizado, esta herramienta ha quedado relegada como último recurso para casos excepcionales o migraciones aisladas.*
 - **Seguridad y Gestión de Usuarios:**
   - Autenticación segura con contraseñas hasheadas (bcrypt).
   - Control de Acceso Basado en Roles (RBAC) para `admin`, `gestor`, etc.
