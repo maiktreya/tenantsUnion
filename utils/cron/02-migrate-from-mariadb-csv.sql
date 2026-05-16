@@ -138,7 +138,13 @@ ON CONFLICT (cif) DO UPDATE SET
     fecha_alta = EXCLUDED.fecha_alta,
     nivel_participacion = EXCLUDED.nivel_participacion,
     afiliacion = 'Importado'
-WHERE UPPER(afiliadas.afiliacion) = 'FALSE';
+WHERE UPPER(afiliadas.afiliacion) = 'FALSE'
+   OR EXISTS (
+       SELECT 1 
+       FROM facturacion 
+       WHERE facturacion.afiliada_id = afiliadas.id 
+         AND facturacion.cuota = 0
+);
 
 -- 7. Poblar Facturación 
 INSERT INTO facturacion (afiliada_id, cuota, periodicidad, forma_pago, iban)
