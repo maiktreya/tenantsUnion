@@ -546,11 +546,12 @@ class ConflictsView(BaseView):
             if data.get("tarea_actual"):
                 conflict_update["tarea_actual"] = data.get("tarea_actual")
             if data.get("estado"):
-                if data["estado"] == "Cerrado":
-                    conflict_update["estado"] = "Cerrado"
+                if data["estado"] in ["Cerrado", "Victoria"]:
+                    conflict_update["estado"] = data["estado"]
                     conflict_update["fecha_cierre"] = date.today().isoformat()
                 else:
                     conflict_update["estado"] = data["estado"]
+                    conflict_update["fecha_cierre"] = None  #clears the date if you reopen it!
             if conflict_update:
                 await self.api.update_record(
                     "conflictos", selected_conflict["id"], conflict_update
