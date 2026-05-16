@@ -438,11 +438,67 @@ class ConflictsView(BaseView):
         await dialog.open()
 
     async def _create_conflict(self):
-        dialog = EnhancedRecordDialog(
+        class ConflictCreateDialog(EnhancedRecordDialog):
+            async def _create_inputs(self_dialog):
+                await super()._create_inputs()
+                self_dialog.inputs["primera_tarea"] = ui.textarea(
+                    label="Primera Tarea (se añadirá al diario automáticamente)", 
+                    value=""
+                ).classes("w-full")
+
+        async def _handle_save(data: dict) -> bool:
+            # 1. Validation Step
+            missing_fields = []
+            if not data.get("ambito"):
+                missing_fields.append("Ámbito")
+            if not data.get("afiliada_id"):
+                missing_fields.append("Contacto")
+            if not data.get("descripcion") or str(data.get("descripcion")).strip() == "":
+                missing_fields.append("Descripción")
+                
+            if missing_fields:
+                ui.notify(
+                    f"Faltan campos obligatorios: {', '.join(missing_fields)}", 
+                    type="warning",
+                    position="top"
+                )
+                return False 
+            # Extract custom field before hitting the API
+            primera_tarea = data.pop("primera_tarea", None)
+            data["estado"] = "Abierto"
+            if primera_tarea:
+                data["tarea_actual"] = primera_tarea
+            # Step A: Create the main 'conflicto' record
+            result, error = await self.api.create_record("conflictos", data)
+            if not result:
+                ui.notify(f"Error al crear conflicto: {error}", type="negative")
+                return False
+            # Step B: Create the initial entry in 'diario_conflictos'
+            if primera_tarea:
+                user_id = app.storage.user.get("user_id")
+                nota_data = {
+                    "conflicto_id": result["id"],
+                    "usuario_id": user_id,
+                    "estado": "Abierto", 
+                    "tarea_actual": primera_tarea,
+                    "accion": "Inicio del conflicto", 
+                    "notas": "Generado automáticamente al abrir el conflicto."
+                }
+                note_result, note_error = await self.api.create_record("diario_conflictos", nota_data)
+                if not note_result:
+                    ui.notify(f"Conflicto creado, pero falló la nota: {note_error}", type="warning")
+                    return True # Still return True to close dialog since the main conflict succeeded
+                
+            ui.notify("Conflicto creado con éxito.", type="positive")
+            return True
+
+        dialog = ConflictCreateDialog(
             api=self.api,
             table="conflictos",
             mode="create",
+            record={"ambito": "Afiliada"}, 
             on_success=self._load_conflicts,
+            on_save=_handle_save, 
             sort_fields=False,
             custom_options={"afiliada_id": self.global_state.all_afiliadas_options},
             custom_labels={"afiliada_id": "Contacto:"},
