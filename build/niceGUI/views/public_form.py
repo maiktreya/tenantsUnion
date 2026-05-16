@@ -2,6 +2,7 @@ from nicegui import ui
 from api.client import APIClient
 import logging
 from pathlib import Path
+import re
 
 log = logging.getLogger(__name__)
 
@@ -68,8 +69,14 @@ class PublicJoinForm:
                                 type="warning",
                             )
                             return
-
-                        data = {k: v.value for k, v in fields.items()}
+                        # Clean the data before saving
+                        data = {}
+                        for k, v in fields.items():
+                            if isinstance(v.value, str):
+                                # Strip edges and collapse multiple internal spaces into one
+                                data[k] = re.sub(r'\s+', ' ', v.value).strip()
+                            else:
+                                data[k] = v.value
                         data["afiliacion"] = False
 
                         record, error = await self.api.create_record(
