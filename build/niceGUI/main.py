@@ -297,4 +297,5 @@ if __name__ in {"__main__", "__mp_main__"}:
         title=config.APP_TITLE,
         storage_secret=os.environ.get("NICEGUI_STORAGE_SECRET", "a-key-here"),
         favicon="🎯",
+        language="es"
     )
