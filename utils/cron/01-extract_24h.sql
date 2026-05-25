@@ -1,5 +1,5 @@
 SELECT
-    e.id                                              AS entry_id,
+    e.id                                                              AS entry_id,
     e.date_created,
 
     -- ── Personal data ──────────────────────────────────────────────────────
@@ -30,10 +30,15 @@ SELECT
     MAX(CASE WHEN m.meta_key = '41'    THEN m.meta_value END)   AS field_41,
     MAX(CASE WHEN m.meta_key = '46'    THEN m.meta_value END)   AS field_46,
     MAX(CASE WHEN m.meta_key = '48'    THEN m.meta_value END)   AS field_48,
-    MAX(CASE WHEN m.meta_key = '49.1'  THEN m.meta_value END)   AS field_49_1,
+    
+    -- Modified conditional field 49.1
+    CASE 
+        WHEN MAX(CASE WHEN m.meta_key = '49.1' THEN m.meta_value END) = 'Mi bloque es todo del mismo propietario' THEN 'Si'
+        ELSE 'No'
+    END AS field_49_1,
 
     -- ── Membership / payment ───────────────────────────────────────────────
-    MAX(CASE WHEN m.meta_key = '1'     THEN m.meta_value END)   AS membership_type,
+    MAX(CASE WHEN m.meta_key = '1'      THEN m.meta_value END)   AS membership_type,
     
     TRIM(SUBSTRING_INDEX(
         COALESCE(

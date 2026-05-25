@@ -66,7 +66,13 @@ SET
 -- 3. Normalizar la Dirección
 UPDATE staging_gravity
 SET computed_address = 
-    TRIM(SPLIT_PART(address_full_google, ',', 1)) || 
+    REGEXP_REPLACE(
+        REGEXP_REPLACE(
+            TRIM(SPLIT_PART(address_full_google, ',', 1)), 
+            '\yCalle\y', 'C.', 'ig'
+        ),
+        '\yAvenida\y', 'Av.', 'ig'
+    ) || 
     CASE WHEN NULLIF(TRIM(address_number), '') IS NOT NULL THEN ', ' || TRIM(address_number) ELSE '' END ||
     CASE WHEN NULLIF(TRIM(address_floor), '') IS NOT NULL THEN ', Piso ' || TRIM(address_floor) ELSE '' END ||
     CASE WHEN NULLIF(TRIM(address_door), '') IS NOT NULL THEN ', Pta ' || TRIM(address_door) ELSE '' END;
@@ -101,12 +107,11 @@ WHERE afiliada_id IN (
 
 -- 6. Poblar Afiliadas
 INSERT INTO afiliadas (
-    piso_id, num_afiliada, nombre, apellidos, cif, fecha_nac, genero, 
+    piso_id, nombre, apellidos, cif, fecha_nac, genero, 
     email, telefono, estado, regimen, fecha_alta, nivel_participacion, afiliacion
 )
 SELECT 
     p.id,
-    s.entry_id, 
     TRIM(s.first_name),
     TRIM(s.last_name),
     TRIM(s.nif_dni),
@@ -122,11 +127,12 @@ SELECT
 FROM staging_gravity s
 JOIN pisos p ON s.computed_address = p.direccion
 WHERE NOT EXISTS (
-    SELECT 1 FROM afiliadas a WHERE a.num_afiliada = s.entry_id
+    -- CHANGED: Now checks by CIF instead of num_afiliada vs entry_id
+    SELECT 1 FROM afiliadas a WHERE a.cif = TRIM(s.nif_dni)
 )
 ON CONFLICT (cif) DO UPDATE SET
     piso_id = EXCLUDED.piso_id,
-    num_afiliada = EXCLUDED.num_afiliada,
+    -- (num_afiliada = EXCLUDED.num_afiliada REMOVED)
     nombre = EXCLUDED.nombre,
     apellidos = EXCLUDED.apellidos,
     fecha_nac = EXCLUDED.fecha_nac,
