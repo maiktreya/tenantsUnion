@@ -126,13 +126,8 @@ SELECT
     'Importado'
 FROM staging_gravity s
 JOIN pisos p ON s.computed_address = p.direccion
-WHERE NOT EXISTS (
-    -- CHANGED: Now checks by CIF instead of num_afiliada vs entry_id
-    SELECT 1 FROM afiliadas a WHERE a.cif = TRIM(s.nif_dni)
-)
 ON CONFLICT (cif) DO UPDATE SET
     piso_id = EXCLUDED.piso_id,
-    -- (num_afiliada = EXCLUDED.num_afiliada REMOVED)
     nombre = EXCLUDED.nombre,
     apellidos = EXCLUDED.apellidos,
     fecha_nac = EXCLUDED.fecha_nac,
