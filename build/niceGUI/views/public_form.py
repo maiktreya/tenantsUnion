@@ -3,6 +3,7 @@ from api.client import APIClient
 import logging
 from pathlib import Path
 import re
+from datetime import date
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class PublicJoinForm:
                             'style="color: #dc2626; text-decoration: underline;">'
                             'términos de privacidad</a>',
                             sanitize=False  # needed to allow the <a> tag through
-                    )
+                        )
 
                     # Send button — disabled by default
                     send_btn = ui.button("Enviar Registro").classes(
@@ -69,24 +70,65 @@ class PublicJoinForm:
                                 type="warning",
                             )
                             return
-                        # Clean the data before saving
-                        data = {}
-                        for k, v in fields.items():
-                            if isinstance(v.value, str):
-                                # Strip edges and collapse multiple internal spaces into one
-                                data[k] = re.sub(r'\s+', ' ', v.value).strip()
-                            else:
-                                data[k] = v.value
-                        data["afiliacion"] = False
+                        
+                        # 1. Data Sanitization 
+                        # .strip() naturally removes both leading and trailing whitespaces.
+                        # re.sub() removes internal duplicate spaces.
+                        clean_cif = re.sub(r'\s+', '', fields["cif"].value).strip().upper()
+                        clean_nombre = re.sub(r'\s+', ' ', fields["nombre"].value).strip().title()
+                        clean_apellidos = re.sub(r'\s+', ' ', fields["apellidos"].value).strip().title()
+                        clean_email = re.sub(r'\s+', '', fields["email"].value).strip().lower()
+                        
+                        telefono_val = fields["telefono"].value
+                        clean_telefono = re.sub(r'\s+', '', telefono_val).strip() if telefono_val else None
 
-                        record, error = await self.api.create_record(
-                            "afiliadas",
-                            data,
-                            return_representation=False
+                        # Prepare the payload with the target values
+                        data = {
+                            "nombre": clean_nombre,
+                            "apellidos": clean_apellidos,
+                            "email": clean_email,
+                            "cif": clean_cif,
+                            "telefono": clean_telefono,
+                            "afiliacion": "TRUE", # Upgrading their status!
+                            "fecha_alta": date.today().isoformat()
+                        }
+
+                        # 2. Application-Level Upsert Logic
+                        # First, check if the pre-afiliada already exists by CIF
+                        existing_records = await self.api.get_records(
+                            "afiliadas", 
+                            filters={"cif": f"eq.{clean_cif}"}
                         )
 
-                        if record:
-                            ui.notify("¡Registro completado!", type="positive")
+                        success = False
+                        
+                        if existing_records:
+                            # They exist! UPDATE the record (transform 'Importado' -> 'TRUE')
+                            existing_id = existing_records[0]["id"]
+                            updated_record = await self.api.update_record(
+                                "afiliadas", 
+                                existing_id, 
+                                data
+                            )
+                            if updated_record:
+                                success = True
+                            else:
+                                ui.notify("Error al actualizar los datos existentes.", type="negative")
+                        else:
+                            # They don't exist, INSERT as a brand new record
+                            created_record, error = await self.api.create_record(
+                                "afiliadas",
+                                data,
+                                return_representation=False
+                            )
+                            if created_record:
+                                success = True
+                            else:
+                                ui.notify(f"{error}", type="negative")
+
+                        # 3. Success UI Update
+                        if success:
+                            ui.notify("¡Registro procesado con éxito!", type="positive")
                             form_container.clear()
                             
                             with form_container:
@@ -99,7 +141,5 @@ class PublicJoinForm:
                                         "Esperamos que la reunión de bienvenida empiece a resolver tus dudas. "
                                         "Nos pondremos en contacto contigo pronto."
                                     ).classes("text-lg text-center text-gray-700")
-                        else:
-                            ui.notify(f"{error}", type="negative")
 
                     send_btn.on("click", submit)
