@@ -1,7 +1,8 @@
-# build/niceGUI/views/conflicts.py (Enhanced for Client-Side State)
+# build/niceGUI/views/conflicts.py
 
 from typing import Optional, List, Dict, Awaitable, Callable
 from datetime import date
+import unicodedata  # <-- Added for tilde normalization
 from nicegui import ui, app
 from collections import Counter
 
@@ -17,12 +18,16 @@ class ConflictsView(BaseView):
 
     def __init__(self, api_client: APIClient, state: AppState):
         self.api = api_client
-        self.global_state = state  # For read-only global data like nodos
+        self.global_state = state  
         if "conflicts_view_state" not in app.storage.client:
-            client_state = GenericViewState()  # Initialize the state object on tab
-            client_state.history = []  # Add custom attribute for this view
+            client_state = GenericViewState()  
+            client_state.history = []  
             app.storage.client["conflicts_view_state"] = client_state
         self.state: GenericViewState = app.storage.client["conflicts_view_state"]
+        
+        # Cache for holding unfiltered select options to keep track during text filtering
+        self.unfiltered_conflict_options: Dict[int, str] = {} 
+        
         self.history_container = None
         self.info_container = None
         self.conflict_select = None
@@ -30,7 +35,7 @@ class ConflictsView(BaseView):
         self.filter_nodo = None
         self.filter_estado = None
         self.filter_causa = None
-        self.filter_ambito = None  # Added filter variable for 'ambito'
+        self.filter_ambito = None  
         self.filter_text = None
 
     def create(self) -> ui.column:
@@ -42,7 +47,6 @@ class ConflictsView(BaseView):
                 "text-h6 font-italic"
             )
 
-            # Use the read-only global state for options that don't change per-tab
             nodo_options = {
                 "": "Todos los nodos",
                 **{nodo["id"]: nodo["nombre"] for nodo in self.global_state.all_nodos},
@@ -50,7 +54,7 @@ class ConflictsView(BaseView):
             conflict_options = TABLE_INFO.get("conflictos", {}).get("field_options", {})
             estado_opts_list = conflict_options.get("estado", [])
             causa_opts_list = conflict_options.get("causa", [])
-            ambito_opts_list = conflict_options.get("ambito", [])  # Fetched 'ambito' options
+            ambito_opts_list = conflict_options.get("ambito", [])  
             
             estado_options = {
                 "": "Todos los estados",
@@ -60,7 +64,7 @@ class ConflictsView(BaseView):
                 "": "Todas las causas",
                 **{opt: opt for opt in causa_opts_list},
             }
-            ambito_options = {  # Created dropdown options for 'ambito'
+            ambito_options = {  
                 "": "Todos los ámbitos",
                 **{opt: opt for opt in ambito_opts_list},
             }
@@ -89,7 +93,7 @@ class ConflictsView(BaseView):
                         on_change=self._apply_filters,
                         clearable=True,
                     ).classes("w-64")
-                    self.filter_ambito = ui.select(  # Added UI element for 'ambito'
+                    self.filter_ambito = ui.select(  
                         options=ambito_options,
                         label="Filtrar por Ámbito",
                         value=self.state.filters.get("ambito"),
@@ -111,7 +115,7 @@ class ConflictsView(BaseView):
                         on_click=self._clear_filters,
                     ).props("flat color=orange-600")
 
-            # Full-width conflict selector bar (separate row)
+            # Enhanced full-width conflict selector bar with custom tilde-insensitive event filters
             with ui.row().classes("w-full gap-2 items-center"):
                 self.conflict_select = (
                     ui.select(
@@ -123,12 +127,12 @@ class ConflictsView(BaseView):
                     )
                     .classes("flex-grow")
                     .props("use-input")
+                    .on("input-value", self._filter_conflict_options)
+                    .on("focus", lambda: self.conflict_select.set_options(self.unfiltered_conflict_options))
                 )
                 ui.button(icon="refresh", on_click=self._load_conflicts).props("flat")
 
-            # Two-column layout that collapses to a single column on small screens
             with ui.row().classes("w-full gap-4 items-start flex-wrap md:flex-nowrap"):
-                # Left panel: fixed width on desktop, full width on mobile
                 with ui.column().classes("w-full md:w-96 md:shrink-0 gap-4"):
                     self.stats_card = ui.card().classes("w-full p-4")
                     self._display_statistics()
@@ -142,7 +146,6 @@ class ConflictsView(BaseView):
                             on_click=self._create_conflict,
                         ).props("color=green-600").classes("flex-grow")
                     self.info_container = ui.column().classes("w-full")
-                # Right panel: grows on desktop, full width on mobile
                 with ui.column().classes("w-full md:flex-grow"):
                     self.history_container = ui.column().classes("w-full gap-4")
 
@@ -166,24 +169,40 @@ class ConflictsView(BaseView):
     def _get_conflict_options(self, conflicts: List[Dict]) -> Dict[int, str]:
         options = {}
         for c in conflicts:
-            # Extract fields, providing fallbacks if they are missing
             ambito = c.get("ambito") or "Sin ámbito"
             nodo = c.get("nodo_nombre") or "Sin nodo"
             nombre = c.get("afiliada_nombre_completo") or "Sin afiliada"
             direccion = c.get("piso_direccion") or c.get("bloque_direccion") or "Sin dirección"
             
-            # Extract the opening date
             fecha_raw = c.get("fecha_apertura")
             fecha = str(fecha_raw).split("T")[0] if fecha_raw else "Sin fecha"
             
-            # Extract the last updated date (from our new SQL join)
             act_raw = c.get("ultima_actualizacion")
             actualizado = str(act_raw).split("T")[0] if act_raw else "Sin act."
             
-            # Format the string: "[Ámbito] [Nodo] (Apertura | Act: Fecha) Nombre, Dirección"
             options[c["id"]] = f"[{ambito}] [{nodo}] (Apertura: {fecha} | Act: {actualizado}) {nombre}, {direccion}"
             
         return options
+
+    def _normalize_string(self, text: str) -> str:
+        """Helper method to remove accents/tildes and convert to lowercase."""
+        if not text:
+            return ""
+        normalized = unicodedata.normalize("NFD", str(text).lower())
+        return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+
+    def _filter_conflict_options(self, e):
+        """Filters options accent-insensitively from Python side as the user types."""
+        needle = self._normalize_string(e.args).strip()
+        if not needle:
+            self.conflict_select.set_options(self.unfiltered_conflict_options)
+            return
+            
+        filtered = {
+            k: v for k, v in self.unfiltered_conflict_options.items()
+            if needle in self._normalize_string(v)
+        }
+        self.conflict_select.set_options(filtered)
 
     async def _apply_filters(self, _=None):
         filters = {
@@ -202,7 +221,7 @@ class ConflictsView(BaseView):
                 if self.filter_causa and self.filter_causa.value
                 else None
             ),
-            "ambito": (  # Included 'ambito' in the filter logic payload
+            "ambito": (  
                 self.filter_ambito.value
                 if self.filter_ambito and self.filter_ambito.value
                 else None
@@ -217,6 +236,8 @@ class ConflictsView(BaseView):
         self.state.apply_filters_and_sort()
 
         options = self._get_conflict_options(self.state.filtered_records)
+        self.unfiltered_conflict_options = options  # Update cache
+        
         if self.conflict_select:
             self.conflict_select.set_options(options)
             current_selection_id = (
@@ -235,7 +256,7 @@ class ConflictsView(BaseView):
         self.filter_nodo.value = None
         self.filter_estado.value = ""
         self.filter_causa.value = None
-        self.filter_ambito.value = None  # Included 'ambito' in the UI reset logic
+        self.filter_ambito.value = None  
         self.filter_text.value = ""
         ui.timer(0.1, self._apply_filters, once=True)
 
@@ -245,7 +266,6 @@ class ConflictsView(BaseView):
         self.stats_card.clear()
         with self.stats_card:
             ui.label("Estadísticas").classes("text-h6 mb-2")
-            # Ensure None values are counted as 'Sin estado' to avoid sort errors
             status_counts = Counter(
                 (c.get("estado") or "Sin estado") for c in self.state.filtered_records
             )
@@ -273,6 +293,8 @@ class ConflictsView(BaseView):
         )
         if conflict:
             self.state.selected_item.set(conflict)
+            # Restore the complete options list on selection change so the full list is ready when reopened
+            self.conflict_select.set_options(self.unfiltered_conflict_options)
             await self._display_conflict_info()
             await self._load_conflict_history()
 
@@ -343,7 +365,6 @@ class ConflictsView(BaseView):
             )
             self.state.history = history_records
             with self.history_container:
-                # Subheader for the diary/history section
                 ui.label("Historial del conflicto").classes(
                     "text-subtitle1 font-semibold mb-2"
                 )
@@ -447,7 +468,6 @@ class ConflictsView(BaseView):
                 ).classes("w-full")
 
         async def _handle_save(data: dict) -> bool:
-            # 1. Validation Step
             missing_fields = []
             if not data.get("ambito"):
                 missing_fields.append("Ámbito")
@@ -463,17 +483,14 @@ class ConflictsView(BaseView):
                     position="top"
                 )
                 return False 
-            # Extract custom field before hitting the API
             primera_tarea = data.pop("primera_tarea", None)
             data["estado"] = "Abierto"
             if primera_tarea:
                 data["tarea_actual"] = primera_tarea
-            # Step A: Create the main 'conflicto' record
             result, error = await self.api.create_record("conflictos", data)
             if not result:
                 ui.notify(f"Error al crear conflicto: {error}", type="negative")
                 return False
-            # Step B: Create the initial entry in 'diario_conflictos'
             if primera_tarea:
                 user_id = app.storage.user.get("user_id")
                 nota_data = {
@@ -487,7 +504,7 @@ class ConflictsView(BaseView):
                 note_result, note_error = await self.api.create_record("diario_conflictos", nota_data)
                 if not note_result:
                     ui.notify(f"Conflicto creado, pero falló la nota: {note_error}", type="warning")
-                    return True # Still return True to close dialog since the main conflict succeeded
+                    return True 
                 
             ui.notify("Conflicto creado con éxito.", type="positive")
             return True
@@ -551,7 +568,7 @@ class ConflictsView(BaseView):
                     conflict_update["fecha_cierre"] = date.today().isoformat()
                 else:
                     conflict_update["estado"] = data["estado"]
-                    conflict_update["fecha_cierre"] = None  #clears the date if you reopen it!
+                    conflict_update["fecha_cierre"] = None  
             if conflict_update:
                 await self.api.update_record(
                     "conflictos", selected_conflict["id"], conflict_update

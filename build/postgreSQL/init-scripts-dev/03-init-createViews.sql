@@ -26,7 +26,7 @@ SELECT
     ee.id, -- ID primario del entramado
     ee.nombre AS "Entramado",
     ee.descripcion AS "Descripción",
-    COUNT(DISTINCT e.id) AS "Núm. Empresas",
+    e.nombre AS "Empresa",
     COUNT(DISTINCT b.id) AS "Núm. Bloques",
     COUNT(DISTINCT p.id) AS "Núm. Pisos",
     COUNT(DISTINCT a.id) AS "Núm. Afiliadas"
@@ -35,7 +35,7 @@ FROM entramado_empresas ee
     LEFT JOIN bloques b ON e.id = b.empresa_id
     LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
-GROUP BY ee.id, ee.nombre, ee.descripcion;
+GROUP BY ee.id, ee.nombre, ee.descripcion, e.nombre;
 
 -- ---------------------------------------------------------------------
 -- VISTA: v_resumen_nodos
@@ -44,11 +44,10 @@ DROP VIEW IF EXISTS v_resumen_nodos CASCADE;
 
 CREATE OR REPLACE VIEW v_resumen_nodos AS
 SELECT
-    n.id,
-    n.nombre AS "Nodo Territorial",
-    n.descripcion AS "Descripcion",
+    COALESCE(n.id, 0) AS id,
+    COALESCE(n.nombre, 'Sin Nodo') AS "Nodo Territorial",
+    COALESCE(n.descripcion, 'Afiliadas sin nodo territorial asignado') AS "Descripcion",
     COUNT(DISTINCT p.id) AS "Num. Pisos",
-    COUNT(DISTINCT b.id) AS "Num. Bloques",
     COUNT(DISTINCT a.id) FILTER (
         WHERE a.estado = 'Alta') AS "Afiliadas Alta",
     COUNT(DISTINCT a.id) FILTER (
@@ -56,16 +55,27 @@ SELECT
     COUNT(DISTINCT c.id) AS "Total Conflictos",
     COUNT(DISTINCT c.id) FILTER (
         WHERE a.estado = 'Alta' AND c.estado = 'Abierto'
-    ) AS "Conflictos Abiertos"
+    ) AS "Conflictos Abiertos",
+    -- 1. Nueva métrica para ordenar por conflictos abiertos de ámbito bloque
+    COUNT(DISTINCT c.id) FILTER (
+        WHERE c.estado = 'Abierto' AND LOWER(c.ambito) = 'bloque'
+    ) AS "Conf. Abiertos Bloque",
+    -- 4. Cálculo del % del total de afiliadas de alta que pertenecen a este nodo
+    ROUND(
+        100.0 * COUNT(DISTINCT a.id) FILTER (WHERE a.estado = 'Alta') / 
+        NULLIF(SUM(COUNT(DISTINCT a.id) FILTER (WHERE a.estado = 'Alta')) OVER (), 0), 
+        2
+    ) AS "% Afiliadas Alta"
 FROM nodos n
     LEFT JOIN nodos_cp_mapping ncm ON n.id = ncm.nodo_id
     LEFT JOIN pisos p ON p.cp = ncm.cp
-    LEFT JOIN bloques b ON p.bloque_id = b.id
-    LEFT JOIN afiliadas a ON p.id = a.piso_id
+    -- 3. Cambiado a FULL OUTER JOIN para capturar afiliadas cuyos pisos/CPs no mapean a ningún nodo
+    FULL OUTER JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN conflictos c ON a.id = c.afiliada_id
     LEFT JOIN facturacion f ON a.id = f.afiliada_id
 GROUP BY n.id, n.nombre, n.descripcion
-ORDER BY "Afiliadas Alta" DESC;
+-- 1. Ordenación prioritaria solicitada
+ORDER BY "Conf. Abiertos Bloque" DESC;
 
 -- ---------------------------------------------------------------------
 -- VISTA: v_conflictos_detalle
@@ -146,16 +156,28 @@ SELECT
     MIN(ncm.nodo_id) AS nodo_id,
     b.direccion AS "Direccion",
     e.nombre AS "Empresa Propietaria",
+    ee.nombre AS "Entramado", -- Obtenemos el nombre real desde entramado_empresas
     COALESCE(MAX(n.nombre), 'Sin Nodo Asignado') AS "Nodo Territorial",
     COUNT(DISTINCT p.id) AS "Pisos en el bloque",
-    COUNT(DISTINCT a.id) AS "Afiliadas en el bloque"
+    COUNT(DISTINCT a.id) AS "Afiliadas en el bloque",
+    -- Conteo de afiliadas activas (Alta) con cuota estrictamente mayor a 1
+    COUNT(DISTINCT a.id) FILTER (
+        WHERE a.estado = 'Alta' AND f.cuota > 1
+    ) AS "Afiliadas Alta (Cuota > 1)",
+    -- Conteo de afiliadas registradas como 'Baja'
+    COUNT(DISTINCT a.id) FILTER (
+        WHERE a.estado = 'Baja'
+    ) AS "Afiliadas Baja"
 FROM bloques b
     LEFT JOIN empresas e ON b.empresa_id = e.id
+    -- Nuevo JOIN utilizando la clave foránea esperada (entramado_id)
+    LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id 
     LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
     LEFT JOIN nodos n ON ncm.nodo_id = n.id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
-GROUP BY b.id, b.empresa_id, b.direccion, e.nombre;
+    LEFT JOIN facturacion f ON a.id = f.afiliada_id
+GROUP BY b.id, b.empresa_id, b.direccion, e.nombre, ee.nombre;
 
 -- ---------------------------------------------------------------------
 -- VISTA: v_facturacion

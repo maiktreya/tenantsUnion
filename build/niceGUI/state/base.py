@@ -5,7 +5,18 @@ from dataclasses import dataclass, field
 import unicodedata
 import re
 from datetime import datetime
+# Add this new utility function near _normalize_for_sorting:
 
+def _normalize_for_filtering(value: Any) -> str:
+    """
+    Normalizes a value specifically for text filtering (substring matches).
+    Converts to lowercase and cleanly strips accents/tildes without 
+    distorting numerical queries into fixed-width floats.
+    """
+    if value is None:
+        return ""
+    normalized = unicodedata.normalize("NFD", str(value).strip().lower())
+    return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
 
 def _normalize_for_sorting(value: Any) -> str:
     """
@@ -141,8 +152,8 @@ class BaseTableState:
             elif column == "global_search":
                 raw_search = str(filter_value).strip()
                 if raw_search:
-                    normalized_term = _normalize_for_sorting(raw_search)
-                    lowered_term = raw_search.lower()
+                    # Use our text-filtering specific normalization function here
+                    normalized_term = _normalize_for_filtering(raw_search)
 
                     def matches(value):
                         if value is None:
@@ -151,15 +162,14 @@ class BaseTableState:
                             return any(matches(v) for v in value.values())
                         if isinstance(value, (list, tuple, set)):
                             return any(matches(v) for v in value)
-                        normalized_value = _normalize_for_sorting(value)
-                        if normalized_term and normalized_term in normalized_value:
-                            return True
-                        return lowered_term in str(value).lower()
+                        
+                        # Match cleanly against normalized tilde-free strings
+                        return normalized_term in _normalize_for_filtering(value)
 
                     filtered = [
                         r for r in filtered if any(matches(v) for v in r.values())
                     ]
-
+                    
             elif isinstance(filter_value, list):
                 if filter_value:
                     filtered = [

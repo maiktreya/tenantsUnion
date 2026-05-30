@@ -372,8 +372,8 @@ VIEW_INFO = {
         "base_table": "entramado_empresas",
         "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
-    "comprobar_link_pisos_bloques": {
-        "display_name": "Comprobar Vínculo Pisos-Bloques",
+    "v_sugerencias_pisos_huerfanos": {
+        "display_name": "Sugerencias pisos",
         "base_table": "pisos",
     },
     "v_consolidar_pisos_bloques": {
@@ -391,7 +391,7 @@ VIEW_ORDER = [
     "v_resumen_nodos",
     "v_resumen_bloques",
     "v_resumen_entramados_empresas",
-    "comprobar_link_pisos_bloques",
+    "v_sugerencias_pisos_huerfanos",
     "v_consolidar_pisos_bloques",
 ]
 
