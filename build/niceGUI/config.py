@@ -356,6 +356,7 @@ VIEW_INFO = {
         "display_name": "Vista extendida de facturación",
         "base_table": "afiliadas",
         "hidden_fields": ["id"],
+        "excluded_roles": ["gestor"],
     },
     "v_resumen_nodos": {
         "display_name": "Resumen de Nodos",

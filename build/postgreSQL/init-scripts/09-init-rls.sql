@@ -36,16 +36,24 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY tables
   LOOP
-      -- You WANTED security here, so we enable it.
+      -- 1. Mantenemos la seguridad RLS activa (El cortafuegos se enciende para ambas)
       EXECUTE format('ALTER TABLE sindicato_inq.%I ENABLE ROW LEVEL SECURITY', t);
 
-      -- Admin (ALL)
+      -- 2. Admin (ALL) - Permitimos acceso total al administrador en ambas tablas
       EXECUTE format('DROP POLICY IF EXISTS admin_all ON sindicato_inq.%I', t);
       EXECUTE format('CREATE POLICY admin_all ON sindicato_inq.%I FOR ALL TO web_user USING (current_setting(''request.jwt.claims'', true)::jsonb -> ''roles'' ? ''admin'')', t, t);
-     
-      -- Gestor (READ ONLY)
-      EXECUTE format('DROP POLICY IF EXISTS gestor_read ON sindicato_inq.%I', t);
-      EXECUTE format('CREATE POLICY gestor_read ON sindicato_inq.%I FOR SELECT TO web_user USING (current_setting(''request.jwt.claims'', true)::jsonb -> ''roles'' ? ''gestor'')', t, t);
+       
+      -- 3. Control específico por tabla (Implementación robusta de la Opción A)
+      IF t = 'afiliadas' THEN
+          -- El Gestor solo puede consultar (SELECT) la tabla de afiliadas
+          EXECUTE format('DROP POLICY IF EXISTS gestor_read ON sindicato_inq.%I', t);
+          EXECUTE format('CREATE POLICY gestor_read ON sindicato_inq.%I FOR SELECT TO web_user USING (current_setting(''request.jwt.claims'', true)::jsonb -> ''roles'' ? ''gestor'')', t, t);
+      ELSE
+          -- Para 'facturacion', nos aseguramos de BORRAR cualquier política residual antigua.
+          -- Al quedar RLS activo y no existir ninguna política para el gestor,
+          -- PostgreSQL aplicará un "Deny por defecto" automático para ese rol.
+          EXECUTE format('DROP POLICY IF EXISTS gestor_read ON sindicato_inq.%I', t);
+      END IF;
   END LOOP;
 END
 $$;
