@@ -78,7 +78,7 @@ GROUP BY n.id, n.nombre, n.descripcion
 ORDER BY "Conf. Abiertos Bloque" DESC;
 
 -- ---------------------------------------------------------------------
--- VISTA: v_conflictos_detalle
+-- VISTA: v_conflictos_detalle (Con ordenación de campos personalizada)
 -- ---------------------------------------------------------------------
 DROP VIEW IF EXISTS v_conflictos_detalle CASCADE;
 
@@ -91,13 +91,13 @@ SELECT
     p.direccion AS "Dirección",
     c.causa AS "Causa",
     c.fecha_apertura AS "Fecha de Apertura",
+    ult_act.ultima_actualizacion AS "Fecha Última Actualización",
     c.descripcion AS "Descripción",
     c.tarea_actual AS "Tarea Actual",
     c.fecha_cierre AS "Fecha de Cierre",
     c.resolucion AS "Resolución",
-    n.nombre AS "Nodo",
-    c.afiliada_id AS "Afiliada ID",
-    ult_act.ultima_actualizacion AS "Fecha Última Actualización"
+    COALESCE(n.nombre, 'Sin Nodo') AS "Nodo",
+    c.afiliada_id AS "Afiliada ID"
 FROM sindicato_inq.conflictos c
     LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
     LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
@@ -108,7 +108,8 @@ FROM sindicato_inq.conflictos c
         SELECT conflicto_id, MAX(created_at) AS ultima_actualizacion
         FROM sindicato_inq.diario_conflictos
         GROUP BY conflicto_id
-    ) ult_act ON c.id = ult_act.conflicto_id;
+    ) ult_act ON c.id = ult_act.conflicto_id
+ORDER BY c.fecha_apertura DESC;
 
 -- ---------------------------------------------------------------------
 -- VISTA: v_afiliadas_detalle
