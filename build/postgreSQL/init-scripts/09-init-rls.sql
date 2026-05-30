@@ -57,6 +57,7 @@ BEGIN
   END LOOP;
 END
 $$;
+ALTER VIEW sindicato_inq.v_facturacion SET (security_invoker = true);
 
 -- ======= INICIO DEL PARCHE APLICADO EN CONSOLA =======
 -- Política RLS para permitir inserciones públicas (formulario de registro)
