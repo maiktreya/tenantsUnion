@@ -5,7 +5,7 @@
 SET search_path TO public;
 
 -- Ensure required extensions exist
-CREATE EXTENSION IF NOT EXISTS pg_trgm   WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 
 SET search_path TO sindicato_inq, public;
