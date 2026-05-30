@@ -199,16 +199,28 @@ class Application:
             """
             let lastScroll = 0;
             const header = document.getElementById('main-header');
+            const upThreshold = 200; // 💡 The minimum pixels you must scroll up to show the header
+
             window.addEventListener('scroll', function() {
                 const currScroll = window.scrollY;
-                if (currScroll > lastScroll && currScroll > 50) {
-                    header.classList.add('hide-on-scroll');
-                } else {
+                
+                // 1. Always show the header if we are close to the top of the page
+                if (currScroll <= 50) {
                     header.classList.remove('hide-on-scroll');
+                    lastScroll = currScroll;
+                    return;
                 }
-                lastScroll = currScroll;
+                if (currScroll > lastScroll) {
+                    // 2. Scrolling down -> Hide the header immediately
+                    header.classList.add('hide-on-scroll');
+                    lastScroll = currScroll;
+                } else if (lastScroll - currScroll > upThreshold) {
+                    // 3. Scrolling up -> Only show if the accumulated up-scroll exceeds our threshold
+                    header.classList.remove('hide-on-scroll');
+                    lastScroll = currScroll;
+                }
             });
-        """
+            """
         )
 
     def create_views(self):
