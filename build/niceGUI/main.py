@@ -199,7 +199,7 @@ class Application:
             """
             let lastScroll = 0;
             const header = document.getElementById('main-header');
-            const upThreshold = 200; // 💡 The minimum pixels you must scroll up to show the header
+            const upThreshold = 1920; // 💡 The minimum pixels you must scroll up to show the header
 
             window.addEventListener('scroll', function() {
                 const currScroll = window.scrollY;
