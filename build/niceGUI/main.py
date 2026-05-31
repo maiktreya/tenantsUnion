@@ -186,8 +186,6 @@ class Application:
                 #main-header {
                     transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
                     z-index: 100;
-                    position: sticky;
-                    top: 0;
                 }
                 .hide-on-scroll {
                     transform: translateY(-100%);
@@ -237,10 +235,10 @@ class Application:
                 )
             if self.has_role("admin", "gestor", "actas"):
                 self.views["conflicts"] = ConflictsView(self.api_client, self.state)
-            with ui.column().classes("w-full min-h-screen bg-gray-50"):
+            with ui.column().classes("w-full min-h-screen bg-gray-50 p-0 gap-0"):
                 for name, view in self.views.items():
                     self.view_containers[name] = container = ui.column().classes(
-                        "w-full"
+                        "w-full p-0 gap-0"
                     )
                     container.visible = False
                     with container:
