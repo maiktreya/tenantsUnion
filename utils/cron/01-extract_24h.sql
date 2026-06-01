@@ -97,7 +97,7 @@ WHERE e.date_created >= DATE_SUB(NOW(), INTERVAL 1 DAY)
 
 GROUP BY e.id, e.date_created
 
-HAVING bank_iban IS NOT NULL 
-   AND TRIM(bank_iban) != ''
+-- HAVING bank_iban IS NOT NULL 
+--   AND TRIM(bank_iban) != ''
 
 ORDER BY e.id DESC;

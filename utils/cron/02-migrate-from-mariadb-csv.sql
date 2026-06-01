@@ -156,7 +156,8 @@ SELECT
     CASE WHEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$' THEN 'Domiciliación' ELSE 'Metálico' END,
     CASE WHEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$' THEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ELSE NULL END
 FROM staging_gravity s
-JOIN afiliadas a ON s.entry_id = a.num_afiliada
+-- CHANGE THIS JOIN CONDITION TO USE THE NATURAL KEY (CIF/NIF)
+JOIN afiliadas a ON TRIM(s.nif_dni) = a.cif
 WHERE NOT EXISTS (
     SELECT 1 FROM facturacion f WHERE f.afiliada_id = a.id
 );
