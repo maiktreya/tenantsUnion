@@ -428,9 +428,14 @@ class EnhancedRecordDialog:
                     ui.notify(f"Error: {error_message}", type="negative")
 
             else:
-                record_id = self.record.get(
-                    TABLE_INFO.get(self.table, {}).get("id_field", "id")
-                )
+                id_field = TABLE_INFO.get(self.table, {}).get("id_field", "id")
+                
+                # Support composite primary keys for updates
+                if "," in id_field:
+                    record_id = {k.strip(): self.record.get(k.strip()) for k in id_field.split(",")}
+                else:
+                    record_id = self.record.get(id_field)
+                    
                 result = await self.api.update_record(self.table, record_id, final_data)
                 if result:
                     ui.notify("Record updated successfully", type="positive")

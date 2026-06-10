@@ -335,11 +335,11 @@ class UserManagementView(BaseView):
 
                 async def update_roles():
                     try:
-                        client = self.api._ensure_client()
                         for link in user_role_links:
-                            url = f"{self.api.base_url}/usuario_roles?usuario_id=eq.{link['usuario_id']}&role_id=eq.{link['role_id']}"
-                            await client.delete(url)
-
+                            await self.api.delete_record(
+                                "usuario_roles", 
+                                {"usuario_id": link['usuario_id'], "role_id": link['role_id']}
+                            )
                         if roles_select.value:
                             for role_id in roles_select.value:
                                 await self.api.create_record(

@@ -212,18 +212,31 @@ class AdminView(BaseView):
         await dialog.open()
 
     def _delete_record(self, record: Dict):
-        record_id = record.get(
-            TABLE_INFO.get(self.state.selected_entity_name.value, {}).get(
-                "id_field", "id"
-            )
-        )
+        table_name = self.state.selected_entity_name.value
+        id_field = TABLE_INFO.get(table_name, {}).get("id_field", "id")
+        
+        # Check if it's a composite key (e.g., "usuario_id,role_id")
+        if "," in id_field:
+            record_id = {k.strip(): record.get(k.strip()) for k in id_field.split(",")}
+            display_id = "Seleccionado"
+        else:
+            record_id = record.get(id_field)
+            display_id = f"#{record_id}"
+
         ConfirmationDialog(
-            title=f"¿Eliminar registro #{record_id}?",
+            title=f"¿Eliminar registro {display_id}?",
             message="Esta acción no se puede deshacer.",
             on_confirm=lambda: self._confirm_delete(record_id),
             confirm_button_text="Eliminar",
             confirm_button_color="negative",
         )
+
+    async def _confirm_delete(self, record_id: Any): # Note: Changed int to Any
+        if await self.api.delete_record(
+            self.state.selected_entity_name.value, record_id
+        ):
+            ui.notify("Registro eliminado con éxito", type="positive")
+            await self._refresh_data()
 
     async def _confirm_delete(self, record_id: int):
         if await self.api.delete_record(

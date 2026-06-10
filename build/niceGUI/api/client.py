@@ -53,6 +53,16 @@ class APIClient:
             
         return {}
 
+    def _build_pk_filter(self, table: str, record_id: Any) -> str:
+        """Builds a PostgREST query string for single or composite primary keys."""
+        if isinstance(record_id, dict):
+            # If a dict is passed, it's a composite key: "col1=eq.val1&col2=eq.val2"
+            return "&".join([f"{k}=eq.{v}" for k, v in record_id.items()])
+            
+        from config import TABLE_INFO
+        pk_field = TABLE_INFO.get(table, {}).get("id_field", "id")
+        return f"{pk_field}=eq.{record_id}"
+    
     async def get_records(
         self,
         table: str,
@@ -295,10 +305,7 @@ class APIClient:
                 return None
 
         client = self._ensure_client()
-        pk_filter = f"id=eq.{record_id}"
-        if table == "usuario_credenciales":
-            pk_filter = f"usuario_id=eq.{record_id}"
-
+        pk_filter = self._build_pk_filter(table, record_id)
         url = f"{self.base_url}/{table}?{pk_filter}"
         
         # Inject Auth Headers and Merge
@@ -340,7 +347,8 @@ class APIClient:
     async def delete_record(self, table: str, record_id: int) -> bool:
         """Delete a record by ID."""
         client = self._ensure_client()
-        url = f"{self.base_url}/{table}?id=eq.{record_id}"
+        pk_filter = self._build_pk_filter(table, record_id)
+        url = f"{self.base_url}/{table}?{pk_filter}"
 
         # Inject Auth Headers
         headers = self._get_auth_headers()
