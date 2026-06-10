@@ -152,22 +152,22 @@ class BaseTableState:
             elif column == "global_search":
                 raw_search = str(filter_value).strip()
                 if raw_search:
-                    # Use our text-filtering specific normalization function here
                     normalized_term = _normalize_for_filtering(raw_search)
+                    # Split the search query into individual words (tokens)
+                    search_tokens = normalized_term.split()
 
-                    def matches(value):
-                        if value is None:
-                            return False
-                        if isinstance(value, dict):
-                            return any(matches(v) for v in value.values())
-                        if isinstance(value, (list, tuple, set)):
-                            return any(matches(v) for v in value)
-                        
-                        # Match cleanly against normalized tilde-free strings
-                        return normalized_term in _normalize_for_filtering(value)
+                    def get_all_record_text(record):
+                        """Combines all field values into a single searchable string."""
+                        texts = []
+                        for v in record.values():
+                            if v is not None and not isinstance(v, (dict, list, tuple, set)):
+                                texts.append(_normalize_for_filtering(v))
+                        return " ".join(texts)
 
+                    # A record matches if ALL search tokens are found ANYWHERE in the combined text
                     filtered = [
-                        r for r in filtered if any(matches(v) for v in r.values())
+                        r for r in filtered 
+                        if all(token in get_all_record_text(r) for token in search_tokens)
                     ]
                     
             elif isinstance(filter_value, list):

@@ -1,10 +1,19 @@
 # build/niceGUI/components/dialogs.py
 
+import unicodedata
 from typing import Dict, Optional, Callable, Awaitable, Any
 from nicegui import ui
 from api.client import APIClient
 from config import TABLE_INFO
 from datetime import date
+
+
+def _normalize_search(text: Any) -> str:
+    """Helper to remove accents and lowercase strings for robust searching."""
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFD", str(text).lower())
+    return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
 
 
 def _clean_dialog_record(record: Dict) -> Dict:
@@ -83,7 +92,6 @@ class EnhancedRecordDialog:
         self.calling_view = calling_view
         self.sort_fields = sort_fields
         self.extra_hidden_fields = set(extra_hidden_fields or [])
-
 
     def _resolve_select_value(self, value: Any, options: Any) -> Any:
         """Return the option matching value, ignoring case when possible."""
@@ -206,11 +214,36 @@ class EnhancedRecordDialog:
             if field in self.custom_options:
                 options = self.custom_options[field]
                 current_value = self._resolve_select_value(value, options)
-                self.inputs[field] = (
-                    ui.select(options=options, label=label, value=current_value)
-                    .classes("w-full")
-                    .props("use-input")
-                )
+                
+                sel = ui.select(
+                    options=options, 
+                    label=label, 
+                    value=current_value,
+                    clearable=True
+                ).classes("w-full").props("use-input")
+                
+                # Closure to handle dynamic tokenized filtering
+                def make_filter(opts, select_widget):
+                    def filter_fn(e):
+                        needle = _normalize_search(e.args if e.args else "").strip()
+                        if not needle:
+                            select_widget.set_options(opts)
+                            return
+                        tokens = needle.split()
+                        filtered = {
+                            k: v for k, v in opts.items()
+                            if all(t in _normalize_search(v) for t in tokens)
+                        }
+                        select_widget.set_options(filtered)
+                    return filter_fn
+
+                # Bind the text input to our custom filter function
+                sel.on("input-value", make_filter(options, sel))
+                # Restore full list when user clicks/focuses
+                sel.on("focus", lambda opts=options, s=sel: s.set_options(opts))
+                
+                self.inputs[field] = sel
+                
             elif field in relations:
                 relation = relations[field]
                 view_name = relation['view']
@@ -299,17 +332,32 @@ class EnhancedRecordDialog:
                     )
                     continue
 
-                self.inputs[field] = (
-                    ui.select(
-                        options=options,
-                        label=label,
-                        value=normalized_value,
-                        with_input=True,
-                        clearable=True,
-                    )
-                    .classes('w-full')
-                    .props("input-debounce='0' fill-input")
-                )
+                sel = ui.select(
+                    options=options,
+                    label=label,
+                    value=normalized_value,
+                    clearable=True,
+                ).classes('w-full').props("use-input")
+                
+                def make_filter(opts, select_widget):
+                    def filter_fn(e):
+                        needle = _normalize_search(e.args if e.args else "").strip()
+                        if not needle:
+                            select_widget.set_options(opts)
+                            return
+                        tokens = needle.split()
+                        filtered = {
+                            k: v for k, v in opts.items()
+                            if all(t in _normalize_search(v) for t in tokens)
+                        }
+                        select_widget.set_options(filtered)
+                    return filter_fn
+
+                sel.on("input-value", make_filter(options, sel))
+                sel.on("focus", lambda opts=options, s=sel: s.set_options(opts))
+
+                self.inputs[field] = sel
+                
             elif field in field_options:
                 options = field_options[field]
                 current_value = self._resolve_select_value(value, options)
