@@ -20,24 +20,36 @@ def _normalize_for_filtering(value: Any) -> str:
 
 def _normalize_for_sorting(value: Any) -> str:
     """
-    Normalizes a value for robust sorting, handling None, numbers as text,
-    case sensitivity, and accents.
+    Normalizes a value for robust sorting. Handles:
+    - Pure numbers (including negatives and decimals)
+    - Natural alphanumeric sorting (so "A2" < "A10")
+    - Case insensitivity and accent removal
     """
     if value is None:
         return ""
 
     str_value = str(value).strip()
 
+    # 1. Pure numbers: Add an offset so negatives sort correctly via string comparison
     if re.match(r"^-?(?:\d+\.?\d*|\.\d+)$", str_value):
         try:
-            numeric_value = float(str_value)
-            return f"{numeric_value:020.6f}"
+            numeric_value = float(str_value) + 1_000_000_000_000
+            return f"1_NUM_{numeric_value:025.6f}"
         except (ValueError, TypeError):
             pass
 
+    # 2. Text (Natural sorting): Lowercase and remove accents
     normalized = unicodedata.normalize("NFD", str_value.lower())
     without_accents = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
-    return without_accents
+    
+    # Zero-pad any sequences of digits to 20 characters so they string-sort numerically
+    def pad_numbers(match):
+        return match.group(0).zfill(20)
+        
+    natural_sorted_string = re.sub(r'\d+', pad_numbers, without_accents)
+    
+    # Prefix with 2_TXT_ so pure strings safely sort after pure numbers
+    return f"2_TXT_{natural_sorted_string}"
 
 
 @dataclass

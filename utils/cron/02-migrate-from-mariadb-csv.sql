@@ -1,5 +1,6 @@
 -- =====================================================================
 -- ARCHIVO 02: IMPORTACIÓN DESDE GRAVITY FORMS (PIPELINE AUTOMATIZADO)
+-- REFACTORIZADO: FIJADO DE ASOCIACIÓN DE FACTURACIÓN Y CASING DE CIF
 -- =====================================================================
 
 SET search_path TO sindicato_inq, public;
@@ -30,7 +31,7 @@ FROM '/csv-data/mariadb_export.csv'
 WITH (FORMAT csv, DELIMITER ',', HEADER true);
 
 -- ====================================================================================
--- 2.5 SANITIZACIÓN DE NULOS LITERALES (LA SOLUCIÓN AL ERROR DEL CRONJOB)
+-- 2.5 SANITIZACIÓN DE NULOS LITERALES
 -- Convierte el texto "NULL" exportado por bash/mysql en verdaderos valores nulos de SQL
 -- ====================================================================================
 UPDATE staging_gravity
@@ -97,15 +98,19 @@ SELECT DISTINCT
 FROM staging_gravity WHERE computed_address IS NOT NULL
 ON CONFLICT (direccion) DO NOTHING;
 
--- 5.5 Limpiar facturación "ficticia" antigua de las preafiliadas 
+-- ====================================================================================
+-- 5.5 LIMPIEZA DE FACTURACIÓN ANTERIOR (REFACTORIZADO)
+-- Evita bloqueos de "NOT EXISTS" limpiando registros previos de las afiliadas entrantes
+-- ====================================================================================
 DELETE FROM facturacion
 WHERE afiliada_id IN (
     SELECT id FROM afiliadas 
-    WHERE UPPER(afiliacion) = 'FALSE'
-      AND cif IN (SELECT UPPER(TRIM(nif_dni)) FROM staging_gravity)
+    WHERE UPPER(TRIM(cif)) IN (SELECT UPPER(TRIM(nif_dni)) FROM staging_gravity)
 );
 
--- 6. Poblar Afiliadas
+-- ====================================================================================
+-- 6. POBLAR AFILIADAS (REFACTORIZADO CON CASING UPPER EN CIF)
+-- ====================================================================================
 INSERT INTO afiliadas (
     piso_id, nombre, apellidos, cif, fecha_nac, genero, 
     email, telefono, estado, regimen, fecha_alta, nivel_participacion, afiliacion
@@ -114,7 +119,7 @@ SELECT
     p.id,
     TRIM(s.first_name),
     TRIM(s.last_name),
-    TRIM(s.nif_dni),
+    UPPER(TRIM(s.nif_dni)), -- Forzar mayúsculas para evitar fallos de case-sensitivity
     CAST(NULLIF(s.birth_date, '') AS DATE),
     TRIM(s.gender),
     TRIM(s.email),
@@ -140,14 +145,13 @@ ON CONFLICT (cif) DO UPDATE SET
     nivel_participacion = EXCLUDED.nivel_participacion,
     afiliacion = 'Importado'
 WHERE UPPER(afiliadas.afiliacion) = 'FALSE'
-   OR EXISTS (
-       SELECT 1 
-       FROM facturacion 
-       WHERE facturacion.afiliada_id = afiliadas.id 
-         AND facturacion.cuota = 0
-);
+   OR NOT EXISTS (
+       SELECT 1 FROM facturacion WHERE facturacion.afiliada_id = afiliadas.id
+   );
 
--- 7. Poblar Facturación 
+-- ====================================================================================
+-- 7. POBLAR FACTURACIÓN (REFACTORIZADO CON NATURAL KEY MATCH & CASE INSENSITIVITY)
+-- ====================================================================================
 INSERT INTO facturacion (afiliada_id, cuota, periodicidad, forma_pago, iban)
 SELECT 
     a.id,
@@ -156,8 +160,8 @@ SELECT
     CASE WHEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$' THEN 'Domiciliación' ELSE 'Metálico' END,
     CASE WHEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$' THEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ELSE NULL END
 FROM staging_gravity s
--- CHANGE THIS JOIN CONDITION TO USE THE NATURAL KEY (CIF/NIF)
-JOIN afiliadas a ON TRIM(s.nif_dni) = a.cif
+-- INNER JOIN robusto por clave natural (NIF/CIF) limpiando espacios y variaciones de letras
+JOIN afiliadas a ON UPPER(TRIM(s.nif_dni)) = UPPER(TRIM(a.cif))
 WHERE NOT EXISTS (
     SELECT 1 FROM facturacion f WHERE f.afiliada_id = a.id
 );
