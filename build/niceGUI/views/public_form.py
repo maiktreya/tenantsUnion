@@ -89,7 +89,8 @@ class PublicJoinForm:
                             "email": clean_email,
                             "cif": clean_cif,
                             "telefono": clean_telefono,
-                            "afiliacion": "TRUE", # Upgrading their status!
+                            "afiliacion": "true",
+                            "estado": "Bienvenida",
                             "fecha_alta": date.today().isoformat()
                         }
 
