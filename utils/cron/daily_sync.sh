@@ -40,7 +40,7 @@ DB_CONTAINER_NAME="tenantsunion-db-1" # Confirm this matches: docker ps
 
 # File Paths
 SQL_QUERY_PATH="${PROJECT_DIR}/ETL/geo/madrid/01-extract_24h.sql"
-PG_IMPORT_SCRIPT="${PROJECT_DIR}/ETL/03-migrate-from-mariadb-csv.sql"
+PG_IMPORT_SCRIPT="${PROJECT_DIR}/ETL/03-load-from-csv.sql"
 CSV_DEST_PATH="${PROJECT_DIR}/dev/back/SI_MAD/db_fork/mariadb_export.csv" 
 
 # ==============================================================================
