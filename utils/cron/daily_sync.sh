@@ -28,18 +28,13 @@ fi
 # CONFIGURATION
 # ==============================================================================
 # SSH Tunnel Configuration (Variables injected from .env)
-SSH_KEY="/home/other/.ssh/id_rsa"
 TUNNEL_SOCKET="/tmp/mariadb_tunnel_socket"
 LOCAL_DB_PORT="33306"
 REMOTE_DB_HOST="127.0.0.1"
 REMOTE_DB_PORT="3306"
 
-# PostgreSQL (Sindicato) Docker Config
-DB_CONTAINER_NAME="tenantsunion-db-1" # Confirm this matches: docker ps
-# Note: POSTGRES_USER and POSTGRES_DB are now injected directly from your .env file!
-
 # File Paths
-SQL_QUERY_PATH="${PROJECT_DIR}/ETL/geo/madrid/01-extract_24h.sql"
+SQL_QUERY_PATH="${PROJECT_DIR}/${ETL_EXTRACT_PATH#./}"
 PG_IMPORT_SCRIPT="${PROJECT_DIR}/ETL/03-load-from-csv.sql"
 CSV_DEST_PATH="${PROJECT_DIR}/dev/back/SI_MAD/db_fork/mariadb_export.csv" 
 
