@@ -27,6 +27,7 @@ dev/
 logs/
 doc/working-notes.md
 utils/cron/tenants_sync.log
+utils/cron/cron_errors.log
 
 # Ignore the build/nginx directory...
 build/nginx/
