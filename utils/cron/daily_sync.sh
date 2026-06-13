@@ -39,8 +39,8 @@ DB_CONTAINER_NAME="tenantsunion-db-1" # Confirm this matches: docker ps
 # Note: POSTGRES_USER and POSTGRES_DB are now injected directly from your .env file!
 
 # File Paths
-SQL_QUERY_PATH="${PROJECT_DIR}/utils/cron/01-extract_24h.sql"
-PG_IMPORT_SCRIPT="${PROJECT_DIR}/utils/cron/02-migrate-from-mariadb-csv.sql"
+SQL_QUERY_PATH="${PROJECT_DIR}/ETL/01-extract_24h.sql"
+PG_IMPORT_SCRIPT="${PROJECT_DIR}/ETL/geo/madrid/03-migrate-from-mariadb-csv.sql"
 CSV_DEST_PATH="${PROJECT_DIR}/dev/back/SI_MAD/db_fork/mariadb_export.csv" 
 
 # ==============================================================================
