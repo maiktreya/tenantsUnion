@@ -227,8 +227,7 @@ class EnhancedRecordDialog:
                     def filter_fn(e):
                         needle = _normalize_search(e.args if e.args else "").strip()
                         if not needle:
-                            select_widget.set_options(opts)
-                            return
+                            return  # Don't restore here — let on_change handle it
                         tokens = needle.split()
                         filtered = {
                             k: v for k, v in opts.items()
@@ -239,9 +238,6 @@ class EnhancedRecordDialog:
 
                 # Bind the text input to our custom filter function
                 sel.on("input-value", make_filter(options, sel))
-                # Restore full list when user clicks/focuses
-                sel.on("focus", lambda opts=options, s=sel: s.set_options(opts))
-                
                 self.inputs[field] = sel
                 
             elif field in relations:
@@ -343,8 +339,7 @@ class EnhancedRecordDialog:
                     def filter_fn(e):
                         needle = _normalize_search(e.args if e.args else "").strip()
                         if not needle:
-                            select_widget.set_options(opts)
-                            return
+                            return  # Don't restore here — let on_change handle it
                         tokens = needle.split()
                         filtered = {
                             k: v for k, v in opts.items()
@@ -354,8 +349,6 @@ class EnhancedRecordDialog:
                     return filter_fn
 
                 sel.on("input-value", make_filter(options, sel))
-                sel.on("focus", lambda opts=options, s=sel: s.set_options(opts))
-
                 self.inputs[field] = sel
                 
             elif field in field_options:
