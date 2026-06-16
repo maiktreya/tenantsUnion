@@ -192,15 +192,14 @@ class ConflictsView(BaseView):
         return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
 
     def _filter_conflict_options(self, e):
-        """Filters options accent-insensitively from Python side as the user types."""
-        needle = self._normalize_string(e.args).strip()
+        needle = self._normalize_string(e.args if e.args else "").strip()
         if not needle:
-            self.conflict_select.set_options(self.unfiltered_conflict_options)
-            return
-            
+            return  # Don't restore options here — let on_change handle it
+
+        tokens = needle.split()
         filtered = {
             k: v for k, v in self.unfiltered_conflict_options.items()
-            if needle in self._normalize_string(v)
+            if all(t in self._normalize_string(v) for t in tokens)
         }
         self.conflict_select.set_options(filtered)
 
@@ -284,6 +283,7 @@ class ConflictsView(BaseView):
                     ui.chip(f"{estado}: {count}", color=color)
 
     async def _on_conflict_change(self, conflict_id: Optional[int]):
+        self.conflict_select.set_options(self.unfiltered_conflict_options)  # safe here, value already committed
         if not conflict_id:
             self.state.selected_item.set(None)
             self._clear_displays()
@@ -293,8 +293,6 @@ class ConflictsView(BaseView):
         )
         if conflict:
             self.state.selected_item.set(conflict)
-            # Restore the complete options list on selection change so the full list is ready when reopened
-            self.conflict_select.set_options(self.unfiltered_conflict_options)
             await self._display_conflict_info()
             await self._load_conflict_history()
 
