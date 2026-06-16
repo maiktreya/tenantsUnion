@@ -126,7 +126,7 @@ TABLE_INFO = {
             "fecha_baja",
         ],
         "field_options": {
-            "estado": sorted(["Alta", "Baja"]),
+            "estado": sorted(["Alta", "Baja", "Bienvenida"]),
         },
         "relations": {
             "piso_id": {
