@@ -27,7 +27,6 @@ class ConflictsView(BaseView):
         
         # Cache for holding unfiltered select options to keep track during text filtering
         self.unfiltered_conflict_options: Dict[int, str] = {} 
-        
         self.history_container = None
         self.info_container = None
         self.conflict_select = None
@@ -36,7 +35,6 @@ class ConflictsView(BaseView):
         self.filter_estado = None
         self.filter_causa = None
         self.filter_ambito = None  
-        self.filter_text = None
 
     def create(self) -> ui.column:
         """Create the enhanced conflicts view UI"""
@@ -100,15 +98,6 @@ class ConflictsView(BaseView):
                         on_change=self._apply_filters,
                         clearable=True,
                     ).classes("w-48")
-                    self.filter_text = (
-                        ui.input(
-                            label="Búsqueda global",
-                            value=self.state.filters.get("global_search"),
-                            on_change=self._apply_filters,
-                        )
-                        .classes("flex-grow min-w-[16rem]")
-                        .props("clearable")
-                    )
                     ui.button(
                         "Limpiar Filtros",
                         icon="clear_all",
@@ -225,11 +214,6 @@ class ConflictsView(BaseView):
                 if self.filter_ambito and self.filter_ambito.value
                 else None
             ),
-            "global_search": (
-                self.filter_text.value
-                if self.filter_text and self.filter_text.value
-                else None
-            ),
         }
         self.state.filters = {k: v for k, v in filters.items() if v is not None}
         self.state.apply_filters_and_sort()
@@ -256,7 +240,6 @@ class ConflictsView(BaseView):
         self.filter_estado.value = ""
         self.filter_causa.value = None
         self.filter_ambito.value = None  
-        self.filter_text.value = ""
         ui.timer(0.1, self._apply_filters, once=True)
 
     def _display_statistics(self):
