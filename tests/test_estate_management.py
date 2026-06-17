@@ -136,9 +136,9 @@ def test_normalization_for_sorting():
     """
     Directly tests the helper function for normalizing sort values.
     """
-    assert _normalize_for_sorting("Álvaro") == "alvaro"
-    assert _normalize_for_sorting("elena") == "elena"
+    assert _normalize_for_sorting("Álvaro") == "2_TXT_alvaro"
+    assert _normalize_for_sorting("elena") == "2_TXT_elena"
     # FINAL FIX: Corrected the expected string to have 10 leading zeros to match the function's output.
-    assert _normalize_for_sorting(100) == "0000000000100.000000"
-    assert _normalize_for_sorting("20.5") == "0000000000020.500000"
+    assert _normalize_for_sorting(100) == "1_NUM_000001000000000100.000000"
+    assert _normalize_for_sorting("20.5") == "1_NUM_000001000000000020.500000"
     assert _normalize_for_sorting(None) == ""

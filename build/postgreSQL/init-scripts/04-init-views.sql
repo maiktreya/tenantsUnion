@@ -98,15 +98,15 @@ SELECT
     c.resolucion AS "Resolución",
     COALESCE(n.nombre, 'Sin Nodo') AS "Nodo",
     c.afiliada_id AS "Afiliada ID"
-FROM sindicato_inq.conflictos c
-    LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
-    LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id
+FROM conflictos c
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN pisos p ON a.piso_id = p.id
+    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN nodos n ON ncm.nodo_id = n.id
     LEFT JOIN (
         -- Subconsulta para obtener la última vez que el conflicto tuvo actividad en el diario
         SELECT conflicto_id, MAX(created_at) AS ultima_actualizacion
-        FROM sindicato_inq.diario_conflictos
+        FROM diario_conflictos
         GROUP BY conflicto_id
     ) ult_act ON c.id = ult_act.conflicto_id
 ORDER BY c.fecha_apertura DESC;
@@ -278,24 +278,24 @@ SELECT
         ', ',
         COALESCE(p.direccion, b.direccion, 'Sin direccion')
     ) AS conflict_label
-FROM sindicato_inq.conflictos c
-    LEFT JOIN sindicato_inq.afiliadas a ON c.afiliada_id = a.id
-    LEFT JOIN sindicato_inq.pisos p ON a.piso_id = p.id
-    LEFT JOIN sindicato_inq.bloques b ON p.bloque_id = b.id
-    LEFT JOIN sindicato_inq.nodos_cp_mapping ncm ON p.cp = ncm.cp
-    LEFT JOIN sindicato_inq.nodos n ON ncm.nodo_id = n.id
+FROM conflictos c
+    LEFT JOIN afiliadas a ON c.afiliada_id = a.id
+    LEFT JOIN pisos p ON a.piso_id = p.id
+    LEFT JOIN bloques b ON p.bloque_id = b.id
+    LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
+    LEFT JOIN nodos n ON ncm.nodo_id = n.id
     LEFT JOIN (
         SELECT conflicto_id, MAX(created_at) as ultima_actualizacion
-        FROM sindicato_inq.diario_conflictos
+        FROM diario_conflictos
         GROUP BY conflicto_id
     ) ult_act ON c.id = ult_act.conflicto_id;
 
 -- =====================================================================
 -- VISTA: v_sugerencias_pisos_huerfanos (Filtrado > 0.5 y Tiers de 0.05)
 -- =====================================================================
-DROP VIEW IF EXISTS sindicato_inq.v_sugerencias_pisos_huerfanos CASCADE;
+DROP VIEW IF EXISTS v_sugerencias_pisos_huerfanos CASCADE;
 
-CREATE OR REPLACE VIEW sindicato_inq.v_sugerencias_pisos_huerfanos AS
+CREATE OR REPLACE VIEW v_sugerencias_pisos_huerfanos AS
 SELECT
     p.id AS piso_id,
     p.direccion AS "Dirección Piso",
@@ -303,19 +303,19 @@ SELECT
     s.id AS "ID Bloque Sugerido",
     s.direccion AS "Dirección Bloque Sugerido",
     (ROUND(s.score::numeric * 20) / 20)::numeric(3,2) AS "Score"
-FROM sindicato_inq.pisos p
+FROM pisos p
 CROSS JOIN LATERAL (
     SELECT
         b.id,
         b.direccion,
         public.similarity(
-            sindicato_inq.normalize_address_for_match(p.direccion)::text, 
-            sindicato_inq.normalize_address_for_match(b.direccion)::text
+            normalize_address_for_match(p.direccion)::text, 
+            normalize_address_for_match(b.direccion)::text
         ) AS score
-    FROM sindicato_inq.bloques b
-    WHERE sindicato_inq.normalize_address_for_match(p.direccion)::text OPERATOR(public.%) sindicato_inq.normalize_address_for_match(b.direccion)::text
+    FROM bloques b
+    WHERE normalize_address_for_match(p.direccion)::text OPERATOR(public.%) normalize_address_for_match(b.direccion)::text
     ORDER BY 
-        sindicato_inq.normalize_address_for_match(p.direccion)::text OPERATOR(public.<->) sindicato_inq.normalize_address_for_match(b.direccion)::text ASC
+        normalize_address_for_match(p.direccion)::text OPERATOR(public.<->) normalize_address_for_match(b.direccion)::text ASC
     LIMIT 1
 ) s
 WHERE p.bloque_id IS NULL             
@@ -344,8 +344,8 @@ SELECT
     CASE
         WHEN p.bloque_id IS NOT NULL AND b.id IS NOT NULL THEN
             public.similarity(
-                sindicato_inq.normalize_address_for_match(p.direccion),
-                sindicato_inq.normalize_address_for_match(b.direccion)
+                normalize_address_for_match(p.direccion),
+                normalize_address_for_match(b.direccion)
             )
         ELSE NULL
     END AS "Score Enlace Actual",
@@ -377,18 +377,18 @@ FROM pisos p
             b_sug.id,
             b_sug.direccion,
             public.similarity(
-                sindicato_inq.normalize_address_for_match(p.direccion), 
-                sindicato_inq.normalize_address_for_match(b_sug.direccion)
+                normalize_address_for_match(p.direccion), 
+                normalize_address_for_match(b_sug.direccion)
             ) AS score
         FROM bloques b_sug
-        WHERE sindicato_inq.normalize_address_for_match(p.direccion) OPERATOR(public.%) sindicato_inq.normalize_address_for_match(b_sug.direccion)
+        WHERE normalize_address_for_match(p.direccion) OPERATOR(public.%) normalize_address_for_match(b_sug.direccion)
         ORDER BY 
-            sindicato_inq.normalize_address_for_match(p.direccion) OPERATOR(public.<->) sindicato_inq.normalize_address_for_match(b_sug.direccion) ASC
+            normalize_address_for_match(p.direccion) OPERATOR(public.<->) normalize_address_for_match(b_sug.direccion) ASC
         LIMIT 1
     ) s ON p.direccion IS NOT NULL AND btrim(p.direccion) <> '';
 
 CREATE INDEX IF NOT EXISTS bloques_normalized_gist_idx 
-ON bloques USING gist (sindicato_inq.normalize_address_for_match(direccion) public.gist_trgm_ops);
+ON bloques USING gist (normalize_address_for_match(direccion) public.gist_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS pisos_normalized_gist_idx 
-ON pisos USING gist (sindicato_inq.normalize_address_for_match(direccion) public.gist_trgm_ops);
+ON pisos USING gist (normalize_address_for_match(direccion) public.gist_trgm_ops);
