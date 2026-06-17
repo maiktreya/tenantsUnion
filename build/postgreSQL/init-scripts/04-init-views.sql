@@ -60,10 +60,10 @@ SELECT
     COUNT(DISTINCT c.id) FILTER (
         WHERE c.estado = 'Abierto' AND LOWER(c.ambito) = 'bloque'
     ) AS "Conf. Abiertos Bloque",
-    -- 4. Cálculo del % del total de afiliadas de alta que pertenecen a este nodo
+    -- CORREGIDO: Cálculo del % de afiliadas de alta respecto al total de afiliadas de ESTE nodo
     ROUND(
         100.0 * COUNT(DISTINCT a.id) FILTER (WHERE a.estado = 'Alta') / 
-        NULLIF(SUM(COUNT(DISTINCT a.id) FILTER (WHERE a.estado = 'Alta')) OVER (), 0), 
+        NULLIF(COUNT(DISTINCT a.id), 0), 
         2
     ) AS "% Afiliadas Alta"
 FROM nodos n
