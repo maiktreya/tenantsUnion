@@ -289,8 +289,6 @@ FROM sindicato_inq.conflictos c
         FROM sindicato_inq.diario_conflictos
         GROUP BY conflicto_id
     ) ult_act ON c.id = ult_act.conflicto_id;
-    
-SET search_path TO public, sindicato_inq;
 
 -- =====================================================================
 -- VISTA: v_sugerencias_pisos_huerfanos (Filtrado > 0.5 y Tiers de 0.05)
