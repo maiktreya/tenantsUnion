@@ -297,6 +297,7 @@ DROP VIEW IF EXISTS v_sugerencias_pisos_huerfanos CASCADE;
 
 CREATE OR REPLACE VIEW v_sugerencias_pisos_huerfanos AS
 SELECT
+    p.id,
     p.id AS piso_id,
     p.direccion AS "Dirección Piso",
     p.municipio AS "Municipio",

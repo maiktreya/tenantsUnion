@@ -376,6 +376,7 @@ VIEW_INFO = {
     "v_sugerencias_pisos_huerfanos": {
         "display_name": "Sugerencias pisos",
         "base_table": "pisos",
+       "hidden_fields": ["id"],
     },
     "v_consolidar_pisos_bloques": {
         "display_name": "Vista consolidada de Pisos-Bloques",
