@@ -1,22 +1,23 @@
-from typing import Dict, List
+# build/niceGUI/auth/user_management.py
+
+from typing import Dict, List, Optional, Callable
 from nicegui import ui
 from passlib.context import CryptContext
 
 from api.client import APIClient
 from components.base_view import BaseView
 
-# Use the same password context as your login system
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class UserManagementView(BaseView):
-    """User management view integrated with existing auth system"""
+    """User management view integrated with unique single-role relationship topology"""
 
-    def __init__(self, api_client: APIClient):
-        self.api = api_client
-        self.users_container = None
-        self.users_list = []
-        self.roles_list = []
+    def __init__(self, api_client: APIClient) -> None:
+        self.api: APIClient = api_client
+        self.users_container: Optional[ui.column] = None
+        self.users_list: List[Dict] = []
+        self.roles_list: List[Dict] = []
 
     def create(self) -> ui.column:
         """Create the user management view UI"""
@@ -25,42 +26,21 @@ class UserManagementView(BaseView):
         with container:
             ui.label("Gestión de Usuarios y Roles").classes("text-h6")
 
-            # Check permissions
             if not self.has_role("admin", "sistemas"):
-                ui.label(
-                    "Acceso denegado. Se requieren permisos de administrador."
-                ).classes("text-red-600 text-center")
+                ui.label("Acceso denegado. Se requieren permisos de administrador.").classes("text-red-600 text-center")
                 return container
 
-            # Action buttons
             with ui.row().classes("w-full gap-4 items-center mb-4"):
-                ui.button(
-                    "Crear Nuevo Usuario",
-                    icon="person_add",
-                    on_click=self._open_create_user_dialog,
-                ).props("color=orange-600")
+                ui.button("Crear Nuevo Usuario", icon="person_add", on_click=self._open_create_user_dialog).props("color=orange-600")
+                ui.button("Gestionar Roles", icon="admin_panel_settings", on_click=self._open_roles_management).props("color=blue-600")
+                ui.button("Refrescar", icon="refresh", on_click=lambda: ui.timer(0.1, self._load_data, once=True)).props("color=orange-600")
 
-                ui.button(
-                    "Gestionar Roles",
-                    icon="admin_panel_settings",
-                    on_click=self._open_roles_management,
-                ).props("color=blue-600")
-
-                ui.button(
-                    "Refrescar",
-                    icon="refresh",
-                    on_click=lambda: ui.timer(0.1, self._load_data, once=True),
-                ).props("color=orange-600")
-
-            # Users list container
             self.users_container = ui.column().classes("w-full gap-2")
 
-        # Load data on startup
         ui.timer(0.5, self._load_data, once=True)
-
         return container
 
-    async def _load_data(self):
+    async def _load_data(self) -> None:
         """Load users and roles from database"""
         try:
             self.users_list = await self.api.get_records("usuarios", order="alias.asc")
@@ -69,133 +49,84 @@ class UserManagementView(BaseView):
         except Exception as e:
             ui.notify(f"Error al cargar datos: {str(e)}", type="negative")
 
-    async def _get_user_roles(self, user_id: int) -> List[str]:
-        """Get role names for a user"""
+    async def _get_user_role(self, user_id: int) -> Optional[str]:
+        """Get unique role name for a specific user"""
         try:
-            user_role_links = await self.api.get_records(
-                "usuario_roles", {"usuario_id": f"eq.{user_id}"}
-            )
+            user_role_links = await self.api.get_records("usuario_roles", {"usuario_id": f"eq.{user_id}"})
             if not user_role_links:
-                return []
+                return None
 
-            role_ids = [link["role_id"] for link in user_role_links]
-            if not role_ids:
-                return []
-
-            roles_records = await self.api.get_records(
-                "roles", {"id": f'in.({",".join(map(str, role_ids))})'}
-            )
-            return [role.get("nombre", "") for role in roles_records]
+            role_id = user_role_links[0]["role_id"]
+            roles_records = await self.api.get_records("roles", {"id": f"eq.{role_id}"})
+            return roles_records[0].get("nombre", "") if roles_records else None
         except Exception:
-            return []
+            return None
 
-    def _display_users(self):
-        """Display the users list"""
+    def _display_users(self) -> None:
+        """Display the users list inside its explicit reactive container scope"""
         if not self.users_container:
             return
 
         self.users_container.clear()
+        
+        # --- THE CRITICAL LIFECYCLE FIX: Scoping execution blocks inside the container ---
+        with self.users_container:
+            if not self.users_list:
+                ui.label("No se encontraron usuarios").classes("text-gray-500")
+                return
 
-        if not self.users_list:
-            ui.label("No se encontraron usuarios").classes("text-gray-500")
-            return
+            ui.label(f"Usuarios registrados ({len(self.users_list)})").classes("text-h6 mb-2")
 
-        ui.label(f"Usuarios registrados ({len(self.users_list)})").classes(
-            "text-h6 mb-2"
-        )
+            with ui.card().classes("w-full"):
+                with ui.row().classes("w-full bg-gray-100 p-3 font-bold"):
+                    ui.label("Alias").classes("flex-1")
+                    ui.label("Nombre").classes("flex-2")
+                    ui.label("Email").classes("flex-2")
+                    ui.label("Rol").classes("flex-2")
+                    ui.label("Acciones").classes("w-40")
 
-        with ui.card().classes("w-full"):
-            with ui.row().classes("w-full bg-gray-100 p-3 font-bold"):
-                ui.label("Alias").classes("flex-1")
-                ui.label("Nombre").classes("flex-2")
-                ui.label("Email").classes("flex-2")
-                ui.label("Roles").classes("flex-2")
-                ui.label("Acciones").classes("w-40")
+                for user in self.users_list:
+                    with ui.row().classes("w-full border-b p-3 hover:bg-gray-50 items-center"):
+                        ui.label(user.get("alias", "")).classes("flex-1")
+                        full_name = f"{user.get('nombre', '')} {user.get('apellidos', '')}".strip()
+                        ui.label(full_name or "Sin nombre").classes("flex-2")
+                        ui.label(user.get("email", "Sin email")).classes("flex-2")
+                        
+                        role_label = ui.label("Cargando...").classes("flex-2 text-gray-500")
+                        ui.timer(0.1, lambda u=user, rl=role_label: self._load_user_role_display(u, rl), once=True)
+                        
+                        with ui.row().classes("w-40 gap-1"):
+                            ui.button(icon="edit", on_click=lambda u=user: self._open_edit_user_dialog(u)).props("size=sm flat dense color=orange-600").tooltip("Editar usuario")
+                            ui.button(icon="security", on_click=lambda u=user: self._open_roles_dialog(u)).props("size=sm flat dense color=blue-600").tooltip("Gestionar rol")
+                            ui.button(icon="key", on_click=lambda u=user: self._open_password_dialog(u)).props("size=sm flat dense color=green-600").tooltip("Cambiar contraseña")
 
-            for user in self.users_list:
-                with ui.row().classes(
-                    "w-full border-b p-3 hover:bg-gray-50 items-center"
-                ):
-                    ui.label(user.get("alias", "")).classes("flex-1")
-                    full_name = (
-                        f"{user.get('nombre', '')} {user.get('apellidos', '')}".strip()
-                    )
-                    ui.label(full_name or "Sin nombre").classes("flex-2")
-                    ui.label(user.get("email", "Sin email")).classes("flex-2")
-                    roles_label = ui.label("Cargando...").classes(
-                        "flex-2 text-gray-500"
-                    )
-                    ui.timer(
-                        0.1,
-                        lambda u=user, rl=roles_label: self._load_user_roles_display(
-                            u, rl
-                        ),
-                        once=True,
-                    )
-                    with ui.row().classes("w-40 gap-1"):
-                        ui.button(
-                            icon="edit",
-                            on_click=lambda u=user: self._open_edit_user_dialog(u),
-                        ).props("size=sm flat dense color=orange-600").tooltip(
-                            "Editar usuario"
-                        )
-                        ui.button(
-                            icon="security",
-                            on_click=lambda u=user: self._open_roles_dialog(u),
-                        ).props("size=sm flat dense color=blue-600").tooltip(
-                            "Gestionar roles"
-                        )
-                        ui.button(
-                            icon="key",
-                            on_click=lambda u=user: self._open_password_dialog(u),
-                        ).props("size=sm flat dense color=green-600").tooltip(
-                            "Cambiar contraseña"
-                        )
+    async def _load_user_role_display(self, user: Dict, role_label: ui.label) -> None:
+        """Load and display the single user role in the data table matrix"""
+        role_name = await self._get_user_role(user["id"])
+        role_label.set_text(role_name if role_name else "Sin rol")
+        role_label.classes(remove="text-gray-500", add="text-blue-600" if role_name else "text-gray-500")
 
-    async def _load_user_roles_display(self, user: Dict, roles_label):
-        """Load and display user roles in the table"""
-        roles = await self._get_user_roles(user["id"])
-        roles_label.set_text(", ".join(roles) if roles else "Sin roles")
-        roles_label.classes(
-            remove="text-gray-500",
-            add="text-blue-600" if roles else "text-gray-500",
-        )
-
-    def _open_create_user_dialog(self):
-        """Open dialog for creating a new user"""
+    def _open_create_user_dialog(self) -> None:
+        """Open dialog for creating a new user with single-choice role assignment"""
         dialog = ui.dialog()
         with dialog, ui.card().classes("w-96"):
             ui.label("Crear Nuevo Usuario").classes("text-h6 mb-4")
-            alias_input = ui.input("Alias *", placeholder="usuario123").classes(
-                "w-full"
-            )
+            alias_input = ui.input("Alias *", placeholder="usuario123").classes("w-full")
             nombre_input = ui.input("Nombre *", placeholder="Juan").classes("w-full")
-            apellidos_input = ui.input("Apellidos", placeholder="García López").classes(
-                "w-full"
-            )
-            email_input = ui.input("Email", placeholder="usuario@ejemplo.com").classes(
-                "w-full"
-            )
-            password_input = ui.input(
-                "Contraseña *", password=True, password_toggle_button=True
-            ).classes("w-full")
-            ui.label("Roles").classes("text-subtitle2 mt-4")
+            apellidos_input = ui.input("Apellidos", placeholder="García López").classes("w-full")
+            email_input = ui.input("Email", placeholder="usuario@ejemplo.com").classes("w-full")
+            password_input = ui.input("Contraseña *", password=True, password_toggle_button=True).classes("w-full")
+            
+            ui.label("Rol").classes("text-subtitle2 mt-4")
             roles_options = {role["id"]: role["nombre"] for role in self.roles_list}
-            roles_select = ui.select(
-                options=roles_options, multiple=True, label="Seleccionar roles"
-            ).classes("w-full")
+            role_select = ui.select(options=roles_options, multiple=False, label="Seleccionar rol", clearable=True).classes("w-full")
 
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
                 ui.button("Cancelar", on_click=dialog.close).props("flat")
 
-                async def create_user():
-                    if not all(
-                        [alias_input.value, nombre_input.value, password_input.value]
-                    ):
-                        ui.notify(
-                            "Alias, nombre y contraseña son obligatorios",
-                            type="warning",
-                        )
+                async def create_user() -> None:
+                    if not all([alias_input.value, nombre_input.value, password_input.value]):
+                        ui.notify("Alias, nombre y contraseña son obligatorios", type="warning")
                         return
 
                     try:
@@ -206,67 +137,42 @@ class UserManagementView(BaseView):
                             "email": (email_input.value or "").strip() or None,
                         }
 
-                        # --- FIX: Unpack the tuple returned by create_record ---
-                        new_user, error_message = await self.api.create_record(
-                            "usuarios", user_data
-                        )
-
+                        new_user, error_message = await self.api.create_record("usuarios", user_data)
                         if not new_user:
-                            ui.notify(
-                                error_message or "Error al crear el usuario",
-                                type="negative",
-                            )
+                            ui.notify(error_message or "Error al crear el usuario", type="negative")
                             return
 
                         user_id = new_user["id"]
                         password_hash = pwd_context.hash(password_input.value)
-                        cred_data = {
-                            "usuario_id": user_id,
-                            "password_hash": password_hash,
-                        }
+                        cred_data = {"usuario_id": user_id, "password_hash": password_hash}
                         await self.api.create_record("usuario_credenciales", cred_data)
 
-                        if roles_select.value:
-                            for role_id in roles_select.value:
-                                await self.api.create_record(
-                                    "usuario_roles",
-                                    {"usuario_id": user_id, "role_id": role_id},
-                                )
+                        if role_select.value:
+                            await self.api.create_record("usuario_roles", {"usuario_id": user_id, "role_id": role_select.value})
 
                         ui.notify("Usuario creado exitosamente", type="positive")
                         dialog.close()
                         await self._load_data()
-
                     except Exception as e:
                         ui.notify(f"Error al crear usuario: {str(e)}", type="negative")
 
-                ui.button("Crear Usuario", on_click=create_user).props(
-                    "color=orange-600"
-                )
+                ui.button("Crear Usuario", on_click=create_user).props("color=orange-600")
         dialog.open()
 
-    def _open_edit_user_dialog(self, user: Dict):
+    def _open_edit_user_dialog(self, user: Dict) -> None:
         """Open dialog for editing user details"""
         dialog = ui.dialog()
         with dialog, ui.card().classes("w-96"):
             ui.label(f'Editar Usuario: {user.get("alias", "")}').classes("text-h6 mb-4")
-            alias_input = ui.input("Alias *", value=user.get("alias", "")).classes(
-                "w-full"
-            )
-            nombre_input = ui.input("Nombre *", value=user.get("nombre", "")).classes(
-                "w-full"
-            )
-            apellidos_input = ui.input(
-                "Apellidos", value=user.get("apellidos", "")
-            ).classes("w-full")
-            email_input = ui.input("Email", value=user.get("email", "")).classes(
-                "w-full"
-            )
+            alias_input = ui.input("Alias *", value=user.get("alias", "")).classes("w-full")
+            nombre_input = ui.input("Nombre *", value=user.get("nombre", "")).classes("w-full")
+            apellidos_input = ui.input("Apellidos", value=user.get("apellidos", "")).classes("w-full")
+            email_input = ui.input("Email", value=user.get("email", "")).classes("w-full")
 
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
                 ui.button("Cancelar", on_click=dialog.close).props("flat")
 
-                async def update_user():
+                async def update_user() -> None:
                     if not alias_input.value or not nombre_input.value:
                         ui.notify("Alias y nombre son obligatorios", type="warning")
                         return
@@ -278,153 +184,90 @@ class UserManagementView(BaseView):
                         "email": (email_input.value or "").strip() or None,
                     }
                     try:
-                        if await self.api.update_record(
-                            "usuarios", user["id"], user_data
-                        ):
-                            ui.notify(
-                                "Usuario actualizado exitosamente", type="positive"
-                            )
+                        if await self.api.update_record("usuarios", user["id"], user_data):
+                            ui.notify("Usuario actualizado exitosamente", type="positive")
                             dialog.close()
                             await self._load_data()
                     except Exception as e:
-                        ui.notify(
-                            f"Error al actualizar usuario: {str(e)}", type="negative"
-                        )
+                        ui.notify(f"Error al actualizar usuario: {str(e)}", type="negative")
 
-                ui.button("Guardar Cambios", on_click=update_user).props(
-                    "color=orange-600"
-                )
+                ui.button("Guardar Cambios", on_click=update_user).props("color=orange-600")
         dialog.open()
 
-    async def _open_roles_dialog(self, user: Dict):
-        """Open dialog for managing user roles"""
+    async def _open_roles_dialog(self, user: Dict) -> None:
+        """Open dialog for managing single user role status mapping"""
         dialog = ui.dialog()
-        user_role_links = await self.api.get_records(
-            "usuario_roles", {"usuario_id": f"eq.{user['id']}"}
-        )
-        current_role_ids = [link["role_id"] for link in user_role_links]
+        user_role_links = await self.api.get_records("usuario_roles", {"usuario_id": f"eq.{user['id']}"})
+        current_role_id = user_role_links[0]["role_id"] if user_role_links else None
 
         with dialog, ui.card().classes("w-96"):
-            ui.label(f'Gestionar Roles: {user.get("alias", "")}').classes(
-                "text-h6 mb-4"
-            )
-            current_roles = [
-                role["nombre"]
-                for role in self.roles_list
-                if role["id"] in current_role_ids
-            ]
-            ui.label("Roles actuales:").classes("text-subtitle2")
-            if current_roles:
-                with ui.row().classes("gap-1 mb-4"):
-                    for role in current_roles:
-                        ui.chip(role, color="orange").props("dense")
+            ui.label(f'Gestionar Rol: {user.get("alias", "")}').classes("text-h6 mb-4")
+            current_role_name = next((role["nombre"] for role in self.roles_list if role["id"] == current_role_id), None)
+            
+            ui.label("Rol actual:").classes("text-subtitle2")
+            if current_role_name:
+                ui.chip(current_role_name, color="orange").props("dense").classes("mb-4")
             else:
-                ui.label("Sin roles asignados").classes("text-gray-500 mb-4")
+                ui.label("Sin rol asignado").classes("text-gray-500 mb-4")
 
-            ui.label("Actualizar roles:").classes("text-subtitle2")
+            ui.label("Actualizar rol:").classes("text-subtitle2")
             roles_options = {role["id"]: role["nombre"] for role in self.roles_list}
-            roles_select = ui.select(
-                options=roles_options,
-                multiple=True,
-                value=current_role_ids,
-                label="Seleccionar roles",
-            ).classes("w-full")
+            role_select = ui.select(options=roles_options, multiple=False, value=current_role_id, label="Seleccionar rol", clearable=True).classes("w-full")
 
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
                 ui.button("Cancelar", on_click=dialog.close).props("flat")
 
-                async def update_roles():
+                async def update_role() -> None:
                     try:
-                        for link in user_role_links:
-                            await self.api.delete_record(
-                                "usuario_roles", 
-                                {"usuario_id": link['usuario_id'], "role_id": link['role_id']}
-                            )
-                        if roles_select.value:
-                            for role_id in roles_select.value:
-                                await self.api.create_record(
-                                    "usuario_roles",
-                                    {"usuario_id": user["id"], "role_id": role_id},
-                                )
+                        await self.api.delete_record("usuario_roles", user["id"])
+                        if role_select.value:
+                            await self.api.create_record("usuario_roles", {"usuario_id": user["id"], "role_id": role_select.value})
 
-                        ui.notify("Roles actualizados exitosamente", type="positive")
+                        ui.notify("Rol actualizado exitosamente", type="positive")
                         dialog.close()
                         await self._load_data()
                     except Exception as e:
-                        ui.notify(
-                            f"Error al actualizar roles: {str(e)}", type="negative"
-                        )
+                        ui.notify(f"Error al actualizar the rol: {str(e)}", type="negative")
 
-                ui.button("Actualizar Roles", on_click=update_roles).props(
-                    "color=orange-600"
-                )
+                ui.button("Actualizar Rol", on_click=update_role).props("color=orange-600")
         dialog.open()
 
-    def _open_password_dialog(self, user: Dict):
+    def _open_password_dialog(self, user: Dict) -> None:
         """Open dialog for changing user password"""
         dialog = ui.dialog()
         with dialog, ui.card().classes("w-96"):
-            ui.label(f'Cambiar Contraseña: {user.get("alias", "")}').classes(
-                "text-h6 mb-4"
-            )
-            new_password = ui.input(
-                "Nueva Contraseña *", password=True, password_toggle_button=True
-            ).classes("w-full")
-            confirm_password = ui.input(
-                "Confirmar Contraseña *", password=True, password_toggle_button=True
-            ).classes("w-full")
+            ui.label(f'Cambiar Contraseña: {user.get("alias", "")}').classes("text-h6 mb-4")
+            new_password = ui.input("Nueva Contraseña *", password=True, password_toggle_button=True).classes("w-full")
+            confirm_password = ui.input("Confirmar Contraseña *", password=True, password_toggle_button=True).classes("w-full")
 
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
                 ui.button("Cancelar", on_click=dialog.close).props("flat")
 
-                async def change_password():
+                async def change_password() -> None:
                     if not new_password.value or not confirm_password.value:
-                        return ui.notify(
-                            "Ambos campos son obligatorios", type="warning"
-                        )
+                        return ui.notify("Ambos campos son obligatorios", type="warning")
                     if new_password.value != confirm_password.value:
                         return ui.notify("Las contraseñas no coinciden", type="warning")
                     if len(new_password.value) < 6:
-                        return ui.notify(
-                            "La contraseña debe tener al menos 6 caracteres",
-                            type="warning",
-                        )
+                        return ui.notify("La contraseña debe tener al menos 6 caracteres", type="warning")
 
                     try:
                         password_hash = pwd_context.hash(new_password.value)
-                        cred_records = await self.api.get_records(
-                            "usuario_credenciales", {"usuario_id": f'eq.{user["id"]}'}
-                        )
+                        cred_records = await self.api.get_records("usuario_credenciales", {"usuario_id": f'eq.{user["id"]}'})
                         if cred_records:
-                            await self.api.update_record(
-                                "usuario_credenciales",
-                                user["id"],
-                                {"password_hash": password_hash},
-                            )
+                            await self.api.update_record("usuario_credenciales", user["id"], {"password_hash": password_hash})
                         else:
-                            await self.api.create_record(
-                                "usuario_credenciales",
-                                {
-                                    "usuario_id": user["id"],
-                                    "password_hash": password_hash,
-                                },
-                            )
+                            await self.api.create_record("usuario_credenciales", {"usuario_id": user["id"], "password_hash": password_hash})
 
-                        ui.notify(
-                            "Contraseña actualizada exitosamente", type="positive"
-                        )
+                        ui.notify("Contraseña actualizada exitosamente", type="positive")
                         dialog.close()
                     except Exception as e:
-                        ui.notify(
-                            f"Error al cambiar contraseña: {str(e)}", type="negative"
-                        )
+                        ui.notify(f"Error al cambiar contraseña: {str(e)}", type="negative")
 
-                ui.button("Cambiar Contraseña", on_click=change_password).props(
-                    "color=orange-600"
-                )
+                ui.button("Cambiar Contraseña", on_click=change_password).props("color=orange-600")
         dialog.open()
 
-    def _open_roles_management(self):
+    def _open_roles_management(self) -> None:
         """Open dialog for managing available roles"""
         dialog = ui.dialog()
         with dialog, ui.card().classes("w-96"):
@@ -432,37 +275,26 @@ class UserManagementView(BaseView):
             ui.label("Roles disponibles:").classes("text-subtitle2")
             roles_container = ui.column().classes("w-full gap-2 mb-4")
 
-            async def refresh_roles():
-                self.roles_list = await self.api.get_records(
-                    "roles", order="nombre.asc"
-                )
+            async def refresh_roles() -> None:
+                self.roles_list = await self.api.get_records("roles", order="nombre.asc")
                 roles_container.clear()
                 with roles_container:
                     for role in self.roles_list:
                         with ui.row().classes("w-full items-center justify-between"):
                             ui.label(role["nombre"]).classes("flex-grow")
-                            ui.button(
-                                icon="delete",
-                                on_click=lambda r=role: self._delete_role(
-                                    r, refresh_roles
-                                ),
-                            ).props("size=sm flat dense color=negative")
+                            ui.button(icon="delete", on_click=lambda r=role: self._delete_role(r, refresh_roles)).props("size=sm flat dense color=negative")
 
             ui.timer(0.1, refresh_roles, once=True)
             ui.separator()
             ui.label("Crear nuevo rol:").classes("text-subtitle2 mt-4")
-            new_role_input = ui.input(
-                "Nombre del rol", placeholder="nuevo_rol"
-            ).classes("w-full")
+            new_role_input = ui.input("Nombre del rol", placeholder="nuevo_rol").classes("w-full")
 
             with ui.row().classes("w-full justify-end gap-2 mt-4"):
                 ui.button("Cerrar", on_click=dialog.close).props("flat")
 
-                async def create_role():
+                async def create_role() -> None:
                     if not new_role_input.value:
-                        return ui.notify(
-                            "El nombre del rol es obligatorio", type="warning"
-                        )
+                        return ui.notify("El nombre del rol es obligatorio", type="warning")
                     try:
                         role_data = {"nombre": new_role_input.value.strip().lower()}
                         if await self.api.create_record("roles", role_data):
@@ -476,17 +308,15 @@ class UserManagementView(BaseView):
                 ui.button("Crear Rol", on_click=create_role).props("color=orange-600")
         dialog.open()
 
-    async def _delete_role(self, role: Dict, refresh_callback):
+    async def _delete_role(self, role: Dict, refresh_callback: Callable[[], None]) -> None:
         """Delete a role with confirmation"""
         with ui.dialog() as confirm_dialog, ui.card():
             ui.label(f'¿Eliminar el rol "{role["nombre"]}"?').classes("text-h6")
-            ui.label(
-                "Esta acción no se puede deshacer y eliminará todas las asignaciones."
-            ).classes("text-body2 text-gray-600")
+            ui.label("Esta acción no se puede deshacer y eliminará todas las asignaciones.").classes("text-body2 text-gray-600")
             with ui.row().classes("w-full justify-end gap-2"):
                 ui.button("Cancelar", on_click=confirm_dialog.close).props("flat")
 
-                async def confirm():
+                async def confirm() -> None:
                     try:
                         if await self.api.delete_record("roles", role["id"]):
                             ui.notify("Rol eliminado exitosamente", type="positive")

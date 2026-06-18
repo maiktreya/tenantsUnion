@@ -197,8 +197,8 @@ TABLE_INFO = {
         "relations": {"usuario_id": {"view": "usuarios", "display_field": "alias"}},
     },
     "usuario_roles": {
-        "display_name": "Roles Asignados",
-        "id_field": "usuario_id,role_id",
+        "display_name": "Rol Asignado",
+        "id_field": "usuario_id",
         "hidden_fields": [],
         "fields": ["usuario_id", "role_id"],
         "relations": {

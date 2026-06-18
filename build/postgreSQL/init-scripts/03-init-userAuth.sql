@@ -17,15 +17,12 @@ CREATE TABLE sindicato_inq.roles (
 );
 
 CREATE TABLE sindicato_inq.usuario_roles (
-    -- Also references the main schema
-    usuario_id INTEGER REFERENCES sindicato_inq.usuarios (id) ON DELETE CASCADE,
-    role_id INTEGER REFERENCES sindicato_inq.roles (id) ON DELETE CASCADE,
-    PRIMARY KEY (usuario_id, role_id)
+    -- Shifted to a single standalone Primary Key
+    usuario_id INTEGER PRIMARY KEY REFERENCES sindicato_inq.usuarios (id) ON DELETE CASCADE,
+    role_id INTEGER REFERENCES sindicato_inq.roles (id) ON DELETE CASCADE NOT NULL
 );
 
--- Índices para optimizar las uniones.
-CREATE INDEX idx_usuario_roles_usuario_id ON sindicato_inq.usuario_roles (usuario_id);
-
+-- OPTIMIZED INDEX DEFINITIONS
 CREATE INDEX idx_usuario_roles_role_id ON sindicato_inq.usuario_roles (role_id);
 
 -- populate credentials for existing users with the default password:

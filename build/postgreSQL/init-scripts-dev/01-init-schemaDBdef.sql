@@ -79,12 +79,11 @@ CREATE TABLE IF NOT EXISTS usuario_credenciales (
 );
 
 CREATE TABLE IF NOT EXISTS usuario_roles (
-    usuario_id INTEGER REFERENCES usuarios (id) ON DELETE CASCADE,
-    role_id INTEGER REFERENCES roles (id) ON DELETE CASCADE,
-    PRIMARY KEY (usuario_id, role_id)
+    -- Making 'usuario_id' the PRIMARY KEY prevents a user from ever occupying multiple rows
+    usuario_id INTEGER PRIMARY KEY REFERENCES usuarios (id) ON DELETE CASCADE,
+    role_id INTEGER REFERENCES roles (id) ON DELETE CASCADE NOT NULL
 );
 
--- CORREGIDO: Añadido el campo 'propiedad' para alinear con el esquema final.
 CREATE TABLE IF NOT EXISTS pisos (
     id SERIAL PRIMARY KEY,
     bloque_id INTEGER REFERENCES bloques (id) ON DELETE SET NULL,
@@ -177,8 +176,6 @@ CREATE TABLE IF NOT EXISTS diario_conflictos (
 CREATE INDEX IF NOT EXISTS idx_nodos_cp_mapping_nodo_id ON nodos_cp_mapping (nodo_id);
 
 CREATE INDEX IF NOT EXISTS idx_empresas_entramado_id ON empresas (entramado_id);
-
-CREATE INDEX IF NOT EXISTS idx_usuario_roles_usuario_id ON usuario_roles (usuario_id);
 
 CREATE INDEX IF NOT EXISTS idx_usuario_roles_role_id ON usuario_roles (role_id);
 
