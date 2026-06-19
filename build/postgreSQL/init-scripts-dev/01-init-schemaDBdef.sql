@@ -67,9 +67,16 @@ CREATE TABLE IF NOT EXISTS empresas (
     url_notas TEXT
 );
 
+CREATE TABLE IF NOT EXISTS agrupacion_bloques (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE,
+    descripcion TEXT
+);
+
 CREATE TABLE IF NOT EXISTS bloques (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
+    agrupacion_bloque_id INTEGER REFERENCES agrupacion_bloques (id) ON DELETE SET NULL,
     direccion TEXT UNIQUE
 );
 
@@ -178,6 +185,8 @@ CREATE INDEX IF NOT EXISTS idx_nodos_cp_mapping_nodo_id ON nodos_cp_mapping (nod
 CREATE INDEX IF NOT EXISTS idx_empresas_entramado_id ON empresas (entramado_id);
 
 CREATE INDEX IF NOT EXISTS idx_usuario_roles_role_id ON usuario_roles (role_id);
+
+CREATE INDEX IF NOT EXISTS idx_bloques_agrupacion_bloque_id ON bloques (agrupacion_bloque_id);
 
 CREATE INDEX IF NOT EXISTS idx_bloques_empresa_id ON bloques (empresa_id);
 

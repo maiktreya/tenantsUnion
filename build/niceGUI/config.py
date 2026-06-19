@@ -56,13 +56,23 @@ TABLE_INFO = {
             {"table": "bloques", "foreign_key": "empresa_id"},
         ],
     },
+    "agrupacion_bloques": {
+        "display_name": "Agrupación de bloques",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": ["nombre", "descripcion"],
+        "child_relations": [
+            {"table": "bloques", "foreign_key": "agrupacion_bloque_id"},
+        ],
+    },
     "bloques": {
         "display_name": "Bloques",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["direccion", "empresa_id"],
+        "fields": ["direccion", "empresa_id", "agrupacion_id"],
         "relations": {
             "empresa_id": {"view": "empresas", "display_field": "nombre"},
+            "agrupacion_bloque_id": {"view": "agrupacion_bloques", "display_field": "nombre"},
         },
         "child_relations": [
             {

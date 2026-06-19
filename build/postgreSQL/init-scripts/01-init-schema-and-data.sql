@@ -32,13 +32,20 @@ CREATE TABLE empresas (
     url_notas TEXT
 );
 
-CREATE TABLE bloques (
+CREATE TABLE IF NOT EXISTS agrupacion_bloques (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE,
+    descripcion TEXT
+);
+
+CREATE TABLE IF NOT EXISTS bloques (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
+    agrupacion_bloque_id INTEGER REFERENCES agrupacion_bloques (id) ON DELETE SET NULL,
     direccion TEXT UNIQUE
 );
 
-CREATE TABLE pisos (
+CREATE TABLE IF NOT EXISTS pisos (
     id SERIAL PRIMARY KEY,
     bloque_id INTEGER REFERENCES bloques (id) ON DELETE SET NULL,
     direccion TEXT NOT NULL UNIQUE,
@@ -54,7 +61,7 @@ CREATE TABLE pisos (
     vpo_date DATE
 );
 
-CREATE TABLE usuarios (
+CREATE TABLE IF NOT EXISTS usuarios (
     id SERIAL PRIMARY KEY,
     alias TEXT UNIQUE,
     nombre TEXT,
@@ -133,6 +140,8 @@ CREATE TABLE IF NOT EXISTS diario_conflictos (
 -- PARTE 1.5: CREACIÓN DE ÍNDICES PARA MEJORAR EL RENDIMIENTO
 -- =====================================================================
 CREATE INDEX IF NOT EXISTS idx_empresas_entramado_id ON empresas (entramado_id);
+
+CREATE INDEX IF NOT EXISTS idx_bloques_agrupacion_bloque_id ON bloques (agrupacion_bloque_id);
 
 CREATE INDEX IF NOT EXISTS idx_bloques_empresa_id ON bloques (empresa_id);
 
