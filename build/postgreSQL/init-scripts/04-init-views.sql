@@ -159,6 +159,7 @@ SELECT
     e.nombre AS "Empresa Propietaria",
     ee.nombre AS "Entramado", -- Obtenemos el nombre real desde entramado_empresas
     COALESCE(MAX(n.nombre), 'Sin Nodo Asignado') AS "Nodo Territorial",
+    ab.nombre AS "Agrup. Bloque",
     COUNT(DISTINCT p.id) AS "Pisos en el bloque",
     COUNT(DISTINCT a.id) AS "Afiliadas en el bloque",
     -- Conteo de afiliadas activas (Alta) con cuota estrictamente mayor a 1
@@ -170,15 +171,15 @@ SELECT
         WHERE a.estado = 'Baja'
     ) AS "Afiliadas Baja"
 FROM bloques b
+    LEFT JOIN agrupacion_bloques ab ON b.agrupacion_bloque_id = ab.id
     LEFT JOIN empresas e ON b.empresa_id = e.id
-    -- Nuevo JOIN utilizando la clave foránea esperada (entramado_id)
     LEFT JOIN entramado_empresas ee ON e.entramado_id = ee.id 
     LEFT JOIN pisos p ON b.id = p.bloque_id
     LEFT JOIN nodos_cp_mapping ncm ON p.cp = ncm.cp
     LEFT JOIN nodos n ON ncm.nodo_id = n.id
     LEFT JOIN afiliadas a ON p.id = a.piso_id
     LEFT JOIN facturacion f ON a.id = f.afiliada_id
-GROUP BY b.id, b.empresa_id, b.direccion, e.nombre, ee.nombre;
+GROUP BY b.id, b.empresa_id, ab.nombre, b.direccion, e.nombre, ee.nombre;
 
 -- ---------------------------------------------------------------------
 -- VISTA: v_facturacion
