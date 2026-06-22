@@ -14,40 +14,8 @@
 SET search_path TO sindicato_inq, public;
 
 -- =====================================================================
--- 04-init: POBLACIÓN DE DATOS ARTIFICIALES (final init script)
+-- 05-init: POBLACIÓN DE DATOS ARTIFICIALES (final init script)
 -- =====================================================================
-
-TRUNCATE TABLE diario_conflictos,
-conflictos,
-asesorias,
-facturacion,
-afiliadas,
-pisos,
-bloques,
-empresas,
-entramado_empresas,
-usuario_credenciales,
-usuario_roles,
-usuarios,
-roles,
-nodos_cp_mapping,
-nodos RESTART IDENTITY CASCADE;
-
--- Insertar roles
-INSERT INTO
-    roles (nombre, descripcion)
-VALUES (
-        'admin',
-        'Administrador con todos los permisos'
-    ),
-    (
-        'gestor',
-        'Gestor de conflictos y afiliadas'
-    ),
-    (
-        'actas',
-        'Técnico para asesorías'
-    );
 
 -- Insertar nodos territoriales
 INSERT INTO nodos (nombre, descripcion) VALUES
@@ -168,6 +136,29 @@ VALUES (
         'Calle Ejemplo, 15, Madrid'
     ),
     (5, 'Avenida Test, 30, Madrid');
+
+-- 1. Insertar de forma idempotente las agrupaciones (evita duplicados si se corre el script más de una vez)
+INSERT INTO agrupacion_bloques (nombre, descripcion) VALUES
+    ('Gran Capital', 'Bloques gestionados por grandes fondos de inversión'),
+    ('Patrimonio Local', 'Bloques con propiedad local dispersa'),
+    ('Vivienda Protegida', 'Bloques sujetos a regímenes de VPO')
+ON CONFLICT (nombre) DO NOTHING;
+
+-- 2. Mapear y actualizar los bloques existentes usando su clave única (direccion)
+-- Este enfoque es inmune a cambios en los IDs secuenciales de la base de datos.
+UPDATE bloques b
+SET agrupacion_bloque_id = ab.id
+FROM agrupacion_bloques ab
+JOIN (VALUES
+    ('Calle de la Invención, 10, Madrid', 'Gran Capital'),
+    ('Calle Falsa, 123, Madrid', 'Gran Capital'),
+    ('Avenida de la Imaginación, 20, Madrid', 'Gran Capital'),
+    ('Plaza de la Creatividad, 5, Madrid', 'Vivienda Protegida'),
+    ('Calle Ejemplo, 15, Madrid', 'Patrimonio Local'),
+    ('Avenida Test, 30, Madrid', 'Patrimonio Local')
+) AS mapping(direccion_bloque, nombre_agrupacion) 
+  ON ab.nombre = mapping.nombre_agrupacion
+WHERE b.direccion = mapping.direccion_bloque;
 
 -- CORREGIDO: Añadidos valores para el nuevo campo 'propiedad'.
 INSERT INTO
@@ -325,61 +316,6 @@ VALUES (
         NULL,
         NULL
     );
-
--- =====================================================================
--- PASO 5: INSERTAR USUARIOS Y CONFIGURAR ADMIN
--- =====================================================================
-
-INSERT INTO
-    usuarios (
-        alias,
-        nombre,
-        apellidos,
-        email,
-        is_active
-    )
-VALUES (
-        'sumate',
-        'Sumate',
-        '(sistemas)',
-        'sumate@inquilinato.org',
-        TRUE
-    ),
-    (
-        'gestor',
-        'test',
-        'test',
-        'test@inquilinato.org',
-        TRUE
-    ),
-    (
-        'actas',
-        'test',
-        'test',
-        'actas@inquilinato.org',
-        TRUE
-    );
-
-INSERT INTO
-    usuario_credenciales (usuario_id, password_hash)
-VALUES (
-        1,
-        '$2b$12$gVMWfDAGD3K7cG0IgaAmxOLsa9hBDN2FK3iFU96R7JZ7d6t.tzrBC'
-    ),
-    (
-        2,
-        '$2b$12$Vr5p/mTdYLOxjSzCj0bdV.YpJCQAz5mkYZBS/8wSX5HAwf8etbzUe'
-    ),
-    (
-        3,
-        '$2b$12$fUC/WbD0gQMAyAvpPveD5.AZSh9uTQWmHScILf8jl00L5lH7uSTAK'
-    );
-
-INSERT INTO
-    usuario_roles (usuario_id, role_id)
-VALUES (1, 1),
-    (2, 2),
-    (3, 3);
 
 -- CORREGIDO: Eliminados valores para 'seccion_sindical', 'comision', 'trato_propiedad'.
 INSERT INTO

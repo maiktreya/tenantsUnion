@@ -6,6 +6,8 @@ services:
       - "5432:5432"
     volumes:
       - /var/lib/postgresql/data # Explicit anonymous volume for --renew-anon-volumes
+      # Mount the artificial data script directly into the common folder sequence
+      - ./build/postgreSQL/init-scripts-dev/05-init-artificial_data.sql:/docker-entrypoint-initdb.d/05-init-artificial_data.sql
   server:
     ports:
       - "3001:3000"
