@@ -1,8 +1,16 @@
 -- =====================================================================
 -- 1. BASE PERMISSIONS (Re-applying to be safe)
 -- =====================================================================
-CREATE ROLE web_anon nologin;
-CREATE ROLE web_user nologin;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'web_anon') THEN
+        CREATE ROLE web_anon nologin;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'web_user') THEN
+        CREATE ROLE web_user nologin;
+    END IF;
+END
+$$;
 
 GRANT USAGE ON SCHEMA sindicato_inq TO web_anon, web_user;
 GRANT ALL ON ALL TABLES IN SCHEMA sindicato_inq TO web_user;
