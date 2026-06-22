@@ -90,8 +90,7 @@ class PublicJoinForm:
                             "cif": clean_cif,
                             "telefono": clean_telefono,
                             "afiliacion": "true",
-                            "estado": "Bienvenida",
-                            "fecha_alta": date.today().isoformat()
+                            "estado": "Bienvenida"
                         }
 
                         # 2. Application-Level Upsert Logic

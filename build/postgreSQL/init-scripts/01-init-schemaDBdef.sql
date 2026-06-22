@@ -77,7 +77,9 @@ CREATE TABLE IF NOT EXISTS bloques (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas (id) ON DELETE SET NULL,
     agrupacion_bloque_id INTEGER REFERENCES agrupacion_bloques (id) ON DELETE SET NULL,
-    direccion TEXT UNIQUE
+    direccion TEXT UNIQUE,
+    fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS usuario_credenciales (
@@ -104,10 +106,11 @@ CREATE TABLE IF NOT EXISTS pisos (
     n_personas INTEGER,
     fecha_firma DATE,
     vpo BOOLEAN,
-    vpo_date DATE
+    vpo_date DATE,
+    fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- CORREGIDO: Eliminados campos 'trato_propiedad', 'seccion_sindical', 'comision'.
 CREATE TABLE IF NOT EXISTS afiliadas (
     id SERIAL PRIMARY KEY,
     piso_id INTEGER REFERENCES pisos (id) ON DELETE SET NULL,
@@ -121,10 +124,11 @@ CREATE TABLE IF NOT EXISTS afiliadas (
     telefono TEXT,
     estado TEXT,
     regimen TEXT,
-    fecha_alta DATE,
+    fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_baja DATE,
     nivel_participacion TEXT,
-    afiliacion TEXT DEFAULT 'TRUE'
+    afiliacion TEXT DEFAULT 'TRUE',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS facturacion (
@@ -133,7 +137,9 @@ CREATE TABLE IF NOT EXISTS facturacion (
     cuota DECIMAL(8, 2),
     periodicidad SMALLINT,
     forma_pago TEXT,
-    iban TEXT
+    iban TEXT,
+    fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 --  Relax the IBAN format constraint to allow non-Spanish EU formats 

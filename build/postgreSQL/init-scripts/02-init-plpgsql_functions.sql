@@ -385,3 +385,45 @@ CREATE TRIGGER trg_normalize_piso
 BEFORE INSERT OR UPDATE ON pisos
 FOR EACH ROW
 EXECUTE FUNCTION fn_normalize_piso_data();
+
+-- ==============================================================================
+-- AUTOMATED MODIFICATION TRACKING INFRASTRUCTURE (updated_at)
+-- ==============================================================================
+
+-- 1. Shared row-level modification trigger interceptor function
+CREATE OR REPLACE FUNCTION sindicato_inq.fn_set_updated_at_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at := CURRENT_TIMESTAMP;
+    -- Note: NEW.fecha_alta remains totally un-touched here, shielding original history from edits
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. Hook linkage: afiliadas
+DROP TRIGGER IF EXISTS trg_audit_timestamp_afiliadas ON sindicato_inq.afiliadas;
+CREATE TRIGGER trg_audit_timestamp_afiliadas
+    BEFORE UPDATE ON sindicato_inq.afiliadas
+    FOR EACH ROW
+    EXECUTE FUNCTION sindicato_inq.fn_set_updated_at_timestamp();
+
+-- 3. Hook linkage: bloques
+DROP TRIGGER IF EXISTS trg_audit_timestamp_bloques ON sindicato_inq.bloques;
+CREATE TRIGGER trg_audit_timestamp_bloques
+    BEFORE UPDATE ON sindicato_inq.bloques
+    FOR EACH ROW
+    EXECUTE FUNCTION sindicato_inq.fn_set_updated_at_timestamp();
+
+-- 4. Hook linkage: pisos
+DROP TRIGGER IF EXISTS trg_audit_timestamp_pisos ON sindicato_inq.pisos;
+CREATE TRIGGER trg_audit_timestamp_pisos
+    BEFORE UPDATE ON sindicato_inq.pisos
+    FOR EACH ROW
+    EXECUTE FUNCTION sindicato_inq.fn_set_updated_at_timestamp();
+
+-- 5. Hook linkage: facturacion
+DROP TRIGGER IF EXISTS trg_audit_timestamp_facturacion ON sindicato_inq.facturacion;
+CREATE TRIGGER trg_audit_timestamp_facturacion
+    BEFORE UPDATE ON sindicato_inq.facturacion
+    FOR EACH ROW
+    EXECUTE FUNCTION sindicato_inq.fn_set_updated_at_timestamp();

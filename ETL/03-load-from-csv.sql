@@ -127,6 +127,7 @@ SELECT
     'Alta', 
     TRIM(s.tenure_type),
     CAST(NULLIF(SPLIT_PART(s.date_created, ' ', 1), '') AS DATE), 
+    -- NULLIF(btrim(s.date_created), '')::timestamp
     TRIM(s.membership_type),
     'Importado'
 FROM staging_gravity s

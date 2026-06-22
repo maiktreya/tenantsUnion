@@ -1,11 +1,24 @@
 from typing import List, Optional, Callable
+from datetime import datetime
 from nicegui import ui, events
 from state.base import BaseTableState
-from .utils import format_date_es  # Import the date formatting function
+from .utils import format_date_es
+
+
+def _format_cell_value(column: str, value: any) -> str:
+    """Format a cell value: dates/timestamps get parsed and localized, blanks become '-'."""
+    if value and isinstance(value, str) and any(k in column.lower() for k in ["fecha", "updated", "_at"]):
+        try:
+            clean_str = value.replace("T", " ").replace("Z", "").split(".")[0]
+            dt = datetime.fromisoformat(clean_str)
+            return dt.strftime("%d/%m/%Y" if dt.hour == 0 and dt.minute == 0 else "%d/%m/%Y %H:%M")
+        except Exception:
+            return format_date_es(value)  # Fallback parser for non-ISO date strings
+    return value if value is not None and value != "" else "-"
 
 
 class DataTable:
-    """Reusable data table with client-side multi-sort, filtering, and pagination."""
+    """Reusable data table with sorting, filtering, pagination, resizable columns, and themeable colors."""
 
     def __init__(
         self,
@@ -15,6 +28,15 @@ class DataTable:
         on_row_click: Optional[Callable] = None,
         show_actions: bool = True,
         hidden_columns: Optional[List[str]] = None,
+        # Branding/style parameters — defaults anchored to the brand red (#dc2626 = Tailwind red-600).
+        bg_header: str = "bg-red-50/40",
+        text_header: str = "text-red-700",
+        border_style: str = "border-red-100",
+        handle_color: str = "hover:bg-red-600 active:bg-red-700",
+        row_stripe: str = "bg-red-50/25",
+        row_hover: str = "hover:bg-red-50/50",
+        min_col_width: str = "140px",
+        max_col_width: str = "320px",
     ):
         self.state = state
         self.on_edit = on_edit
@@ -23,6 +45,15 @@ class DataTable:
         self.show_actions = show_actions
         self.hidden_columns = hidden_columns or []
         self.container = None
+
+        self.bg_header = bg_header
+        self.text_header = text_header
+        self.border_style = border_style
+        self.handle_color = handle_color
+        self.row_stripe = row_stripe
+        self.row_hover = row_hover
+        self.min_col_width = min_col_width
+        self.max_col_width = max_col_width
 
     def create(self) -> ui.column:
         """Create the table UI's container and initial render."""
@@ -59,90 +90,132 @@ class DataTable:
                 all_columns = list(records[0].keys())
                 columns = [col for col in all_columns if col not in self.hidden_columns]
 
-                with ui.card().classes("w-full"):
-                    with ui.row().classes("w-full bg-gray-100 p-2 items-center"):
-                        for column in columns:
-                            with ui.row().classes(
-                                "flex-1 items-center cursor-pointer gap-1"
-                            ).on(
-                                "click",
-                                lambda e, c=column: self._sort_by_column(c, e),
-                                ["shiftKey"],
-                            ):
-                                ui.label(column).classes("font-bold")
-                                sort_info = next(
-                                    (
-                                        crit
-                                        for crit in self.state.sort_criteria
-                                        if crit[0] == column
-                                    ),
-                                    None,
+                # Shrink-wraps to content width (no dead space on narrow tables) but caps
+                # at max-w-full and scrolls horizontally on wide ones.
+                with ui.card().classes("w-fit max-w-full overflow-x-auto p-0 rounded-xl shadow-sm border bg-white").classes(self.border_style):
+
+                    table_id = f"data_table_grid_{id(self)}"
+                    # Each column gets a flexible width band instead of a fixed size,
+                    # so narrow and wide tables both render sensibly.
+                    col_width = f"minmax({self.min_col_width}, {self.max_col_width})"
+                    init_widths = " ".join([col_width for _ in columns])
+                    if self.show_actions:
+                        init_widths += " 120px"
+
+                    grid_canvas = ui.element('div').props(f'id="{table_id}"').style(
+                        f"display: grid; grid-template-columns: {init_widths};"
+                    ).classes("w-full text-slate-700 bg-white")
+
+                    with grid_canvas:
+                        # Header row: column labels, sort indicators, resize handles.
+                        for idx, column in enumerate(columns):
+                            header_cell = ui.element('div').classes(
+                                f"grid-header-track p-3 font-bold text-xs uppercase tracking-wider "
+                                f"relative border-b border-r flex items-center select-none overflow-hidden {self.bg_header} {self.border_style}"
+                            )
+                            with header_cell:
+                                ui.label(column.replace("_", " ")).classes(f"truncate flex-1 cursor-pointer {self.text_header} hover:text-red-900").on(
+                                    "click",
+                                    lambda e, c=column: self._sort_by_column(c, e),
+                                    ["shiftKey"],
                                 )
+
+                                # Sort direction icon, plus position badge when multi-sorting.
+                                sort_info = next((crit for crit in self.state.sort_criteria if crit[0] == column), None)
                                 if sort_info:
-                                    icon = (
-                                        "arrow_upward"
-                                        if sort_info[1]
-                                        else "arrow_downward"
-                                    )
-                                    ui.icon(icon, size="sm")
+                                    icon = "arrow_upward" if sort_info[1] else "arrow_downward"
+                                    ui.icon(icon, size="xs").classes(f"{self.text_header} ml-1")
                                     if len(self.state.sort_criteria) > 1:
-                                        sort_index = (
-                                            self.state.sort_criteria.index(sort_info)
-                                            + 1
-                                        )
-                                        ui.label(f"({sort_index})").classes("text-xs")
+                                        sort_index = self.state.sort_criteria.index(sort_info) + 1
+                                        ui.label(f"({sort_index})").classes(f"text-xs {self.text_header} ml-0.5")
+
+                                # Drag handle for column resizing.
+                                ui.element('div').classes(
+                                    f"resizer-handle absolute right-0 top-0 bottom-0 w-1.5 "
+                                    f"cursor-col-resize transition-colors z-10 {self.handle_color}"
+                                ).props(f'data-col-idx="{idx}"')
 
                         if self.show_actions:
-                            ui.label("Acciones").classes("font-bold w-32 text-center")
+                            with ui.element('div').classes(f"grid-header-track p-3 font-bold text-xs uppercase tracking-wider border-b border-r text-center {self.bg_header} {self.border_style}"):
+                                ui.label("Acciones").classes(self.text_header)
 
-                    for record in records:
-                        row_classes = (
-                            "w-full border-b p-2 hover:bg-gray-50 items-center"
-                        )
-                        if self.on_row_click:
-                            row_classes += " cursor-pointer"
+                        # Data rows, alternating stripe background.
+                        for row_idx, record in enumerate(records):
+                            row_bg = self.row_stripe if row_idx % 2 == 1 else "bg-white"
 
-                        with ui.row().classes(row_classes) as row:
                             for column in columns:
                                 value = record.get(column, "")
+                                display_value = _format_cell_value(column, value)
 
-                                # If the column is a date, format it
-                                if "fecha" in column.lower() and isinstance(value, str):
-                                    display_value = format_date_es(value)
-                                else:
-                                    display_value = (
-                                        value
-                                        if value is not None and value != ""
-                                        else "-"
-                                    )
+                                cell = ui.element('div').classes(
+                                    f"p-3 text-sm border-b border-r flex items-center overflow-hidden transition-colors {row_bg} {self.border_style}"
+                                )
+                                with cell:
+                                    ui.label(str(display_value)).classes("truncate w-full").tooltip(str(value))
 
-                                display_value_str = (
-                                    str(display_value)[:75] + "..."
-                                    if len(str(display_value)) > 75
-                                    else str(display_value)
-                                )
-                                ui.label(display_value_str).classes("flex-1").tooltip(
-                                    str(value)
-                                )
+                                if self.on_row_click:
+                                    cell.classes(f"cursor-pointer {self.row_hover}")
+                                    cell.on("click", lambda _, r=record: self.on_row_click(r))
 
                             if self.show_actions:
-                                with ui.row().classes("w-32 gap-1 justify-center"):
+                                action_cell = ui.element('div').classes(
+                                    f"p-1 border-b flex items-center justify-center gap-1 shrink-0 {row_bg} {self.border_style}"
+                                )
+                                with action_cell:
                                     if self.on_edit:
-                                        ui.button(
-                                            icon="edit",
-                                            on_click=lambda r=record: self.on_edit(r),
-                                        ).props("size=sm flat dense color=orange-600")
+                                        ui.button(icon="edit", on_click=lambda r=record: self.on_edit(r)).props(
+                                            "size=sm flat dense color=red-600"
+                                        ).classes("rounded hover:bg-red-50")
                                     if self.on_delete:
-                                        ui.button(
-                                            icon="delete",
-                                            on_click=lambda r=record: self.on_delete(r),
-                                        ).props("size=sm flat dense color=negative")
+                                        ui.button(icon="delete", on_click=lambda r=record: self.on_delete(r)).props(
+                                            "size=sm flat dense color=negative"
+                                        ).classes("rounded hover:bg-red-50")
 
-                        if self.on_row_click:
-                            row.on("click", lambda r=record: self.on_row_click(r))
+                self._inject_resize_handlers(table_id)
 
             if self.state.get_total_pages() > 1:
                 self._create_pagination()
+
+    def _inject_resize_handlers(self, table_id: str):
+        """Wire up pointer drag handlers so each column-resize handle resizes its column."""
+        js_code = """
+        (function() {
+            const grid = document.getElementById('TARGET_GRID_ID');
+            if (!grid) return;
+            
+            grid.querySelectorAll('.resizer-handle').forEach(handle => {
+                handle.addEventListener('pointerdown', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const colIdx = parseInt(e.target.getAttribute('data-col-idx'));
+                    const startX = e.clientX;
+                    
+                    const headerTracks = Array.from(grid.querySelectorAll('.grid-header-track'));
+                    const currentWidths = headerTracks.map(cell => cell.getBoundingClientRect().width);
+                    const startWidth = currentWidths[colIdx];
+                    
+                    handle.setPointerCapture(e.pointerId);
+                    
+                    function onPointerMove(ev) {
+                        const deltaX = ev.clientX - startX;
+                        currentWidths[colIdx] = Math.max(70, startWidth + deltaX);
+                        grid.style.gridTemplateColumns = currentWidths.map(w => w + 'px').join(' ');
+                    }
+                    
+                    function onPointerUp(ev) {
+                        handle.releasePointerCapture(ev.pointerId);
+                        document.removeEventListener('pointermove', onPointerMove);
+                        document.removeEventListener('pointerup', onPointerUp);
+                    }
+                    
+                    document.addEventListener('pointermove', onPointerMove);
+                    document.addEventListener('pointerup', onPointerUp);
+                });
+            });
+        })();
+        """.replace('TARGET_GRID_ID', table_id)
+        ui.run_javascript(js_code)
 
     def _sort_by_column(self, column: str, e: events.GenericEventArguments):
         """Handle multi-column sorting with shift key."""
@@ -192,9 +265,9 @@ class DataTable:
             ui.button(
                 icon="chevron_right", on_click=lambda: self._go_to_page(current + 1)
             ).props("flat dense").set_enabled(current < total_pages)
-            ui.button(
-                icon="last_page", on_click=lambda: self._go_to_page(total_pages)
-            ).props("flat dense").set_enabled(current < total_pages)
+            ui.button(icon="last_page", on_click=lambda: self._go_to_page(total_pages)).props(
+                "flat dense"
+            ).set_enabled(current < total_pages)
 
             with ui.row().classes("items-center gap-2 ml-4"):
                 ui.label("Mostrar:")
