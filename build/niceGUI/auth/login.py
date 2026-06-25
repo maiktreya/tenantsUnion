@@ -1,6 +1,7 @@
 # build/niceGUI/auth/login.py
 
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
@@ -15,11 +16,6 @@ log = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Simple in-memory brute-force guard.
-# Stores {username: {"failures": int, "locked_until": datetime | None}}
-# This resets on process restart, which is acceptable for a single-process
-# deployment. For multi-process / multi-container setups, move this to Redis
-# or a DB table.
 _login_attempts: dict = {}
 _MAX_FAILURES = 5
 _LOCKOUT_MINUTES = 15
@@ -36,7 +32,6 @@ def _is_locked(username: str) -> bool:
     locked_until = entry.get("locked_until")
     if locked_until and datetime.now(timezone.utc) < locked_until:
         return True
-    # Lock expired — clean up so the counter resets
     if locked_until and datetime.now(timezone.utc) >= locked_until:
         _login_attempts.pop(username, None)
     return False
@@ -87,7 +82,6 @@ def create_login_page(api_client: APIClient):
     @ui.page("/login")
     async def login_page(redirect_to: str = "/") -> Optional[RedirectResponse]:
 
-        # Already authenticated — skip straight to destination
         if app.storage.user.get("authenticated", False):
             return RedirectResponse(redirect_to)
 
@@ -102,7 +96,6 @@ def create_login_page(api_client: APIClient):
                 ui.notify("Username and password are required.", type="negative")
                 return
 
-            # Brute-force guard
             if _is_locked(raw_user):
                 remaining = (
                     _login_attempts[raw_user]["locked_until"] - datetime.now(timezone.utc)
@@ -115,7 +108,6 @@ def create_login_page(api_client: APIClient):
                 log.warning("Blocked login attempt for locked account: %s", raw_user)
                 return
 
-            # Look up user
             try:
                 user_records = await api_client.get_records(
                     "usuarios", {"alias": f"eq.{raw_user}"}
@@ -133,7 +125,6 @@ def create_login_page(api_client: APIClient):
             user = user_records[0]
             user_id: int = user["id"]
 
-            # Fetch credentials
             try:
                 cred_records = await api_client.get_records(
                     "usuario_credenciales", {"usuario_id": f"eq.{user_id}"}
@@ -144,7 +135,6 @@ def create_login_page(api_client: APIClient):
                 return
 
             if not cred_records:
-                # User exists but has no password set — treat as auth failure
                 log.warning("No credentials found for user_id=%s", user_id)
                 _record_failure(raw_user)
                 ui.notify("Wrong username or password.", type="negative")
@@ -152,7 +142,6 @@ def create_login_page(api_client: APIClient):
 
             stored_hash: str = cred_records[0].get("password_hash", "")
 
-            # Verify password
             try:
                 password_ok = pwd_context.verify(raw_pass, stored_hash)
             except Exception:
@@ -165,14 +154,10 @@ def create_login_page(api_client: APIClient):
                 ui.notify("Wrong username or password.", type="negative")
                 return
 
-            # --- Authentication successful ---
             _clear_failures(raw_user)
 
             roles = await _get_user_roles(api_client, user_id)
-
-            # Create a DB-scoped JWT for PostgREST / RLS
             db_token = create_db_token(user["alias"], roles)
-
             now_utc = datetime.now(timezone.utc)
 
             app.storage.user.update(
@@ -182,9 +167,6 @@ def create_login_page(api_client: APIClient):
                     "authenticated": True,
                     "roles": roles,
                     "db_token": db_token,
-                    # login_time enables the server-side 3-hour expiry check
-                    # in AuthMiddleware (main.py). Without this the middleware
-                    # can never enforce expiry.
                     "login_time": now_utc.isoformat(),
                 }
             )
@@ -200,10 +182,11 @@ def create_login_page(api_client: APIClient):
             ui.navigate.to(redirect_to)
 
         # ----------------------------------------------------------------
-        # UI
+        # UI (REFACTORED WITH DYNAMIC INSTANCE TEXT HOOKS)
         # ----------------------------------------------------------------
         with ui.card().classes("absolute-center"):
-            ui.label("Gestión Sindicato Inquilinas de Madrid").classes(
+            instance_text = os.environ.get("INSTANCE_NAME", "Madrid")
+            ui.label(f"Gestión Sindicato Inquilinas {instance_text}").classes(
                 "text-h6 self-center"
             )
             username = (

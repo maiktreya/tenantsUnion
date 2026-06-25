@@ -1,11 +1,12 @@
 # /build/niceGUI/views/home.py
+import os
 from typing import Callable
 from nicegui import ui, app
 
 from components.base_view import BaseView
 
 
-class HomeView(BaseView):  # Inherit from BaseView
+class HomeView(BaseView):
     """Home page view with role-based card visibility"""
 
     def __init__(self, navigate: Callable[[str], None]):
@@ -16,15 +17,15 @@ class HomeView(BaseView):  # Inherit from BaseView
         container = ui.column().classes("w-full p-8 items-center gap-8")
 
         with container:
-            # Welcome message with user info
             username = app.storage.user.get("username", "Usuario")
             roles = app.storage.user.get("roles", [])
 
+            # --- REFACTORED BANNER DYNAMIC INTERPOLATION ---
+            instance_text = os.environ.get("INSTANCE_NAME", "Madrid")
             ui.label(
-                "Bienvenido al Sistema de Gestión del Sindicato de Inquilinas de Madrid"
+                f"Bienvenido al Sistema de Gestión del Sindicato de Inquilinas {instance_text}"
             ).classes("text-h5 font-italic text-center")
 
-            # Show current user and roles
             if roles:
                 ui.label(f"Usuario: {username} | Roles: {', '.join(roles)}").classes(
                     "text-subtitle1 text-gray-600 text-center"
@@ -35,7 +36,6 @@ class HomeView(BaseView):  # Inherit from BaseView
                 )
 
             with ui.row().classes("gap-8 flex-wrap justify-center"):
-                # Admin card - only for admin/sistemas roles
                 if self.has_role("admin"):
                     self._create_card(
                         icon="storage",
@@ -44,7 +44,6 @@ class HomeView(BaseView):  # Inherit from BaseView
                         on_click=lambda: self.navigate("admin"),
                         color="text-orange-600",
                     )
-                    # Conflicts card - for admin/gestor/actas roles
                 if self.has_role("admin", "gestor", "actas"):
                     self._create_card(
                         icon="gavel",
@@ -53,7 +52,6 @@ class HomeView(BaseView):  # Inherit from BaseView
                         on_click=lambda: self.navigate("conflicts"),
                         color="text-orange-600",
                     )
-                # Views and Importer cards - for admin/gestor roles
                 if self.has_role("admin", "gestor"):
                     self._create_card(
                         icon="table_view",
@@ -62,7 +60,6 @@ class HomeView(BaseView):  # Inherit from BaseView
                         on_click=lambda: self.navigate("views"),
                         color="text-orange-600",
                     )
-                    # Form importer card - for admin/gestor roles
                     self._create_card(
                         icon="upload_file",
                         title="Importar Afiliadas",
@@ -78,7 +75,6 @@ class HomeView(BaseView):  # Inherit from BaseView
                         on_click=lambda: self.navigate("user_management"),
                         color="text-orange-600",
                     )
-                # User Profile - available to all authenticated users
                 self._create_card(
                     icon="account_circle",
                     title="Mi Perfil",
@@ -87,7 +83,6 @@ class HomeView(BaseView):  # Inherit from BaseView
                     color="text-orange-600",
                 )
 
-            # Show message if user has no accessible features
             if not self.has_role("admin", "gestor", "sistemas", "actas"):
                 with ui.card().classes("w-full max-w-2xl mt-8 p-6"):
                     ui.label("Acceso Limitado").classes("text-h6 text-gray-700 mb-2")

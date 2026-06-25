@@ -10,7 +10,6 @@ services:
     volumes:
       - ./storage:/var/lib/postgresql/data # Bind mount to project root storage folder
       - ./build/postgreSQL/init-scripts:/docker-entrypoint-initdb.d
-      - ./dev/back/SI_MAD/db_fork:/csv-data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -44,6 +43,7 @@ services:
       POSTGREST_API_URL: ${POSTGRES_API_URL}
       NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET}
       PGRST_JWT_SECRET: ${PGRST_JWT_SECRET} 
+      INSTANCE_NAME: ${INSTANCE_NAME} # Add city here
     volumes:
       - ./build/niceGUI:/app${DEV_MODE:+:rw}${DEV_MODE:-:ro}
     working_dir: /app

@@ -32,7 +32,6 @@ jobs:
                   echo "POSTGRES_DB_SCHEMA=${{ secrets.POSTGRES_DB_SCHEMA }}" >> .env
                   echo "POSTGRES_API_URL=${{ secrets.POSTGRES_API_URL }}" >> .env
                   echo "NICEGUI_STORAGE_SECRET=${{ secrets.NICEGUI_STORAGE_SECRET }}" >> .env
-                  echo "INIT_SCRIPTS_PATH=${{ secrets.INIT_SCRIPTS_PATH }}" >> .env
                   echo "DEV_MODE=${{ secrets.DEV_MODE }}" >> .env
                   echo "HOSTNAME=localhost" >> .env # Use a simple hostname for testing
                   echo "DUCKDNS_TOKEN=dummy" >> .env # Not needed for CI

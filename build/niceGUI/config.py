@@ -11,7 +11,8 @@ class Config:
     API_BASE_URL: str = os.environ.get("POSTGREST_API_URL", "http://localhost:3001")
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8081
-    APP_TITLE: str = "Gestión Sindicato de Inquilinas de Madrid"
+    INSTANCE_NAME: str = os.environ.get("INSTANCE_NAME", "Madrid")
+    APP_TITLE: str = f"Gestión Sindicato de Inquilinas {os.environ.get('INSTANCE_NAME', 'Madrid')}"
     PAGE_SIZE_OPTIONS: list = None
 
     def __post_init__(self):
@@ -56,23 +57,13 @@ TABLE_INFO = {
             {"table": "bloques", "foreign_key": "empresa_id"},
         ],
     },
-    "agrupacion_bloques": {
-        "display_name": "Agrupación de bloques",
-        "id_field": "id",
-        "hidden_fields": ["id"],
-        "fields": ["nombre", "descripcion"],
-        "child_relations": [
-            {"table": "bloques", "foreign_key": "agrupacion_bloque_id"},
-        ],
-    },
     "bloques": {
         "display_name": "Bloques",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["direccion", "empresa_id", "agrupacion_id"],
+        "fields": ["direccion", "empresa_id"],
         "relations": {
             "empresa_id": {"view": "empresas", "display_field": "nombre"},
-            "agrupacion_bloque_id": {"view": "agrupacion_bloques", "display_field": "nombre"},
         },
         "child_relations": [
             {
@@ -207,8 +198,8 @@ TABLE_INFO = {
         "relations": {"usuario_id": {"view": "usuarios", "display_field": "alias"}},
     },
     "usuario_roles": {
-        "display_name": "Rol Asignado",
-        "id_field": "usuario_id",
+        "display_name": "Roles Asignados",
+        "id_field": "usuario_id,role_id",
         "hidden_fields": [],
         "fields": ["usuario_id", "role_id"],
         "relations": {
@@ -383,7 +374,7 @@ VIEW_INFO = {
         "base_table": "entramado_empresas",
         "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
-    "v_sugerencias_pisos_huerfanos": {
+    "v_sugersuggestions_pisos_huerfanos": {
         "display_name": "Sugerencias pisos",
         "base_table": "pisos",
        "hidden_fields": ["id"],
@@ -395,7 +386,6 @@ VIEW_INFO = {
     },
 }
 
-# Define the desired order for the views dropdown
 VIEW_ORDER = [
     "v_afiliadas_detalle",
     "v_conflictos_detalle",
@@ -403,13 +393,10 @@ VIEW_ORDER = [
     "v_resumen_nodos",
     "v_resumen_bloques",
     "v_resumen_entramados_empresas",
-    "v_sugerencias_pisos_huerfanos",
+    "v_sugersuggestions_pisos_huerfanos",
     "v_consolidar_pisos_bloques",
 ]
 
-# =====================================================================
-#  UI METADATA (HEADER MAPPINGS)
-# =====================================================================
 IMPORTER_HEADER_MAP = {
     "nombre": "Nombre",
     "apellidos": "Apellidos",
@@ -431,9 +418,7 @@ IMPORTER_HEADER_MAP = {
     "iban": "IBAN",
     "bloque_id": "Bloque sugerido",
 }
-# =====================================================================
-#  AFILIADAS IMPORTER VIEW VALIDATION CONFIG
-# =====================================================================
+
 FAILED_EXPORT_FIELD_MAP = {
     "afiliada": [
         "nombre",
