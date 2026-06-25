@@ -5,32 +5,63 @@ SELECT
     e.date_created,
 
     -- ── Personal data ──────────────────────────────────────────────────────
-    MAX(CASE WHEN m.meta_key = '1'    THEN m.meta_value END)    AS first_name,
-    MAX(CASE WHEN m.meta_key = '3'    THEN m.meta_value END)    AS last_name,
-    MAX(CASE WHEN m.meta_key = '5'    THEN m.meta_value END)    AS nif_dni,
+    -- NOTE: every free-text field below is wrapped in REPLACE(..., '"', '')
+    -- to strip stray double-quote characters before they ever reach the
+    -- CSV export. A literal " inside a quoted CSV field (without being
+    -- doubled to "") breaks PostgreSQL's COPY parser with "unterminated
+    -- CSV quoted field" and can swallow subsequent lines. This has been
+    -- seen in free-text fields (names, addresses, agency names) where
+    -- someone pasted smart-quotes or typed a literal quote character.
+    REPLACE(MAX(CASE WHEN m.meta_key = '1'    THEN m.meta_value END), '"', '') AS first_name,
+    REPLACE(MAX(CASE WHEN m.meta_key = '3'    THEN m.meta_value END), '"', '') AS last_name,
+    REPLACE(MAX(CASE WHEN m.meta_key = '5'    THEN m.meta_value END), '"', '') AS nif_dni,
     MAX(CASE WHEN m.meta_key = '46'   THEN m.meta_value END)    AS birth_date,
     MAX(CASE WHEN m.meta_key = '42'   THEN m.meta_value END)    AS gender,
-    MAX(CASE WHEN m.meta_key = '7'    THEN m.meta_value END)    AS phone,
-    MAX(CASE WHEN m.meta_key = '6'    THEN m.meta_value END)    AS email,
+    REPLACE(MAX(CASE WHEN m.meta_key = '7'    THEN m.meta_value END), '"', '') AS phone,
+    REPLACE(MAX(CASE WHEN m.meta_key = '6'    THEN m.meta_value END), '"', '') AS email,
 
     -- ── Address ────────────────────────────────────────────────────────────
-    MAX(CASE WHEN m.meta_key = '13'   THEN m.meta_value END)    AS address_full_google,
-    MAX(CASE WHEN m.meta_key = '13'   THEN m.meta_value END)    AS address_street,
-    NULL                                                        AS address_number, 
-    MAX(CASE WHEN m.meta_key = '15'   THEN m.meta_value END)    AS address_floor,   
-    MAX(CASE WHEN m.meta_key = '47'   THEN m.meta_value END)    AS address_door,    
-    MAX(CASE WHEN m.meta_key = '16'   THEN m.meta_value END)    AS address_city,
-    MAX(CASE WHEN m.meta_key = '19'   THEN m.meta_value END)    AS address_postcode,
+    -- Field 13 = "Dirección completa (calle y número)" - a plain text box,
+    -- not a Google-validated/composite address field, but kept under BOTH
+    -- original column names since the downstream Postgres load script
+    -- splits "address_full_google" on commas to build computed_address -
+    -- that column is load-critical even though it duplicates address_street.
+    REPLACE(MAX(CASE WHEN m.meta_key = '13'   THEN m.meta_value END), '"', '') AS address_full_google,
+    REPLACE(MAX(CASE WHEN m.meta_key = '13'   THEN m.meta_value END), '"', '') AS address_street,
+    NULL                                                        AS address_number, -- no dedicated field exists; number is inline in field 13
+    REPLACE(MAX(CASE WHEN m.meta_key = '15'   THEN m.meta_value END), '"', '') AS address_floor,   -- "Piso"
+    REPLACE(MAX(CASE WHEN m.meta_key = '47'   THEN m.meta_value END), '"', '') AS address_door,    -- "Puerta" - corrected from field 14 (Portal)
+    REPLACE(MAX(CASE WHEN m.meta_key = '16'   THEN m.meta_value END), '"', '') AS address_city,
+    REPLACE(MAX(CASE WHEN m.meta_key = '19'   THEN m.meta_value END), '"', '') AS address_postcode,
 
     -- ── Housing situation ──────────────────────────────────────────────────
     MAX(CASE WHEN m.meta_key = '54'   THEN m.meta_value END)    AS num_people_in_home,
-    MAX(CASE WHEN m.meta_key = '21'   THEN m.meta_value END)    AS tenure_type,
+    REPLACE(MAX(CASE WHEN m.meta_key = '21'   THEN m.meta_value END), '"', '') AS tenure_type,
     MAX(CASE WHEN m.meta_key = '55'   THEN m.meta_value END)    AS contract_start_date,
-    MAX(CASE WHEN m.meta_key = '22'   THEN m.meta_value END)    AS landlord_contact_type,
-    MAX(CASE WHEN m.meta_key = '23'   THEN m.meta_value END)    AS field_41,
-    MAX(CASE WHEN m.meta_key = '22'   THEN m.meta_value END)    AS field_46,
-    MAX(CASE WHEN m.meta_key = '24'   THEN m.meta_value END)    AS field_48,
 
+    -- landlord_contact_type is not consumed anywhere in the Postgres load
+    -- script - kept as-is (field 22, agency name) purely for column-count
+    -- compatibility with the existing staging table.
+    REPLACE(MAX(CASE WHEN m.meta_key = '22'   THEN m.meta_value END), '"', '') AS landlord_contact_type,
+
+    -- field_41 is selected into staging but never referenced in any
+    -- INSERT/UPDATE/WHERE downstream - functionally dead for this
+    -- pipeline. Kept populated with CIF Agencia (field 23) for audit
+    -- purposes only; safe to repoint if that ever changes.
+    REPLACE(MAX(CASE WHEN m.meta_key = '23'   THEN m.meta_value END), '"', '') AS field_41,
+
+    -- field_46 is consumed by the load script's step 5 as "inmobiliaria"
+    -- (agency name) -> must be field 22, NOT field 47 as the old query had it.
+    REPLACE(MAX(CASE WHEN m.meta_key = '22'   THEN m.meta_value END), '"', '') AS field_46,
+
+    -- field_48 is consumed by the load script's step 4 (populates the
+    -- "empresas" table) and step 5 as "propiedad" (landlord/owner name)
+    -- -> must be field 24, NOT field 48 ("Escalera") as the old query had it.
+    REPLACE(MAX(CASE WHEN m.meta_key = '24'   THEN m.meta_value END), '"', '') AS field_48,
+
+    -- field_49_1 = "prop_vertical" in the load script (step 5) - the
+    -- checkbox. Presence of a sub-key value means it was checked in GF,
+    -- regardless of the exact option text on the live form.
     CASE
         WHEN MAX(CASE WHEN m.meta_key = '27.1' THEN m.meta_value END) IS NOT NULL THEN 'Si'
         ELSE 'No'
@@ -39,6 +70,14 @@ SELECT
     -- ── Membership / payment ───────────────────────────────────────────────
     MAX(CASE WHEN m.meta_key = '50'   THEN m.meta_value END)    AS membership_type,
 
+    -- FIX: each membership type stores its fee in a DIFFERENT conditional
+    -- field, depending on which option was selected in the GF form:
+    --   Cuota Social    -> field 53
+    --   Cuota Sindical  -> field 52
+    --   Cuota de Apoyo  -> field 51
+    -- The previous version only ever read field 53, so Sindical/Apoyo
+    -- always came back NULL. We now pick the correct raw field first,
+    -- then apply the same "take text after the last |" extraction to it.
     TRIM(
         SUBSTRING_INDEX(
             CASE MAX(CASE WHEN m.meta_key = '50' THEN m.meta_value END)
@@ -76,31 +115,30 @@ SELECT
             END
     END AS fee_formatted,
 
-    MAX(CASE WHEN m.meta_key = '30'    THEN m.meta_value END)   AS bank_iban
+    REPLACE(MAX(CASE WHEN m.meta_key = '30'    THEN m.meta_value END), '"', '') AS bank_iban
 
 FROM mod685_gf_entry e
 
--- Dedup optimization
+-- DEDUP BY NIF/DNI: if the same person (same field '5' value) submitted
+-- more than once within the window, keep only their latest entry. Scoped
+-- to the same 30-day window as the outer query, matching the pattern from
+-- the reference query - it does not dedup across the full table history,
+-- only among entries already in scope.
 INNER JOIN (
     SELECT MAX(e_sub.id) AS max_id
     FROM mod685_gf_entry e_sub
     JOIN mod685_gf_entry_meta m_sub ON e_sub.id = m_sub.entry_id
     WHERE e_sub.form_id = 1
-      AND m_sub.meta_key = '5'
+      AND m_sub.meta_key = '5'  -- NIF/DNI
       AND e_sub.date_created >= DATE_SUB(NOW(), INTERVAL 180 DAY)
     GROUP BY m_sub.meta_value
 ) latest_entries ON e.id = latest_entries.max_id
 
--- ── REFACTORED CLEANING LAYER (CHAR FUNCTIONS PREVENT HIGHLIGHTER BUGS) ──────
-LEFT JOIN (
-    SELECT 
-        entry_id,
-        meta_key,
-        REPLACE(REPLACE(REPLACE(meta_value, CHAR(34), CHAR(39)), CHAR(13), ' '), CHAR(10), ' ') AS meta_value
-    FROM mod685_gf_entry_meta
-    WHERE meta_key NOT IN ('submission_speeds', 'gform_product_info_1_')
-) m ON e.id = m.entry_id
+LEFT JOIN mod685_gf_entry_meta m
+       ON e.id = m.entry_id
+          AND m.meta_key NOT IN ('submission_speeds', 'gform_product_info_1_')
 
+-- TARGET ONLY MEMBERSHIP FORM & OPEN THE TIMEFRAME
 WHERE e.form_id = 1
   AND e.date_created >= DATE_SUB(NOW(), INTERVAL 180 DAY)
 
