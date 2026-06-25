@@ -57,13 +57,23 @@ TABLE_INFO = {
             {"table": "bloques", "foreign_key": "empresa_id"},
         ],
     },
+        "agrupacion_bloques": {
+        "display_name": "Agrupación de bloques",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": ["nombre", "descripcion"],
+        "child_relations": [
+            {"table": "bloques", "foreign_key": "agrupacion_bloque_id"},
+        ],
+    },
     "bloques": {
         "display_name": "Bloques",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["direccion", "empresa_id"],
+        "fields": ["direccion", "empresa_id", "agrupacion_id"],
         "relations": {
             "empresa_id": {"view": "empresas", "display_field": "nombre"},
+            "agrupacion_bloque_id": {"view": "agrupacion_bloques", "display_field": "nombre"},
         },
         "child_relations": [
             {
@@ -198,8 +208,8 @@ TABLE_INFO = {
         "relations": {"usuario_id": {"view": "usuarios", "display_field": "alias"}},
     },
     "usuario_roles": {
-        "display_name": "Roles Asignados",
-        "id_field": "usuario_id,role_id",
+        "display_name": "Rol Asignado",
+        "id_field": "usuario_id",
         "hidden_fields": [],
         "fields": ["usuario_id", "role_id"],
         "relations": {
@@ -374,7 +384,7 @@ VIEW_INFO = {
         "base_table": "entramado_empresas",
         "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
     },
-    "v_sugersuggestions_pisos_huerfanos": {
+    "v_sugerencias_pisos_huerfanos": {
         "display_name": "Sugerencias pisos",
         "base_table": "pisos",
        "hidden_fields": ["id"],
@@ -393,7 +403,7 @@ VIEW_ORDER = [
     "v_resumen_nodos",
     "v_resumen_bloques",
     "v_resumen_entramados_empresas",
-    "v_sugersuggestions_pisos_huerfanos",
+    "v_sugerencias_pisos_huerfanos",
     "v_consolidar_pisos_bloques",
 ]
 

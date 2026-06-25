@@ -16,6 +16,11 @@ log = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Simple in-memory brute-force guard.
+# Stores {username: {"failures": int, "locked_until": datetime | None}}
+# This resets on process restart, which is acceptable for a single-process
+# deployment. For multi-process / multi-container setups, move this to Redis
+# or a DB table.
 _login_attempts: dict = {}
 _MAX_FAILURES = 5
 _LOCKOUT_MINUTES = 15
