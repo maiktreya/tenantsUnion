@@ -130,7 +130,7 @@ INNER JOIN (
     JOIN mod685_gf_entry_meta m_sub ON e_sub.id = m_sub.entry_id
     WHERE e_sub.form_id = 1
       AND m_sub.meta_key = '5'  -- NIF/DNI
-      AND e_sub.date_created >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+      AND e_sub.date_created >= DATE_SUB(NOW(), INTERVAL 1 DAY)
     GROUP BY m_sub.meta_value
 ) latest_entries ON e.id = latest_entries.max_id
 
@@ -140,7 +140,7 @@ LEFT JOIN mod685_gf_entry_meta m
 
 -- TARGET ONLY MEMBERSHIP FORM & OPEN THE TIMEFRAME
 WHERE e.form_id = 1
-  AND e.date_created >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+  AND e.date_created >= DATE_SUB(NOW(), INTERVAL 1 DAY)
 
 GROUP BY e.id, e.date_created
 
