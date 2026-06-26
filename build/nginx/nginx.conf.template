@@ -1,0 +1,123 @@
+events {}
+
+http {
+    # =====================================================================
+    # SECURITY: Rate Limiting Zones
+    # =====================================================================
+    # Zone 1: Login limit (10 requests per minute)
+    # Allocates 10MB of memory (enough to track ~160,000 IPs).
+    limit_req_zone $binary_remote_addr zone=login_limit:10m rate=10r/m;
+
+    # Zone 2: Public Form limit (2 requests per minute)
+    # Extremely strict limit to prevent bots from spamming the Preafiliacion QR code.
+    limit_req_zone $binary_remote_addr zone=form_limit:10m rate=2r/m;
+
+    server {
+        listen 80;
+        server_name ${HOSTNAME};
+
+        # Allow Let's Encrypt Certbot verification
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+
+        # Force redirect HTTP -> HTTPS
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        server_name ${HOSTNAME};
+
+        ssl_certificate /etc/letsencrypt/live/${HOSTNAME}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/${HOSTNAME}/privkey.pem;
+
+        # SSL Configuration (Best Practices from Certbot)
+        include /etc/letsencrypt/conf/options-ssl-nginx.conf;
+        ssl_dhparam /etc/letsencrypt/conf/ssl-dhparams.pem;
+
+        # =====================================================================
+        # SECURITY: Hardening Headers
+        # =====================================================================
+        # HSTS: Tell browsers to ALWAYS use HTTPS for the next year (prevents downgrade attacks).
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        
+        # Prevent your site from being framed by other sites (Clickjacking protection).
+        add_header X-Frame-Options "SAMEORIGIN";
+
+        # Prevent the browser from trying to guess the MIME type (Sniffing protection).
+        add_header X-Content-Type-Options "nosniff";
+
+        # =====================================================================
+        # ROUTE: Protected Login Endpoint
+        # =====================================================================
+        location /login {
+            # Apply the login rate limit.
+            # 'burst=5' allows a user to make 5 quick attempts without error.
+            # 'nodelay' ensures legitimate requests are not artificially slowed down.
+            limit_req zone=login_limit burst=5 nodelay;
+
+            proxy_pass http://nicegui-app:8081;
+            # Necessary headers for NiceGUI
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # =====================================================================
+        # ROUTE: Public API (Preafiliacion Form - STRICT RATE LIMIT)
+        # =====================================================================
+        # Nginx matches the most specific location first. This catches /api/afiliadas
+        # before the general /api/ block below.
+        location /api/afiliadas {
+            # Strictly limit to 2 per minute, allowing a tiny burst of 3.
+            limit_req zone=form_limit burst=3 nodelay;
+
+            rewrite ^/api/(.*)$ /$1 break;
+            proxy_pass http://server:3000;
+            
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # =====================================================================
+        # ROUTE: Internal API (PostgREST - General Access)
+        # =====================================================================
+        location /api/ {
+            rewrite ^/api/(.*)$ /$1 break;
+            proxy_pass http://server:3000;
+            
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # =====================================================================
+        # ROUTE: Main Application (NiceGUI)
+        # =====================================================================
+        location / {
+            proxy_pass http://nicegui-app:8081;
+            
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Long timeouts for WebSocket connections (NiceGUI specific)
+            proxy_read_timeout 1d;
+            proxy_send_timeout 1d;
+        }
+    }
+}

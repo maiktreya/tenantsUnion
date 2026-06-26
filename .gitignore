@@ -1,36 +1,50 @@
-# Production environment single file
+# =============================================================================
+# Production Environment & Sensitive Credentials
+# =============================================================================
 .env
 .wsl_env
 
-# Python bytecode and caches
+# =============================================================================
+# Nginx & Certbot (Robust Exception Rule)
+# =============================================================================
+# 1. Ignore absolutely everything (files & folders) inside build/nginx/
+# This automatically catches 'certbot/', local 'nginx.conf', and any keys.
+build/nginx/*
+
+# 2. Whitelist ONLY the initial configuration template
+!build/nginx/nginx.conf.template
+
+# =============================================================================
+# Python Bytecode and Caches
+# =============================================================================
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .pytest_cache/
 .coverage
+htmlcov/
 
-# Environment and IDE specific
+# =============================================================================
+# Environment and IDE Specifics
+# =============================================================================
 .venv/
 .vscode/
 
-# Application storage and generated data
+# =============================================================================
+# Application Storage and Generated Data
+# =============================================================================
 .nicegui/
 storage/
 screenshots/
-htmlcov/
 unittest-cpp/
 
-# Other local folders & files
+# =============================================================================
+# Other Local Folders & Log Files
+# =============================================================================
 back/
 dev/
 logs/
 doc/working-notes.md
 utils/cron/tenants_sync.log
 utils/cron/cron_errors.log
-
-# Ignore the build/nginx directory...
-build/nginx/
-
-# ...BUT keep the template file inside it.
-!build/nginx/nginx.conf.template
