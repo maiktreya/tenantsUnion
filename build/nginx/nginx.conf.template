@@ -75,26 +75,17 @@ http {
         # =====================================================================
         # Nginx matches the most specific location first. This catches /api/afiliadas
         # before the general /api/ block below.
-        location /api/afiliadas {
-            # Strictly limit to 2 per minute, allowing a tiny burst of 3.
-            limit_req zone=form_limit burst=3 nodelay;
+        location /join {
+            # Apply the login rate limit.
+            # 'burst=5' allows a user to make 5 quick attempts without error.
+            # 'nodelay' ensures legitimate requests are not artificially slowed down.
+            limit_req zone=login_limit burst=5 nodelay;
 
-            rewrite ^/api/(.*)$ /$1 break;
-            proxy_pass http://server:3000;
-            
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-
-        # =====================================================================
-        # ROUTE: Internal API (PostgREST - General Access)
-        # =====================================================================
-        location /api/ {
-            rewrite ^/api/(.*)$ /$1 break;
-            proxy_pass http://server:3000;
-            
+            proxy_pass http://nicegui-app:8081;
+            # Necessary headers for NiceGUI
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
