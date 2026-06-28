@@ -48,7 +48,7 @@ TABLE_INFO = {
             "directivos",
             "direccion_fiscal",
             "entramado_id",
-            "url_notas",
+            "url_notas"
         ],
         "relations": {
             "entramado_id": {"view": "entramado_empresas", "display_field": "nombre"}
@@ -70,7 +70,7 @@ TABLE_INFO = {
         "display_name": "Bloques",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["direccion", "empresa_id", "agrupacion_id"],
+        "fields": ["direccion", "empresa_id", "agrupacion_bloque_id", "fecha_alta", "updated_at"],
         "relations": {
             "empresa_id": {"view": "empresas", "display_field": "nombre"},
             "agrupacion_bloque_id": {"view": "agrupacion_bloques", "display_field": "nombre"},
@@ -96,12 +96,14 @@ TABLE_INFO = {
             "propiedad",
             "prop_vertical",
             "n_personas",
-            "fecha_firma",
+            "fecha_firma"
         ],
         "fields": [
             "direccion",
             "municipio",
             "cp",
+            "fecha_alta",
+            "updated_at"
         ],
         "relations": {
             "bloque_id": {
@@ -132,9 +134,10 @@ TABLE_INFO = {
             "telefono",
             "estado",
             "regimen",
-            "afiliacion",  # <--- AÑADIDO SOLO AQUÍ PARA LA VISTA/EDICIÓN EN UI
+            "afiliacion",
             "fecha_alta",
             "fecha_baja",
+            "updated_at"
         ],
         "field_options": {
             "estado": sorted(["Alta", "Baja", "Bienvenida"]),
@@ -184,7 +187,7 @@ TABLE_INFO = {
             "apellidos",
             "email",
             "is_active",
-            "created_at",
+            "created_at"
         ],
         "child_relations": [
             {"table": "usuario_credenciales", "foreign_key": "usuario_id"},
@@ -228,7 +231,7 @@ TABLE_INFO = {
             "tipo",
             "resultado",
             "afiliada_id",
-            "tecnica_id",
+            "tecnica_id"
         ],
         "relations": {
             "afiliada_id": {
@@ -249,7 +252,7 @@ TABLE_INFO = {
             "afiliada_id",
             "causa",
             "fecha_apertura",
-            "descripcion",
+            "descripcion"
         ],
         "field_options": {
             "estado": sorted(["Abierto", "Victoria", "Cerrado"]),
@@ -269,7 +272,7 @@ TABLE_INFO = {
                     "Impago",
                     "Actualización del precio (IPC)",
                     "Negociación del contrato",
-                    "Otros",
+                    "Otros"
                 ]
             ),
             "tipo": sorted([]),
@@ -296,7 +299,7 @@ TABLE_INFO = {
             "accion",
             "estado",
             "conflicto_id",
-            "usuario_id",
+            "usuario_id"
         ],
         "field_options": {
             "estado": sorted(["Abierto", "Victoria", "Cerrado"]),
@@ -331,7 +334,7 @@ TABLE_INFO = {
         "display_name": "Facturación",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["cuota", "periodicidad", "forma_pago", "iban", "afiliada_id"],
+        "fields": ["cuota", "periodicidad", "forma_pago", "iban", "afiliada_id", "fecha_alta", "updated_at"],
         "relations": {
             "afiliada_id": {
                 "view": "afiliadas",

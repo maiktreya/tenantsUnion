@@ -34,8 +34,8 @@ def parse_sql_views(sql_content):
     return set(views)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SCHEMA_PATH = PROJECT_ROOT / "build" / "postgreSQL" / "init-scripts-dev" / "01-init-schemaDBdef.sql"
-VIEWS_PATH = PROJECT_ROOT / "build" / "postgreSQL" / "init-scripts-dev" / "03-init-createViews.sql"
+SCHEMA_PATH = PROJECT_ROOT / "build" / "postgreSQL" / "init-scripts" / "01-init-schemaDBdef.sql"
+VIEWS_PATH = PROJECT_ROOT / "build" / "postgreSQL" / "init-scripts" / "03-init-createViews.sql"
 
 # Read the schema definition file
 with SCHEMA_PATH.open("r", encoding="utf-8") as f:

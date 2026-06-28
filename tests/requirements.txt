@@ -35,3 +35,8 @@ selenium-wire
 
 # Optional: For taking better screenshots and debugging
 pillow
+
+# Libs needed fort security
+passlib
+jwt
+bcrypt
