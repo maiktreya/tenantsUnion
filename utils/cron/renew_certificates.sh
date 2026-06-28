@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# script for automated certbot SSL certs renewal 
+# include as crontab -e: 0 1 * * * cd $HOME/github/prod/tenantsUnion && /bin/bash utils/cron/renew_certificates.sh >> logs/certbot-renewal.log 2>&1
 
 # Minimal renewal script — safely read needed .env variables and run certbot from repo root
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
