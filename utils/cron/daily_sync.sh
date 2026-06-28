@@ -1,11 +1,12 @@
 #!/bin/bash
 # daily_sync.sh
 # Dynamic ETL: Extracts last 24h Gravity Forms data over an SSH tunnel OR a direct IP link.
-# Include as crontab -e: 0 2 * * * /home/other/github/prod/tenantsUnion/utils/cron/daily_sync.sh >> /home/other/github/prod/tenantsUnion/utils/cron/cron_errors.log 2>&1
+# Include as crontab -e:0 2 * * * $HOME/github/prod/tenantsUnion/utils/cron/daily_sync.sh >> $HOME/github/prod/tenantsUnion/utils/cron/cron_errors.log 2>&1
 
 set -e # Exit immediately if a command exits with a non-zero status
 
-PROJECT_DIR="/home/other/github/prod/tenantsUnion"
+: "${HOME:?HOME is not set — aborting}"
+PROJECT_DIR="${HOME}/github/prod/tenantsUnion"
 LOG_FILE="${PROJECT_DIR}/utils/cron/tenants_sync.log"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 
