@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# backup_storage.sh
+# Daily backup of the tenantsUnion storage directory.
+# Include as crontab -e: 0 2 * * * $HOME/github/prod/tenantsUnion/utils/cron/backup_storage.sh
 
 # Explicit paths for cron reliability
-SOURCE_DIR="/home/other/github/prod/tenantsUnion/storage"
-BACKUP_ROOT="/home/other/back"
+: "${HOME:?HOME is not set — aborting}"
+PROJECT_DIR="${HOME}/github/prod/tenantsUnion"
+SOURCE_DIR="${PROJECT_DIR}/storage"
+BACKUP_ROOT="${HOME}/back"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_FILE="${BACKUP_ROOT}/storage-${TIMESTAMP}.tar.gz"
 
@@ -17,7 +22,7 @@ fi
 mkdir -p "$BACKUP_ROOT"
 
 # Create backup (tar from parent directory to avoid path issues)
-tar -czf "$BACKUP_FILE" -C "/home/other/github/prod/tenantsUnion" "storage"
+tar -czf "$BACKUP_FILE" -C "$PROJECT_DIR" "storage"
 echo "Backup written to ${BACKUP_FILE}"
 
 # Clean up old backups (keep only 2 most recent)
