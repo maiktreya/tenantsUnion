@@ -45,6 +45,7 @@ unittest-cpp/
 back/
 dev/
 logs/
+ETL/tmp
 doc/working-notes.md
 utils/cron/tenants_sync.log
 utils/cron/cron_errors.log

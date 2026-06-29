@@ -4,8 +4,9 @@
 
 Combines:
 - Proven two-stage lookup strategy (full address → strict comma-parsed fallback)
+- Automated exponential backoff retry loop for resilient API network handling
 - Intelligent comma-boundary address parsing for Spanish data
-- Robust geocoded address sanitation to completely strip out municipal noise (city, postcode, country)
+- Robust geocoded address sanitation to completely strip out municipal noise
 - Automatic formatting and appending of unit tracking tokens (Floor + Door)
 """
 
@@ -21,6 +22,10 @@ import logging
 API_URL = "https://www.cartociudad.es/geocoder/api/geocoder/candidates"
 API_TIMEOUT = 10
 RATE_LIMIT_SLEEP = 0.2
+
+# Resilience / Retry Configurations
+MAX_RETRIES = 3            # Total attempts per API request phase
+RETRY_BACKOFF_BASE = 1.5   # Base multiplier for exponential sleep delays
 
 # Column matching criteria (case-insensitive)
 ADDRESS_FIELDS = ['address_full_google', 'direction', 'direccion', 'address', 'calle']
@@ -91,9 +96,6 @@ def sanitize_geocoded_base(geocoded_str):
     """
     Strips out trailing city, postal codes, and provincial/country indicators 
     returned by the geocoder API to isolate the pure street address line.
-    
-    Example API Return: "Calle de Téllez, 12, 28007 Madrid, Madrid, España"
-    Output:             "Calle de Téllez, 12"
     """
     if not geocoded_str:
         return ""
@@ -102,15 +104,12 @@ def sanitize_geocoded_base(geocoded_str):
     if not parts:
         return ""
         
-    # Standard CartoCiudad response structures lead with [Street Name, Portal Number]
     street_line = parts[0]
     
-    # If the second element is purely or partially a number token (portal identifier), bind it
     if len(parts) > 1:
         second_part = parts[1]
         first_token = second_part.split()[0] if second_part.split() else ""
         
-        # Ensure it's not a postal code (5-digit numeric strings) or a known location block
         if any(char.isdigit() for char in first_token) and len(first_token) < 5:
             return f"{street_line}, {first_token}"
             
@@ -118,7 +117,10 @@ def sanitize_geocoded_base(geocoded_str):
 
 
 def get_cadastral_data(address_string, municipality="Madrid"):
-    """Queries CartoCiudad and returns (ref_catastral, coordenadas, geocoded_address)."""
+    """
+    Queries CartoCiudad and returns (ref_catastral, coordenadas, geocoded_address).
+    Features an exponential backoff retry system to handle transient drops/rate limits.
+    """
     if not address_string or len(address_string) < 5:
         return "", "", ""
 
@@ -129,30 +131,36 @@ def get_cadastral_data(address_string, municipality="Madrid"):
     if municipality:
         params['municipio_filter'] = str(municipality).strip()
 
-    try:
-        response = requests.get(API_URL, params=params, timeout=API_TIMEOUT)
-        response.raise_for_status()
-        data = response.json()
+    # Loop through execution retry budget
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = requests.get(API_URL, params=params, timeout=API_TIMEOUT)
+            response.raise_for_status()
+            data = response.json()
 
-        if data and isinstance(data, list) and len(data) > 0:
-            best = data[0]
-            ref_catastral = best.get('refCatastral', '').strip()
-            lat = best.get('lat', '')
-            lng = best.get('lng', '')
-            
-            # Extract raw response string options
-            raw_geo_addr = best.get('address', '') or best.get('portalAddress', '') or ""
-            
-            # Clean and drop the trailing municipal fields immediately
-            geocoded_address = sanitize_geocoded_base(str(raw_geo_addr))
-            
-            coordenadas = f"{lat}, {lng}" if lat and lng else ""
-            return ref_catastral, coordenadas, geocoded_address
+            if data and isinstance(data, list) and len(data) > 0:
+                best = data[0]
+                ref_catastral = best.get('refCatastral', '').strip()
+                lat = best.get('lat', '')
+                lng = best.get('lng', '')
+                
+                raw_geo_addr = best.get('address', '') or best.get('portalAddress', '') or ""
+                geocoded_address = sanitize_geocoded_base(str(raw_geo_addr))
+                coordenadas = f"{lat}, {lng}" if lat and lng else ""
+                
+                return ref_catastral, coordenadas, geocoded_address
+            else:
+                # API responded with 200 OK but an empty array (Genuine zero match found)
+                return "", "", ""
 
-    except requests.exceptions.RequestException as e:
-        logging.debug(f"API request failed for '{address_string}': {e}")
-    except Exception as e:
-        logging.debug(f"Unexpected error for '{address_string}': {e}")
+        except (requests.exceptions.RequestException, Exception) as e:
+            if attempt == MAX_RETRIES:
+                logging.warning(f"❌ API permanently failed after {MAX_RETRIES} attempts for '{address_string}': {e}")
+            else:
+                # Exponential backoff formula calculation: e.g., 1.5s, 3.0s
+                sleep_time = RETRY_BACKOFF_BASE * attempt
+                logging.info(f"⏳ Retry block triggered (Attempt {attempt}/{MAX_RETRIES} failed: {e}). Retrying in {sleep_time}s...")
+                time.sleep(sleep_time)
 
     return "", "", ""
 
@@ -170,7 +178,7 @@ def main():
     input_path = sys.argv[1]
     output_path = sys.argv[2]
 
-    logging.info("🚀 Starting Geo-Link Enrichment (Strict Localized Address Ingestion)")
+    logging.info("🚀 Starting Geo-Link Enrichment (Resilient Network Topology Ingestion)")
 
     try:
         with open(input_path, mode='r', encoding='utf-8') as infile:
@@ -224,7 +232,6 @@ def main():
                     floor_val = str(row.get(floor_col, '')).strip() if floor_col else ''
                     door_val = str(row.get(door_col, '')).strip() if door_col else ''
                     
-                    # Convert raw integers (e.g., 1, 2) to proper Spanish floor markers (1º, 2º)
                     if floor_val and floor_val.isdigit() and len(floor_val) <= 2:
                         floor_val = f"{floor_val}º"
                     
