@@ -1,6 +1,7 @@
 services:
   db:
-    image: postgres:17
+    build:
+      context: ./build/postgreSQL
     expose:
       - "5432" # Internal only - no external access
     environment:

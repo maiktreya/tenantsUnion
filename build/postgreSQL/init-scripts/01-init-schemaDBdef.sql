@@ -17,6 +17,8 @@
 -- =====================================================================
 CREATE SCHEMA IF NOT EXISTS sindicato_inq;
 
+CREATE EXTENSION IF NOT EXISTS postgis SCHEMA public;
+
 SET search_path TO sindicato_inq, public;
 
 -- =====================================================================
@@ -107,6 +109,8 @@ CREATE TABLE IF NOT EXISTS pisos (
     fecha_firma DATE,
     vpo BOOLEAN,
     vpo_date DATE,
+    ref_catastral TEXT UNIQUE,
+    coordenadas geometry(Point, 4326),
     fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -211,3 +215,6 @@ CREATE INDEX IF NOT EXISTS idx_conflictos_afiliada_id ON conflictos (afiliada_id
 CREATE INDEX IF NOT EXISTS idx_diario_conflictos_conflicto_id ON diario_conflictos (conflicto_id);
 
 CREATE INDEX IF NOT EXISTS idx_diario_conflictos_usuario_id ON diario_conflictos (usuario_id);
+
+-- ÍNDICE ESPACIAL CRUCIAL: Acelera búsquedas de radio, mapas de calor y agrupaciones por zona
+CREATE INDEX IF NOT EXISTS idx_pisos_spatial_coordenadas ON pisos USING gist (coordenadas);
