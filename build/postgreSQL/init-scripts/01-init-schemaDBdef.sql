@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS pisos (
     fecha_firma DATE,
     vpo BOOLEAN,
     vpo_date DATE,
-    ref_catastral TEXT UNIQUE,
+    ref_catastral TEXT,
     coordenadas geometry(Point, 4326),
     fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
