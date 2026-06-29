@@ -103,7 +103,9 @@ TABLE_INFO = {
             "municipio",
             "cp",
             "fecha_alta",
-            "updated_at"
+            "updated_at",
+            "coordenadas",
+            "ref_catastral"
         ],
         "relations": {
             "bloque_id": {
