@@ -16,6 +16,27 @@ def _format_cell_value(column: str, value: any) -> str:
             return format_date_es(value)  # Fallback parser for non-ISO date strings
     return value if value is not None and value != "" else "-"
 
+def _format_cell_value(column: str, value: any) -> str:
+    """Format a cell value: coordinates get unpushed from GeoJSON, dates get localized, blanks become '-'."""
+    # 1. GeoJSON PostGIS Geometry Formatter
+    # Catches the dictionary response passed down by PostgREST spatial types
+    if isinstance(value, dict) and value.get("type") == "Point" and isinstance(value.get("coordinates"), list):
+        coords = value["coordinates"]
+        if len(coords) >= 2:
+            # GeoJSON spec sets coordinates array as [Longitude, Latitude]
+            # We invert them here to render human-readable "Latitude, Longitude"
+            return f"{coords[1]}, {coords[0]}"
+
+    # 2. Date and Timestamp Formatter
+    if value and isinstance(value, str) and any(k in column.lower() for k in ["fecha", "updated", "_at"]):
+        try:
+            clean_str = value.replace("T", " ").replace("Z", "").split(".")[0]
+            dt = datetime.fromisoformat(clean_str)
+            return dt.strftime("%d/%m/%Y" if dt.hour == 0 and dt.minute == 0 else "%d/%m/%Y %H:%M")
+        except Exception:
+            return format_date_es(value)  # Fallback parser for non-ISO date strings
+            
+    return value if value is not None and value != "" else "-"
 
 class DataTable:
     """Reusable data table with sorting, filtering, pagination, resizable columns, and themeable colors."""

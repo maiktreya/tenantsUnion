@@ -64,8 +64,9 @@ class FilterPanel:
         return self.container
 
     def _get_sorted_unique_values(self, column: str) -> List[Any]:
+        # DEFENSIVE GUARD: Exclude nested unhashable structures (dict/list) from set conversion
         unique_values = list(
-            set(r.get(column) for r in self.records if r.get(column) is not None)
+            set(r.get(column) for r in self.records if r.get(column) is not None and not isinstance(r.get(column), (dict, list)))
         )
         try:
             return sorted(unique_values, key=_normalize_for_sorting)
@@ -100,22 +101,21 @@ class FilterPanel:
                     .classes("w-64")
                 )
 
-                # ** 1. New, Consolidated Date Filter UI **
+                # ** 1. Consolidated Date Filter UI **
                 if date_columns:
                     self._create_date_filter_ui(date_columns)
 
                 # ** 2. Standard Column Filters **
                 for column in standard_columns:
+                    # DEFENSIVE GUARD: Filter out nested unhashable values to prevent runtime crashes
                     unique_values = [
-                        r.get(column) for r in self.records if r.get(column) is not None
+                        r.get(column) for r in self.records if r.get(column) is not None and not isinstance(r.get(column), (dict, list))
                     ]
                     unique_count = len(set(unique_values))
 
-                    # Special handling for 'cuota' (supports custom option: greater than 0)
+                    # Special handling for 'cuota'
                     if column.lower() == "cuota":
-                        # Build options as a mapping {value: label} to avoid [object Object]
                         options: Dict[Any, str] = {"__GT_ZERO__": "Mayor que 0"}
-                        # Only append explicit numeric values if the set is small
                         if unique_count <= 16:
                             for v in self._get_sorted_unique_values(column):
                                 options[v] = str(v)
@@ -135,7 +135,6 @@ class FilterPanel:
                         )
                         continue
 
-                    # Default logic: only show dropdowns for columns with a small set of values
                     if 1 < unique_count <= 16:
                         self.inputs[column] = (
                             ui.select(
