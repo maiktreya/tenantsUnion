@@ -84,7 +84,7 @@ INNER JOIN (
     JOIN e11fa05ad42a_gf_entry_meta m_sub ON e_sub.id = m_sub.entry_id
     WHERE m_sub.meta_key = '22'
       -- DYNAMIC DATE FILTER
-      AND e_sub.date_created >= DATE_SUB(NOW(), INTERVAL 8 DAY)
+      AND e_sub.date_created >= DATE_SUB(NOW(), INTERVAL 1 DAY)
     GROUP BY m_sub.meta_value
 ) latest_entries ON e.id = latest_entries.max_id
 
@@ -93,7 +93,7 @@ LEFT JOIN e11fa05ad42a_gf_entry_meta m
           AND m.meta_key NOT IN ('submission_speeds', 'gform_product_info_1_')
 
 -- DYNAMIC DATE FILTER
-WHERE e.date_created >= DATE_SUB(NOW(), INTERVAL 8 DAY)
+WHERE e.date_created >= DATE_SUB(NOW(), INTERVAL 1 DAY)
 
 GROUP BY e.id, e.date_created
 
