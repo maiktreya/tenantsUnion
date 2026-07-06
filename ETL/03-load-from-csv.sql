@@ -1,6 +1,7 @@
 -- =====================================================================
 -- ARCHIVO 03: IMPORTACIÓN Y ENRIQUECIMIENTO ESPACIAL DESDE GRAVITY FORMS
 -- REFACTORIZADO: INTEGRACIÓN DE POSTGIS Y ACTUALIZACIONES IDEMPOTENTES
+-- SEGURO: FILTRADO ESTRICTO DE CREACIÓN DE BLOQUES SOLO PARA PROPIEDAD VERTICAL
 -- =====================================================================
 
 SET search_path TO sindicato_inq, public;
@@ -102,7 +103,7 @@ WHERE NULLIF(TRIM(field_48), '') IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM empresas WHERE nombre = TRIM(staging_gravity.field_48));
 
 -- ====================================================================================
--- 5. POBLAR PISOS (RESOLUCIÓN DE EN CONFLICTO BATCH MEDIANTE DISTINCT ON)
+-- 5. POBLAR PISOS 
 -- ====================================================================================
 INSERT INTO pisos (
     direccion, municipio, cp, inmobiliaria, propiedad, prop_vertical, n_personas, 
@@ -124,7 +125,7 @@ SELECT DISTINCT ON (computed_address)
     ELSE NULL END
 FROM staging_gravity 
 WHERE computed_address IS NOT NULL
-ORDER BY computed_address, CAST(entry_id AS INTEGER) DESC -- Prioriza la última entrada enviada
+ORDER BY computed_address, CAST(entry_id AS INTEGER) DESC 
 ON CONFLICT (direccion) DO UPDATE SET
     ref_catastral = COALESCE(EXCLUDED.ref_catastral, pisos.ref_catastral),
     coordenadas = COALESCE(EXCLUDED.coordenadas, pisos.coordenadas),
@@ -138,10 +139,10 @@ ON CONFLICT (direccion) DO UPDATE SET
     updated_at = CURRENT_TIMESTAMP;
 
 -- ====================================================================================
--- 5.1 ORQUESTACIÓN DE PARENTALIDAD DE BLOQUES
+-- 5.1 ORQUESTACIÓN DE PARENTALIDAD DE BLOQUES (FILTRADO SELECTIVO CORREGIDO)
 -- ====================================================================================
 
--- PASO A: Si ya existe un bloque asociado a este Catastro, vincular automáticamente
+-- PASO A: Si ya existe un bloque asociado a este Catastro en la BD, vincular automáticamente
 UPDATE pisos p
 SET bloque_id = sub.max_bloque_id
 FROM (
@@ -153,7 +154,7 @@ FROM (
 WHERE p.ref_catastral = sub.ref_catastral
   AND p.bloque_id IS NULL;
 
--- PASO B: Si es Propiedad Vertical, crear el Bloque base (Calle + Número)
+-- PASO B: Crear el Bloque base ÚNICAMENTE si es una Propiedad Vertical ('Si')
 INSERT INTO bloques (direccion, empresa_id)
 SELECT DISTINCT
     INITCAP(
@@ -171,12 +172,12 @@ SELECT DISTINCT
 FROM staging_gravity s
 LEFT JOIN empresas e ON TRIM(s.field_48) = e.nombre
 JOIN pisos p ON p.direccion = s.computed_address
-WHERE NULLIF(TRIM(p.prop_vertical), '') IS NOT NULL
+WHERE UPPER(TRIM(p.prop_vertical)) = 'SI'
   AND p.ref_catastral IS NOT NULL
   AND p.bloque_id IS NULL
 ON CONFLICT (direccion) DO NOTHING;
 
--- PASO C: Vincular el bloque recién creado al piso
+-- PASO C: Vincular el bloque recién creado al piso (Protección añadida para asegurar consistencia)
 UPDATE pisos p
 SET bloque_id = b.id
 FROM staging_gravity s
@@ -192,9 +193,10 @@ JOIN bloques b ON b.direccion = INITCAP(
     )
 )
 WHERE p.direccion = s.computed_address
+  AND UPPER(TRIM(p.prop_vertical)) = 'SI'
   AND p.bloque_id IS NULL;
 
--- PASO D: Propagar bloque_id a otros pisos con el mismo Catastro
+-- PASO D: Efecto Cascada - Propagar bloque_id a otros pisos con el mismo Catastro
 UPDATE pisos p
 SET bloque_id = sub.max_bloque_id
 FROM (
@@ -207,7 +209,7 @@ WHERE p.ref_catastral = sub.ref_catastral
   AND p.bloque_id IS NULL;
 
 -- ====================================================================================
--- 5.5 LIMPIEZA DE FACTURACIÓN ANTERIOR (Asegura actualización limpia en re-runs)
+-- 5.5 LIMPIEZA DE FACTURACIÓN ANTERIOR
 -- ====================================================================================
 DELETE FROM facturacion
 WHERE afiliada_id IN (
@@ -216,7 +218,7 @@ WHERE afiliada_id IN (
 );
 
 -- ====================================================================================
--- 6. POBLAR AFILIADAS (FILTRO CORRECTOR APLICADO PARA PERMITIR ACTUALIZACIÓN CONTINUA)
+-- 6. POBLAR AFILIADAS
 -- ====================================================================================
 INSERT INTO afiliadas (
     piso_id, nombre, apellidos, cif, fecha_nac, genero, 
@@ -253,9 +255,7 @@ ON CONFLICT (cif) DO UPDATE SET
     fecha_alta = EXCLUDED.fecha_alta,
     nivel_participacion = EXCLUDED.nivel_participacion,
     afiliacion = 'Importado',
-    updated_at = CURRENT_TIMESTAMP; 
-    -- NOTA: Se elimina la restricción WHERE restrictiva anterior para permitir 
-    -- re-escribir y actualizar registros ya existentes o importados a medias.
+    updated_at = CURRENT_TIMESTAMP;
 
 -- ====================================================================================
 -- 7. POBLAR FACTURACIÓN
