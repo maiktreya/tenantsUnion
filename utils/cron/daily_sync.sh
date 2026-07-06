@@ -48,7 +48,7 @@ fi
 SQL_QUERY_PATH="${PROJECT_DIR}/${ETL_EXTRACT_PATH#./}"
 GEOLINK_SCRIPT_PATH="${PROJECT_DIR}/ETL/02-geolink.py"
 PG_IMPORT_SCRIPT="${PROJECT_DIR}/ETL/03-load-from-csv.sql"
-CSV_DEST_PATH="${PROJECT_DIR}/dev/back/SI_MAD/db_fork/mariadb_export.csv" 
+CSV_DEST_PATH="${PROJECT_DIR}/ETL/tmp/mariadb_export.csv"
 CSV_TMP_PATH="${CSV_DEST_PATH}.tmp"
 
 # ==============================================================================

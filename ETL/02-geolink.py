@@ -140,11 +140,12 @@ def get_cadastral_data(address_string, municipality="Madrid"):
 
             if data and isinstance(data, list) and len(data) > 0:
                 best = data[0]
-                ref_catastral = best.get('refCatastral', '').strip()
-                lat = best.get('lat', '')
-                lng = best.get('lng', '')
                 
-                raw_geo_addr = best.get('address', '') or best.get('portalAddress', '') or ""
+                ref_catastral = (best.get('refCatastral') or '').strip()
+                lat = best.get('lat') or ''
+                lng = best.get('lng') or ''
+                
+                raw_geo_addr = best.get('address') or best.get('portalAddress') or ""
                 geocoded_address = sanitize_geocoded_base(str(raw_geo_addr))
                 coordenadas = f"{lat}, {lng}" if lat and lng else ""
                 

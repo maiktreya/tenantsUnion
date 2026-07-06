@@ -1,12 +1,12 @@
 -- =====================================================================
 -- ARCHIVO 03: IMPORTACIÓN Y ENRIQUECIMIENTO ESPACIAL DESDE GRAVITY FORMS
--- REFACTORIZADO: INTEGRACIÓN DE POSTGIS Y AGRUPACIÓN AUTOMÁTICA DE BLOQUES
+-- REFACTORIZADO: INTEGRACIÓN DE POSTGIS Y ACTUALIZACIONES IDEMPOTENTES
 -- =====================================================================
 
 SET search_path TO sindicato_inq, public;
 SET datestyle = 'ISO, DMY';  
 
--- 1. Crear tabla temporal de staging (Actualizada con los 3 campos de enriquecimiento)
+-- 1. Crear tabla temporal de staging (Sincronizada con campos de enriquecimiento)
 CREATE TEMP TABLE staging_gravity (
     entry_id TEXT, date_created TEXT, first_name TEXT, last_name TEXT,
     nif_dni TEXT, birth_date TEXT, gender TEXT, phone TEXT, email TEXT,
@@ -16,11 +16,11 @@ CREATE TEMP TABLE staging_gravity (
     contract_start_date TEXT, landlord_contact_type TEXT, field_41 TEXT,
     field_46 TEXT, field_48 TEXT, field_49_1 TEXT, membership_type TEXT,
     fee_amount TEXT, fee_period TEXT, fee_formatted TEXT, bank_iban TEXT,
-    ref_catastral TEXT, coordenadas TEXT, geocoded_address TEXT, -- Nuevas columnas de Python
+    ref_catastral TEXT, coordenadas TEXT, geocoded_address TEXT, 
     computed_address TEXT
 );
 
--- 2. Cargar datos del CSV (Estructura de COPY sincronizada)
+-- 2. Cargar datos del CSV
 COPY staging_gravity (
     entry_id, date_created, first_name, last_name, nif_dni, birth_date, gender, 
     phone, email, address_full_google, address_street, address_number, 
@@ -70,8 +70,6 @@ SET
 
 -- ====================================================================================
 -- 3. NORMALIZACIÓN AVANZADA DE DIRECCIÓN (Basada en geocoded_address)
--- Reemplaza la dirección antigua por la versión sanitizada de CartoCiudad,
--- aplicando reducciones de abreviaturas uniformes y corrigiendo Capitalización (INITCAP)
 -- ====================================================================================
 UPDATE staging_gravity
 SET computed_address = 
@@ -83,7 +81,7 @@ SET computed_address =
     )
 WHERE geocoded_address IS NOT NULL;
 
--- Fallback por si la geolocalización falló por completo para no perder el registro
+-- Fallback por si la geolocalización falló por completo
 UPDATE staging_gravity
 SET computed_address = 
     INITCAP(
@@ -104,14 +102,13 @@ WHERE NULLIF(TRIM(field_48), '') IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM empresas WHERE nombre = TRIM(staging_gravity.field_48));
 
 -- ====================================================================================
--- 5. POBLAR PISOS (Incluyendo Datos de Catastro y Coordenadas Geográficas)
--- Convertimos "Lat, Lng" de texto a un objeto nativo de tipo Punto Espacial (SRID 4326)
+-- 5. POBLAR PISOS (RESOLUCIÓN DE EN CONFLICTO BATCH MEDIANTE DISTINCT ON)
 -- ====================================================================================
 INSERT INTO pisos (
     direccion, municipio, cp, inmobiliaria, propiedad, prop_vertical, n_personas, 
     fecha_firma, ref_catastral, coordenadas
 )
-SELECT DISTINCT
+SELECT DISTINCT ON (computed_address)
     computed_address,
     TRIM(address_city), 
     CAST(NULLIF(REGEXP_REPLACE(address_postcode, '[^0-9]', '', 'g'), '') AS INTEGER),
@@ -119,14 +116,15 @@ SELECT DISTINCT
     CAST(NULLIF(REGEXP_REPLACE(num_people_in_home, '[^0-9]', '', 'g'), '') AS INTEGER),
     CAST(NULLIF(contract_start_date, '') AS DATE),
     NULLIF(TRIM(ref_catastral), ''),
-    -- PostGIS requiere Longitud (segmento 2) primero, luego Latitud (segmento 1)
     CASE WHEN NULLIF(TRIM(coordenadas), '') IS NOT NULL THEN
         ST_SetSRID(ST_MakePoint(
             CAST(TRIM(SPLIT_PART(coordenadas, ',', 2)) AS DOUBLE PRECISION),
             CAST(TRIM(SPLIT_PART(coordenadas, ',', 1)) AS DOUBLE PRECISION)
         ), 4326)
     ELSE NULL END
-FROM staging_gravity WHERE computed_address IS NOT NULL
+FROM staging_gravity 
+WHERE computed_address IS NOT NULL
+ORDER BY computed_address, CAST(entry_id AS INTEGER) DESC -- Prioriza la última entrada enviada
 ON CONFLICT (direccion) DO UPDATE SET
     ref_catastral = COALESCE(EXCLUDED.ref_catastral, pisos.ref_catastral),
     coordenadas = COALESCE(EXCLUDED.coordenadas, pisos.coordenadas),
@@ -140,10 +138,10 @@ ON CONFLICT (direccion) DO UPDATE SET
     updated_at = CURRENT_TIMESTAMP;
 
 -- ====================================================================================
--- 5.1 ORQUESTACIÓN DE PARENTALIDAD DE BLOQUES (TU LÓGICA DE PROPIEDAD VERTICAL)
+-- 5.1 ORQUESTACIÓN DE PARENTALIDAD DE BLOQUES
 -- ====================================================================================
 
--- PASO A: Si ya existe un bloque asociado a este Catastro en la BD, vincular el nuevo piso automáticamente
+-- PASO A: Si ya existe un bloque asociado a este Catastro, vincular automáticamente
 UPDATE pisos p
 SET bloque_id = sub.max_bloque_id
 FROM (
@@ -155,10 +153,9 @@ FROM (
 WHERE p.ref_catastral = sub.ref_catastral
   AND p.bloque_id IS NULL;
 
--- PASO B: Si es Propiedad Vertical y ningún piso con este catastro tiene bloque, crear el Bloque base (Calle + Número)
+-- PASO B: Si es Propiedad Vertical, crear el Bloque base (Calle + Número)
 INSERT INTO bloques (direccion, empresa_id)
 SELECT DISTINCT
-    -- Extraemos solo Calle y Número del geocoded_address original usando comas
     INITCAP(
         REGEXP_REPLACE(
             REGEXP_REPLACE(
@@ -174,12 +171,12 @@ SELECT DISTINCT
 FROM staging_gravity s
 LEFT JOIN empresas e ON TRIM(s.field_48) = e.nombre
 JOIN pisos p ON p.direccion = s.computed_address
-WHERE NULLIF(TRIM(p.prop_vertical), '') IS NOT NULL -- Flag de Propiedad Vertical activo
+WHERE NULLIF(TRIM(p.prop_vertical), '') IS NOT NULL
   AND p.ref_catastral IS NOT NULL
   AND p.bloque_id IS NULL
 ON CONFLICT (direccion) DO NOTHING;
 
--- PASO C: Vincular el bloque recién creado al piso que lo generó
+-- PASO C: Vincular el bloque recién creado al piso
 UPDATE pisos p
 SET bloque_id = b.id
 FROM staging_gravity s
@@ -197,7 +194,7 @@ JOIN bloques b ON b.direccion = INITCAP(
 WHERE p.direccion = s.computed_address
   AND p.bloque_id IS NULL;
 
--- PASO D: Efecto Cascada - Propagar el bloque id a CUALQUIER otro piso con la misma Ref. Catastral en la BD
+-- PASO D: Propagar bloque_id a otros pisos con el mismo Catastro
 UPDATE pisos p
 SET bloque_id = sub.max_bloque_id
 FROM (
@@ -209,9 +206,8 @@ FROM (
 WHERE p.ref_catastral = sub.ref_catastral
   AND p.bloque_id IS NULL;
 
-
 -- ====================================================================================
--- 5.5 LIMPIEZA DE FACTURACIÓN ANTERIOR
+-- 5.5 LIMPIEZA DE FACTURACIÓN ANTERIOR (Asegura actualización limpia en re-runs)
 -- ====================================================================================
 DELETE FROM facturacion
 WHERE afiliada_id IN (
@@ -220,13 +216,13 @@ WHERE afiliada_id IN (
 );
 
 -- ====================================================================================
--- 6. POBLAR AFILIADAS
+-- 6. POBLAR AFILIADAS (FILTRO CORRECTOR APLICADO PARA PERMITIR ACTUALIZACIÓN CONTINUA)
 -- ====================================================================================
 INSERT INTO afiliadas (
     piso_id, nombre, apellidos, cif, fecha_nac, genero, 
     email, telefono, estado, regimen, fecha_alta, nivel_participacion, afiliacion
 )
-SELECT 
+SELECT DISTINCT ON (UPPER(TRIM(s.nif_dni)))
     p.id,
     TRIM(s.first_name),
     TRIM(s.last_name),
@@ -242,6 +238,8 @@ SELECT
     'Importado'
 FROM staging_gravity s
 JOIN pisos p ON s.computed_address = p.direccion
+WHERE s.nif_dni IS NOT NULL AND TRIM(s.nif_dni) != ''
+ORDER BY UPPER(TRIM(s.nif_dni)), CAST(s.entry_id AS INTEGER) DESC
 ON CONFLICT (cif) DO UPDATE SET
     piso_id = EXCLUDED.piso_id,
     nombre = EXCLUDED.nombre,
@@ -254,17 +252,16 @@ ON CONFLICT (cif) DO UPDATE SET
     regimen = EXCLUDED.regimen,
     fecha_alta = EXCLUDED.fecha_alta,
     nivel_participacion = EXCLUDED.nivel_participacion,
-    afiliacion = 'Importado'
-WHERE UPPER(afiliadas.afiliacion) = 'FALSE'
-   OR NOT EXISTS (
-       SELECT 1 FROM facturacion WHERE facturacion.afiliada_id = afiliadas.id
-   );
+    afiliacion = 'Importado',
+    updated_at = CURRENT_TIMESTAMP; 
+    -- NOTA: Se elimina la restricción WHERE restrictiva anterior para permitir 
+    -- re-escribir y actualizar registros ya existentes o importados a medias.
 
 -- ====================================================================================
 -- 7. POBLAR FACTURACIÓN
 -- ====================================================================================
 INSERT INTO facturacion (afiliada_id, cuota, periodicidad, forma_pago, iban)
-SELECT 
+SELECT DISTINCT ON (UPPER(TRIM(s.nif_dni)))
     a.id,
     CAST(REPLACE(NULLIF(s.fee_amount, ''), ',', '.') AS DECIMAL(8, 2)),
     CASE TRIM(LOWER(s.fee_period)) WHEN 'año' THEN 1 WHEN 'mes' THEN 12 ELSE 0 END,
@@ -274,7 +271,8 @@ FROM staging_gravity s
 JOIN afiliadas a ON UPPER(TRIM(s.nif_dni)) = UPPER(TRIM(a.cif))
 WHERE NOT EXISTS (
     SELECT 1 FROM facturacion f WHERE f.afiliada_id = a.id
-);
+)
+ORDER BY UPPER(TRIM(s.nif_dni)), CAST(s.entry_id AS INTEGER) DESC;
 
 -- 8. Limpieza final de la tabla de staging
 DROP TABLE staging_gravity;
