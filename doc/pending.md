@@ -4,5 +4,5 @@
 
 ## postgresql
 
-- Spider deployment for syndication of independent instances
-- Granularize already implemented row level security through postgrest RBAC
+- Spider deployment for syndication of independent instance.
+- Generate a doc file overviewing the one single main branch orchestrated update through Ansible automatic git pulls.
