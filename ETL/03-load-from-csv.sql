@@ -208,9 +208,17 @@ FROM (
 WHERE p.ref_catastral = sub.ref_catastral
   AND p.bloque_id IS NULL;
 
+-- ====================================================================================
+-- 5.5 LIMPIEZA DE FACTURACIÓN ANTERIOR
+-- ====================================================================================
+DELETE FROM facturacion
+WHERE afiliada_id IN (
+    SELECT id FROM afiliadas 
+    WHERE UPPER(TRIM(cif)) IN (SELECT UPPER(TRIM(nif_dni)) FROM staging_gravity)
+);
 
 -- ====================================================================================
--- 5. POBLAR AFILIADAS
+-- 6. POBLAR AFILIADAS
 -- ====================================================================================
 INSERT INTO afiliadas (
     piso_id, nombre, apellidos, cif, fecha_nac, genero, 
@@ -250,22 +258,21 @@ ON CONFLICT (cif) DO UPDATE SET
     updated_at = CURRENT_TIMESTAMP;
 
 -- ====================================================================================
--- 6. POBLAR FACTURACIÓN
+-- 7. POBLAR FACTURACIÓN
 -- ====================================================================================
 INSERT INTO facturacion (afiliada_id, cuota, periodicidad, forma_pago, iban)
 SELECT DISTINCT ON (UPPER(TRIM(s.nif_dni)))
     a.id,
-    CAST(REPLACE(NULLIF(s.fee_amount, ''), ',', '.') AS DECIMAL(8,2)),
+    CAST(REPLACE(NULLIF(s.fee_amount, ''), ',', '.') AS DECIMAL(8, 2)),
     CASE TRIM(LOWER(s.fee_period)) WHEN 'año' THEN 1 WHEN 'mes' THEN 12 ELSE 0 END,
-    CASE WHEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$' 
-         THEN 'Domiciliación' ELSE NULL END,
-    CASE WHEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$' 
-         THEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ELSE NULL END
+    CASE WHEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$' THEN 'Domiciliación' ELSE 'Metálico' END,
+    CASE WHEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$' THEN UPPER(REGEXP_REPLACE(s.bank_iban, '\s+', '', 'g')) ELSE NULL END
 FROM staging_gravity s
 JOIN afiliadas a ON UPPER(TRIM(s.nif_dni)) = UPPER(TRIM(a.cif))
-ORDER BY UPPER(TRIM(s.nif_dni)), CAST(s.entry_id AS INTEGER) DESC
-ON CONFLICT (afiliada_id) DO UPDATE SET
-    cuota        = COALESCE(EXCLUDED.cuota, facturacion.cuota),
-    periodicidad = COALESCE(NULLIF(EXCLUDED.periodicidad, 0), facturacion.periodicidad),
-    forma_pago   = COALESCE(EXCLUDED.forma_pago, facturacion.forma_pago),
-    iban         = COALESCE(EXCLUDED.iban, facturacion.iban);
+WHERE NOT EXISTS (
+    SELECT 1 FROM facturacion f WHERE f.afiliada_id = a.id
+)
+ORDER BY UPPER(TRIM(s.nif_dni)), CAST(s.entry_id AS INTEGER) DESC;
+
+-- 8. Limpieza final de la tabla de staging
+DROP TABLE staging_gravity;
