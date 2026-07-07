@@ -1,4 +1,4 @@
-# Tenants Union Platform
+# Tenants Union Platform (`readme.en.md`)
 
 The **Tenants Union Platform** is a secure web application designed for tenant organizing, affiliate tracking, and housing data analytics. Built using Python's **NiceGUI** framework (FastAPI + Vue.js/Quasar unified ecosystem), it connects a reactive management dashboard directly to a hardened PostgreSQL/PostGIS relational database.
 

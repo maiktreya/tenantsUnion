@@ -1,25 +1,33 @@
-# Sistema de Gestión para el Sindicato de Inquilinas
+# Sistema de Gestión para un Sindicato de Inquilinas (`readme.md`)
 
-[<img src="https://img.shields.io/badge/English-1f425f.svg" alt="Read in English">](./readme.en.md)
+Este proyecto es una aplicación web de escritorio completa (full-stack) desarrollada para facilitar el registro de información interna, el mapeo de relaciones de propiedad y el análisis automatizado de datos para el **Sindicato de Inquilinas**. La interfaz, construida de forma nativa con **NiceGUI**, ofrece un panel de control interactivo y reactivo respaldado por una base de datos relacional PostgreSQL robustecida con la extensión espacial PostGIS.
 
-Este proyecto es una aplicación web de escritorio desarrollada para facilitar la gestión interna de la información del **Sindicato de Inquilinas e Inquilinos**. La interfaz, construida con **NiceGUI**, ofrece una experiencia de usuario rápida y reactiva para interactuar con una base de datos PostgreSQL a través de una API RESTful generada automáticamente con **PostgREST**.
+El modelo de ingesta de datos del sistema está impulsado por un **pipeline ETL (Extracción, Transformación y Carga) asíncrono y desatendido**. Esta arquitectura automatizada elimina los antiguos cuellos de botella operativos de las interfaces de importación manuales en el navegador, ejecutándose de forma independiente en segundo plano para extraer, formatear, geolocalizar y limpiar los formularios descentralizados con un alto nivel de consistencia.
+
+---
 
 ## 🏛️ Arquitectura
 
-El sistema sigue una arquitectura de tres capas, completamente dockerizada para garantizar la portabilidad y facilidad en el despliegue. Esta elección pragmática está optimizada para la máxima productividad de equipos pequeños.
+El sistema implementa una arquitectura segura de tres capas, totalmente aislada dentro de un ecosistema de contenedores Docker. Esta estructura maximiza la encapsulación de los datos y garantiza la reproducibilidad del despliegue tanto en entornos locales de desarrollo como en servidores de producción securizados.
 
 ```mermaid
 graph TD
-    subgraph "Cliente"
-        A[Usuario en Navegador Web]
+    subgraph "Capa del Cliente"
+        A[Usuario en el Navegador Web]
     end
 
-    subgraph "Host Único Dockerizado"
-        B[Firewall UFW <br> Puertos 22/80/443]
-        C[Nginx Reverse Proxy <br> SSL Termination]
-        D[Frontend NiceGUI <br> Python]
-        E[API PostgREST <br> Generada desde BBDD]
-        F[Base de Datos PostgreSQL]
+    subgraph "Servidor Seguro Contenedorizado"
+        B[Cortafuegos UFW Restricciones del Host <br> Puertos: 22 / 80 / 443]
+        C[Proxy Inverso Nginx <br> Terminación Criptográfica SSL/TLS]
+        D[Motor de la Aplicación NiceGUI <br> Contexto Python / FastAPI / Quasar]
+        E[Pasarela de Datos de la API PostgREST]
+        F[Almacenamiento Relacional PostgreSQL <br> PostGIS / Vistas / Seguridad RLS]
+    end
+
+    subgraph "Pipeline Asíncrono de Datos Externos"
+        G[Motor de Cron Diario del Sistema <br> Planificación de Ejecución 0 2 * * *]
+        H[BD Remota de WordPress / Gravity Forms]
+        I[API Externa de Geocodificación CartoCiudad]
     end
 
     A --> B
@@ -27,190 +35,197 @@ graph TD
     C --> D
     D --> E
     E <--> F
+    G -->|1. Túnel SSH Seguro y Extracción| H
+    G -->|2. Estandarización y Geocodificación| I
+    G -->|3. Ingesta mediante COPY de Alto Rendimiento| F
+
 ```
 
-- **Capa de Datos (PostgreSQL):** La única fuente de verdad. La lógica de bajo nivel, como la sincronización de nodos o la validación, se implementa directamente en la BBDD mediante vistas, funciones y triggers para centralizar las reglas y garantizar la consistencia.
-- **Capa de API (PostgREST):** En lugar de escribir un backend manualmente, PostgREST genera una API RESTful de alto rendimiento directamente desde el esquema de la base de datos, reduciendo drásticamente el tiempo de desarrollo.
-- **Capa de Presentación (NiceGUI):** Un framework moderno en Python que permite construir la interfaz de usuario de forma rápida y eficiente, sin necesidad de escribir JavaScript, HTML o CSS por separado.
+* **Capa de Presentación (NiceGUI):** Un framework de Python de alto rendimiento construido sobre FastAPI y Vue/Quasar. Centraliza los componentes de la interfaz y las capas de estado directamente en módulos de Python limpios y tipados, eliminando la necesidad de escribir código separado en JavaScript, HTML o CSS.
+* **Pasarela de la API (PostgREST):** Elimina las tareas rutinarias de programación del backend al convertir dinámicamente el esquema de la base de datos, sus tablas y sus relaciones directamente en puntos de enlace (endpoints) RESTful completamente accesibles.
+* **Capa de Datos y Espacial (PostgreSQL + PostGIS):** Actúa como la única fuente de verdad autoritativa para todo el estado del sistema. Las restricciones de negocio, los controles de acceso, el indexado espacial, el auditado automático de fechas y las métricas de seguimiento se implementan directamente en la base de datos mediante funciones PL/pgSQL nativas, vistas, disparadores (triggers) y políticas de Seguridad a Nivel de Fila (RLS).
+* **Automatización de Ingesta (ETL Desatendido):** Una rutina modular en segundo plano programada mediante el script `utils/cron/daily_sync.sh` que abre un túnel SSH seguro hacia el entorno remoto, aísla los nuevos registros de afiliación, estandariza las cadenas de texto introducidas manualmente por los usuarios, añade coordenadas geográficas y consolida las actualizaciones en PostgreSQL.
+
+---
 
 ## ⭐ Características Principales
 
-La aplicación se organiza en módulos funcionales clave, accesibles según los roles de usuario asignados.
+La consola de administración organiza sus funciones en interfaces modulares, otorgando visibilidad sobre los nodos del sistema mediante permisos de consulta basados en roles:
 
-- **Administración de BBDD Completa (`ADMIN BBDD`):**
-  - Gestión CRUD (Crear, Leer, Actualizar, Eliminar) en todas las tablas.
-  - Resolución automática de claves foráneas con menús desplegables.
-  - Explorador de relaciones para visualizar registros padre e hijo.
-  - Importación y Exportación de datos a formato CSV.
-- **Explorador de Vistas (`VISTAS`):**
-  - Acceso de solo lectura a vistas materializadas para análisis de datos consolidados.
-  - Potente sistema de filtros y búsqueda en el lado del cliente.
-- **Gestor de Conflictos (`CONFLICTOS`):**
-  - Módulo especializado para el seguimiento detallado de conflictos.
-  - Permite añadir notas, acciones y seguir el historial de cada caso.
-  - Actualización de estado y fechas automatizada al registrar notas.
-- **ETL de Importación Automatizado (Sincronización con WordPress):** - Pipeline de datos autónomo integrado como *cronjob* nocturno.
-  - Extrae periódicamente los nuevos registros y actualizaciones desde la base de datos MariaDB (formularios de Gravity Forms en WordPress).
-  - Transforma, sanea (limpieza de espacios, normalización de direcciones) y carga automáticamente los datos en PostgreSQL, gestionando altas de afiliación y cuotas sin intervención humana.
-- **Importador Manual de Afiliadas (Fallback):**
-  - Herramienta de contingencia para la carga masiva de afiliadas desde un archivo CSV.
-  - Ofrece validación de datos en tiempo real y previsualización editable antes de la importación.
-  - *Nota: Gracias al nuevo sistema ETL automatizado, esta herramienta ha quedado relegada como último recurso para casos excepcionales o migraciones aisladas.*
-- **Seguridad y Gestión de Usuarios:**
-  - Autenticación segura con contraseñas hasheadas (bcrypt).
-  - Control de Acceso Basado en Roles (RBAC) para `admin`, `gestor`, etc.
-  - Interfaz para que los administradores gestionen usuarios y asignen roles.
-  - Perfil de usuario para auto-gestión de datos personales y contraseña.
-- **ETL de importación de afiliadas de DB externa automatizado e integrado como cronjob**.
+* **Consola de Administración de la Base de Datos (`ADMIN BBDD`):**
+* Control completo de operaciones CRUD (Crear, Leer, Actualizar, Borrar) en todas las tablas con menús de selección y resolución automática de claves foráneas.
+* Explorador de relaciones interactivo para navegar de forma fluida entre registros padre e hijo.
+* Rutinas de diagnóstico localizadas para la importación y exportación de datos utilizando archivos con estructura CSV estándar.
+
+
+* **Análisis de Vistas Materializadas (`VISTAS`):**
+* Vistas administrativas de solo lectura que exponen bloques de datos analíticos complejos y consolidados para la coordinación del sindicato.
+* Sistema rápido de filtrado multiparámetro del lado del cliente, índices de búsqueda de texto y configuraciones de ordenación dinámica de columnas.
+
+
+* **Seguimiento de Conflictos y Organización (`CONFLICTOS`):**
+* Módulo especializado diseñado específicamente para registrar, etiquetar y supervisar los conflictos sindicales de vivienda, las novedades de los caseros y los hitos de organización colectiva.
+* Historiales automatizados que registran notas, actualizaciones legales y cambios de estado del caso con validación inmutable de marcas de tiempo.
+
+
+* **Motor ETL Espacial Automatizado (Sincronización con Gravity Forms):**
+* Un sistema de sincronización autónomo en segundo plano que se ejecuta en un ciclo diario mediante tareas cron.
+* Realiza un reenvío seguro de puertos por SSH para extraer las nuevas inscripciones de la base de datos remota de WordPress, limpiando cadenas de texto y des-pivotando los metadatos estructurados.
+* Aplica un marco de emparejamiento de direcciones de varias etapas que consulta la **API de CartoCiudad** para adjuntar coordenadas de latitud/longitud precisas y Referencias Catastrales oficiales españolas (`ref_catastral`).
+* Utiliza cargas de alta velocidad en tablas de staging y reglas de actualización condicional (`UPSERT`) para procesar bloques de propiedades de propiedad vertical (`bloques`), unidades de vivienda (`pisos`), datos de facturación (`facturacion`) e información de las afiliadas.
+
+
+* **Seguridad e Identidad:**
+* Credenciales de usuario encriptadas y protegidas mediante funciones de hash criptográfico adaptativo (`bcrypt`).
+* Control de Acceso Basado en Roles (RBAC) estricto que separa las funciones de administración, los gestores de casos regionales y los auditores de solo lectura.
+* Seguridad a Nivel de Fila (RLS) integrada en la base de datos que valida tokens web JSON (JWT) activos para proteger los datos organizativos sensibles frente a consultas no autorizadas.
+
+
+
+---
 
 ## 🚀 Tecnologías Utilizadas
 
-| Componente           | Tecnología                                     | Propósito                                               |
-| -------------------- | ---------------------------------------------- | ------------------------------------------------------- |
-| **Frontend**         | [NiceGUI](https://nicegui.io/) (sobre FastAPI) | Interfaz de usuario web rápida y reactiva en Python.    |
-| **API**              | [PostgREST](http://postgrest.org/)             | Generación automática de API RESTful desde la BBDD.     |
-| **Base de Datos**    | PostgreSQL                                     | Almacenamiento de datos relacional y lógica de negocio. |
-| **Contenerización**  | Docker y Docker Compose                        | Orquestación de servicios para despliegue consistente.  |
-| **Proxy Inverso**    | Nginx                                          | Punto de entrada único, terminación SSL y seguridad.    |
-| **Certificados SSL** | Let's Encrypt con Certbot                      | Cifrado HTTPS gratuito y automatizado.                  |
-| **DNS Dinámico**     | DuckDNS                                        | Gestión de dominio para el certificado SSL.             |
-| **Firewall**         | UFW                                            | Cortafuegos para restringir el acceso a puertos.        |
+| Capa / Componente | Motor Tecnológico Especializado | Propósito Concreto en el Ecosistema |
+| --- | --- | --- |
+| **Interfaz de Usuario** | NiceGUI (Sobre FastAPI y Uvicorn) | Renderiza los paneles de control reactivos unificados en Python. |
+| **Pasarela de la API** | Servidor PostgREST | Genera automáticamente endpoints REST de baja latencia desde el esquema. |
+| **Base de Datos Core** | Servidor PostgreSQL | Proporciona almacenamiento relacional duradero y lógica de restricciones. |
+| **Motor Geoespacial** | Extensión PostGIS | Gestiona el mapeo de coordenadas geográficas e indexación espacial. |
+| **Capa de Contenedores** | Docker / Docker Compose | Aísla, empaqueta y construye los microservicios independientes. |
+| **Seguridad de Acceso** | Plantilla de Proxy Inverso Nginx | Centraliza el tráfico de entrada, oculta servicios y limita conexiones. |
+| **Automatización SSL** | Let's Encrypt + Certbot | Automatiza los ciclos de renovación para conexiones TLS seguras. |
+| **Resolver de Direcciones** | Motor de la API de CartoCiudad | Proporciona coordenadas espaciales y validación catastral oficial. |
+| **Protección del Host** | Uncomplicated Firewall (UFW) | Restringe los accesos del servidor externo a los puertos 22, 80 y 443. |
 
 ---
 
-## 🛠️ Guía de Instalación
+## 🛠️ Despliegue e Instalación
 
-### Inicio Rápido (Desarrollo Local)
+### Inicio Rápido (Modo de Desarrollo Local)
 
-Este método expone los puertos de la base de datos y la API para facilitar el desarrollo.
+Esta configuración inicializa los servicios de software localmente en tu máquina, expone las interfaces de la base de datos y la API para su inspección, y carga un conjunto de datos sintéticos de prueba.
 
-1. **Clonar el repositorio:**
+1. **Clona la instancia del repositorio objetivo:**
+```bash
+git clone https://github.com/maiktreya/tenantsUnion.git
+cd tenantsUnion
 
-   ```bash
-   git clone https://github.com/maiktreya/tenantsUnion.git
-   cd tenantsUnion
-   ```
+```
 
-2. **Configurar el entorno de desarrollo:**
-   Copia `.env.example` a `.env`. Asegúrate de que la siguiente variable esté configurada para usar datos de prueba:
 
-   ```dotenv
-   INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev
-   ```
+2. **Inicializa tu archivo de entorno de desarrollo:**
+Copia el archivo de ejemplo a un archivo `.env` definitivo:
+```bash
+cp .env.example .env
 
-3. **Levantar los servicios:**
+```
 
-   ```bash
-   # Desarrollo local
-    docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml up -d --build --renew-anon-volumes
-   ```
 
-4. **Acceder a la aplicación:**
-   - **Frontend:** `http://localhost:8081`
-   - **API (ejemplo):** `http://localhost:3001/afiliadas`
-   - **Base de Datos:** `postgresql://app_user:password@localhost:5432/mydb`
+Asegúrate de que la variable de ruta de inicialización apunte a la carpeta con datos de prueba simulados:
+```dotenv
+INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev
 
-### Despliegue en Producción (Seguro con SSL)
+```
 
-Sigue estos pasos para un despliegue en un único host con seguridad y HTTPS habilitado.
 
-1. **Clonar el repositorio:**
+3. **Levanta el perfil del entorno de desarrollo:**
+Ejecuta el comando de Compose con múltiples archivos para habilitar la recarga en caliente, asignar volúmenes de desarrollo e iniciar los contenedores:
+```bash
+docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml up -d --renew-anon-volumes
 
-   ```bash
-   git clone https://github.com/maiktreya/tenantsUnion.git
-   cd tenantsUnion
-   ```
+```
 
-2. **Configurar las variables de entorno:**
-   Crea una copia de `.env.example` y renómbrala a `.env`. **Ajusta los siguientes valores obligatorios**:
 
-   ```dotenv
-   # Asegúrate de usar los scripts de producción
-   INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts
+4. **Puntos de Enlace Locales:**
+* **Panel de Gestión:** `http://localhost:8081`
+* **Explorador de la API:** `http://localhost:3001/afiliadas`
+* **Base de Datos Nativa:** `postgresql://app_user:password@localhost:5432/mydb`
 
-   # --- CONFIGURACIÓN SSL OBLIGATORIA ---
-   HOSTNAME=tu-dominio.duckdns.org
-   DUCKDNS_TOKEN=tu-token-de-duckdns
-   EMAIL=tu-email@ejemplo.com
-   ```
 
-3. **Ejecutar el script de configuración inicial de SSL:**
-   Este script automatiza la obtención de certificados. **Solo necesitas ejecutarlo la primera vez.**
-
-   ```bash
-   chmod +x utils/init-letsencrypt.sh
-   ./utils/init-letsencrypt.sh
-   ```
-
-4. **Levantar todos los servicios:**
-   Una vez generados los certificados, levanta la aplicación completa.
-
-   ```bash
-   docker compose --profile Secured --profile Frontend up -d
-   ```
-
-5. **Configurar el Firewall (Recomendado):**
-   Asegura tu servidor permitiendo únicamente el tráfico necesario.
-
-   ```bash
-   chmod +x utils/setup_firewall.sh
-   sudo ./utils/setup_firewall.sh
-   ```
-
-¡Listo\! La aplicación estará disponible en `https://tu-dominio.duckdns.org`.
 
 ---
 
-### Explorando la API
+### Despliegue en Producción (Configuración SSL Segura)
 
-Este proyecto utiliza **PostgREST**, que convierte tu base de datos en una API RESTful. No necesitas escribir código de backend para las operaciones CRUD.
+Sigue estas instrucciones para ejecutar la aplicación en un servidor en la nube expuesto a internet con cortafuegos activos, proxies inversos automatizados y certificados TLS válidos.
 
-- **Acceso:** La API es interna a la red de Docker. En un entorno de desarrollo, puedes acceder a ella a través del puerto expuesto (`http://localhost:3001`).
-- **Endpoints:** Cada tabla y vista de tu esquema `sindicato_inq` se convierte en un endpoint. Por ejemplo, la tabla `afiliadas` es accesible en `/afiliadas`.
-- **Consultas:** Puedes usar parámetros de URL para filtrar, ordenar y paginar. Por ejemplo, para obtener las afiliadas del estado "Alta":
+1. **Clona e ingresa al contexto del repositorio:**
+```bash
+git clone https://github.com/maiktreya/tenantsUnion.git
+cd tenantsUnion
 
-`http://localhost:3001/afiliadas?estado=eq.Alta`
+```
 
-Para más información, consulta la [documentación oficial de PostgREST](https://postgrest.org/en/stable/api.html).
 
-### Operaciones Comunes
+2. **Configura las claves del entorno de producción:**
+Copia la plantilla a un archivo `.env` e introduce tus indicadores únicos de dominio, tokens de seguridad y correos de contacto administrativo:
+```dotenv
+# Apunta explícitamente a la lógica de inicialización con datos de producción
+INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts
 
-- **Ver los logs:** `docker compose logs -f`
-- **Detener la aplicación:** `docker compose down`
-- **Actualizar (tras un `git pull`):** `docker compose --profile Secured --profile Frontend up -d --build`
-- **Renovar certificados SSL manualmente:** `./utils/renew_certificates.sh`
+# Perfiles de Enrutamiento DNS del Servidor de Producción
+HOSTNAME=tu-dominio.duckdns.org
+DUCKDNS_TOKEN=tu-token-de-duckdns
+EMAIL=tu-email@ejemplo.com
 
-## 🔐 Seguridad
+```
 
-- **Proxy Inverso:** Nginx es el único punto de entrada, ocultando los servicios internos.
-- **Tráfico Cifrado:** HTTPS con certificados SSL de Let's Encrypt gestionados automáticamente.
-- **Firewall:** `ufw` restringe el acceso a los puertos 22 (SSH), 80 (HTTP) y 443 (HTTPS).
-- **Contraseñas Seguras:** Las contraseñas se almacenan hasheadas utilizando bcrypt.
-- **Gestión de Secretos:** No hay claves ni secretos hardcodeados. Todo se gestiona a través de `.env`, que está excluido por `.gitignore`.
-- **RLS (Seguridad a nivel de fila):** Seguridad a nivel de base de datos implementada con tokens JWT.
 
-## 🧪 Pruebas
+3. **Arranca los certificados de Let's Encrypt:**
+Ejecuta el script de inicialización de certificados para establecer las credenciales criptográficas de tu servidor. **Este paso solo es necesario en el primer despliegue del proyecto:**
+```bash
+chmod +x utils/init-letsencrypt.sh
+./utils/init-letsencrypt.sh
 
-El proyecto cuenta con una suite de pruebas automatizadas para garantizar la calidad y estabilidad del código. Las pruebas cubren desde la consistencia entre la BBDD y el metadata de config.py hasta flujos completos de la interfaz de usuario. Para ejecutar la suite de pruebas completa, utiliza el siguiente comando:
+```
+
+
+4. **Lanza los contenedores de producción securizados:**
+Inicia las pilas de servicios bajo el perfil de entorno de red securizado de producción (`Secured`):
+```bash
+docker compose --profile Secured up -d
+
+```
+
+
+5. **Habilita las protecciones de red a nivel de host:**
+Cierra los puertos innecesarios del servidor utilizando el script automatizado de configuración de cortafuegos provisto:
+```bash
+chmod +x utils/setup_firewall.sh
+sudo ./utils/setup_firewall.sh
+
+```
+
+
+
+¡Listo! El panel de control de la aplicación estará activo y accesible de forma segura a través de HTTPS en `https://tu-dominio.duckdns.org`.
+
+---
+
+## 🧪 Suite de Pruebas
+
+El sistema incluye un marco integral de pruebas automatizadas impulsado por `pytest`. Esta suite valida los mecanismos de restricciones de la base de datos, los permisos de acceso JWT, los patrones de saneamiento de direcciones y el correcto renderizado de los flujos de la interfaz de usuario.
+
+Para ejecutar las pruebas del sistema en tu entorno de desarrollo y revisar las matrices de cobertura de código, ejecuta:
 
 ```bash
 pytest --cov
+
 ```
 
-Para obtener una guía detallada sobre cómo configurar el entorno de pruebas y ejecutar diferentes tipos de tests, consulta el documento [guía de testeo](https://github.com/maiktreya/tenantsUnion/blob/main/doc/testing.md).
+Para consultar los pasos detallados de configuración del entorno e instrucciones sobre la ejecución de pasadas de integración aisladas, revisa la [Documentación Arquitectónica de Pruebas](https://www.google.com/search?q=./doc/testing.md).
 
 ---
 
-## 🤝 Contribuciones
+## 🤝 Contribuciones y Contacto
 
-¡Las contribuciones son bienvenidas! Si tienes ideas, sugerencias o quieres colaborar en el desarrollo de este proyecto, no dudes en ponerte en contacto.
+Cualquier revisión, propuesta de mejora o modificación de código por parte de la comunidad es bienvenida. Para discutir cambios de diseño, problemas de escala o coordinar contribuciones, abre una tarjeta de issue o envía una solicitud de pull request.
 
-**Contacto:** <garciaduchm@gmail.com>
+**Contacto de Infraestructura Principal:** [garciaduchm@gmail.com](https://www.google.com/search?q=mailto%3Agarciaduchm%40gmail.com)
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto está licenciado bajo la [GNU General Public License v3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.html). Además, el contenido y la documentación asociada se distribuyen bajo una licencia [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).
-
-2025-10-21 @maiktreya
+La arquitectura de este software y su código fuente se distribuyen bajo los términos de la **Licencia Pública General GNU v3.0 (GPLv3)**. Las hojas de documentación técnica, los diagramas estructurales y los materiales de recursos asociados se comparten bajo el marco de la licencia **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**.
