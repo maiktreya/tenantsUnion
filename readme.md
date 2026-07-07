@@ -121,15 +121,7 @@ cp .env.example .env
 
 ```
 
-
-Asegúrate de que la variable de ruta de inicialización apunte a la carpeta con datos de prueba simulados:
-```dotenv
-INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev
-
-```
-
-
-3. **Levanta el perfil del entorno de desarrollo:**
+1. **Levanta el perfil del entorno de desarrollo:**
 Ejecuta el comando de Compose con múltiples archivos para habilitar la recarga en caliente, asignar volúmenes de desarrollo e iniciar los contenedores:
 ```bash
 docker compose --profile Frontend -f docker-compose.yaml -f docker-compose-dev.yaml up -d --renew-anon-volumes
@@ -161,8 +153,6 @@ cd tenantsUnion
 2. **Configura las claves del entorno de producción:**
 Copia la plantilla a un archivo `.env` e introduce tus indicadores únicos de dominio, tokens de seguridad y correos de contacto administrativo:
 ```dotenv
-# Apunta explícitamente a la lógica de inicialización con datos de producción
-INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts
 
 # Perfiles de Enrutamiento DNS del Servidor de Producción
 HOSTNAME=tu-dominio.duckdns.org
