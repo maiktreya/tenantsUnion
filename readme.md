@@ -204,7 +204,9 @@ pytest --cov
 
 ```
 
-Para consultar los pasos detallados de configuración del entorno e instrucciones sobre la ejecución de pasadas de integración aisladas, revisa la [Documentación Arquitectónica de Pruebas](https://www.google.com/search?q=./doc/testing.md).
+Puedes ver más en detalle como desplegar la versión de desarrollo de esta aplicación [Aquí](https://github.com/maiktreya/tenantsunion/doc/first_run.md)
+
+Para consultar los pasos detallados de configuración del entorno e instrucciones sobre la ejecución de pasadas de integración aisladas, revisa la [Documentación Test & Pruebas](https://github.com/maiktreya/tenantsUnion/doc/testing.md).
 
 ---
 
