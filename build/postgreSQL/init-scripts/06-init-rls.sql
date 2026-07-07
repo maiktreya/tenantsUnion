@@ -26,7 +26,7 @@ GRANT web_anon TO app_user;
 GRANT web_user TO app_user;
 
 -- =====================================================================
--- 2. EMERGENCY FIX: RESTORE LOGIN
+-- 2. LOGIN EXCEPTION HANDLING
 -- =====================================================================
 -- We explicitly DISABLE security on 'usuarios' so the login function can 
 -- read it again without being blocked.
