@@ -187,6 +187,8 @@ The application dashboard will now be live and securely accessible via HTTPS at 
 
 ## 🧪 Testing Suite
 
+You can check in detail how to deploy the dev version of this application for the firt time [Here](https://github.com/maiktreya/tenantsUnion/blob/main/doc/first_run.md)
+
 The system includes a comprehensive automated testing framework powered by `pytest`. This test suite validates database constraint mechanics, JWT access permissions, address sanitization patterns, and asynchronous UI workflow rendering.
 
 To run the testing framework inside your execution context and review code coverage matrices, execute:
@@ -195,8 +197,6 @@ To run the testing framework inside your execution context and review code cover
 pytest --cov
 
 ```
-
-You can check in detail how to deploy the dev version of this application for the firt time [Here](https://github.com/maiktreya/tenantsUnion/blob/main/doc/first_run.md)
 
 For comprehensive configuration steps, framework setups, and instructions on running isolated integration passes, review the [Testing documentation](https://github.com/maiktreya/tenantsUnion/blob/main/doc/testing.md).
 

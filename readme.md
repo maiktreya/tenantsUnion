@@ -195,6 +195,8 @@ sudo ./utils/setup_firewall.sh
 
 ## 🧪 Suite de Pruebas
 
+Puedes ver más en detalle como desplegar la versión de desarrollo de esta aplicación [Aquí](https://github.com/maiktreya/tenantsUnion/blob/main/doc/first_run.md)
+
 El sistema incluye un marco integral de pruebas automatizadas impulsado por `pytest`. Esta suite valida los mecanismos de restricciones de la base de datos, los permisos de acceso JWT, los patrones de saneamiento de direcciones y el correcto renderizado de los flujos de la interfaz de usuario.
 
 Para ejecutar las pruebas del sistema en tu entorno de desarrollo y revisar las matrices de cobertura de código, ejecuta:
@@ -203,8 +205,6 @@ Para ejecutar las pruebas del sistema en tu entorno de desarrollo y revisar las 
 pytest --cov
 
 ```
-
-Puedes ver más en detalle como desplegar la versión de desarrollo de esta aplicación [Aquí](https://github.com/maiktreya/tenantsUnion/blob/main/doc/first_run.md)
 
 Para consultar los pasos detallados de configuración del entorno e instrucciones sobre la ejecución de pasadas de integración aisladas, revisa la [Documentación Test & Pruebas](https://github.com/maiktreya/tenantsUnion/blob/main/doc/testing.md).
 
