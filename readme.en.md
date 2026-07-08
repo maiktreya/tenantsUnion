@@ -48,6 +48,10 @@ graph TD
 
 ---
 
+You could check a full ERD of the database in the following [link](https://github.com/maiktreya/tenantsUnion/blob/main/doc/ERD_database.png) It´s just 15 base tables!
+
+---
+
 ## ⭐ Key Features
 
 The management console partitions functionalities into modular runtime interfaces, granting visibility across tracking nodes using role-based query permissions:
