@@ -48,7 +48,7 @@ graph TD
 
 ---
 
-Puedes consultar un diagrama ERD completo de la base de datos [en el siguiente enlace](https://github.com/maiktreya/tenantsUnion/blob/main/doc/ERD_database.png) son solo 15 tablas base!
+Puedes consultar un diagrama ERD completo de la base de datos [en el siguiente enlace](https://github.com/maiktreya/tenantsUnion/blob/main/doc/ERD_database.png) son solo 16 tablas base!
 
 ---
 
