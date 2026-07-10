@@ -10,9 +10,11 @@
 # 1. Ignore absolutely everything (files & folders) inside build/nginx/
 # This automatically catches 'certbot/', local 'nginx.conf', and any keys.
 build/nginx/*
+assets/images/*
 
 # 2. Whitelist ONLY the initial configuration template
 !build/nginx/nginx.conf.template
+!assets/images/logo.png
 
 # =============================================================================
 # Python Bytecode and Caches

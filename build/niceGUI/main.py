@@ -127,7 +127,8 @@ class Application:
     def create_header(self):
         with ui.header().classes("bg-white shadow-lg").props("id=main-header"):
             with ui.row().classes("w-full items-center p-2 gap-4"):
-                ui.image("/assets/images/logo.png").classes("w-48 cursor-pointer").on(
+                logo_path = os.environ.get("INSTANCE_LOGO_PATH", "/assets/images/logo.png")                
+                ui.image(logo_path).classes("w-48 cursor-pointer").on(
                     "click", lambda: self.show_view("home")
                 )
                 ui.element("div").classes("h-10 w-px bg-gray-300")

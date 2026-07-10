@@ -38,7 +38,6 @@ class MultiTableImportService:
         if not cleaned:
             return val
 
-        # Lista ordenada de formatos de entrada más habituales en entornos de oficina
         formats_to_try = [
             "%Y-%m-%d",  # 2026-07-10 (Estándar)
             "%d/%m/%Y",  # 10/07/2026 (Español con barras)
@@ -53,8 +52,6 @@ class MultiTableImportService:
             except ValueError:
                 continue
 
-        # Si no encaja con ningún patrón, devuelve la cadena limpia original
-        # para que el validador emita el aviso controlado correspondiente.
         return cleaned
 
     async def process_relational_import(self, raw_records: List[Dict[str, Any]]) -> AsyncGenerator[str, None]:
@@ -69,6 +66,10 @@ class MultiTableImportService:
         yield f"Iniciando bucle de procesamiento para {total} filas relacionales...\n"
 
         for idx, raw_row in enumerate(raw_records, start=1):
+            # GANCHO DE SEGURIDAD PREVENTIVO: Ignorar silenciosamente la fila de metadatos guía del CSV
+            if raw_row.get("nombre_afiliada") == "Obligatorio":
+                continue
+
             generated_lineage_keys: Dict[str, int] = {}
             row_failed = False
             
@@ -92,10 +93,17 @@ class MultiTableImportService:
                         if db_column == "prop_vertical" and cleaned_val is None:
                             cleaned_val = "No"
                         
-                        # ---- GANCHO DE TOLERANCIA AUTOMÁTICA DE FECHAS ----
-                        # Si la columna destino de la BD es un campo fecha, homogeneizamos su formato
+                        # ---- GANCHO DE TOLERANCIA DE FECHAS ----
                         if cleaned_val is not None and ("fecha" in db_column or "date" in db_column):
                             cleaned_val = self._normalize_date_string(cleaned_val)
+                        
+                        # ---- GANCHO DE TOLERANCIA DE PERIODICIDAD (Mensual -> 1, Anual -> 12) ----
+                        if db_column == "periodicidad" and cleaned_val is not None:
+                            norm_p = cleaned_val.lower()
+                            if "mensual" in norm_p or norm_p == "1":
+                                cleaned_val = 1
+                            elif "anual" in norm_p or norm_p == "12":
+                                cleaned_val = 12
                         
                         if cleaned_val is not None:
                             has_user_data = True
@@ -111,7 +119,6 @@ class MultiTableImportService:
                         parent_table = csv_header.replace("__fk__", "").split(".")[0]
                         parent_id = generated_lineage_keys.get(parent_table)
                         
-                        # Si el padre opcional no se insertó, la FK pasa como None de forma segura
                         db_payload[db_column] = parent_id if parent_id else None
 
                 if row_failed:
@@ -125,25 +132,22 @@ class MultiTableImportService:
                     if error_msg and "Error de Duplicado" in error_msg:
                         existing_records = []
                         
-                        # Recuperar ID existente por dirección (para bloques o pisos)
                         if table_name in ["bloques", "pisos"] and db_payload.get("direccion"):
                             existing_records = await self.api.get_records(
                                 table_name, 
                                 filters={"direccion": f"eq.{db_payload['direccion']}"}
                             )
-                        # Recuperar ID existente por CIF/NIE (para afiliadas)
                         elif table_name == "afiliadas" and db_payload.get("cif"):
                             existing_records = await self.api.get_records(
                                 table_name, 
                                 filters={"cif": f"eq.{db_payload['cif']}"}
                             )
                         
-                        # Si encontramos el registro persistido, salvamos la fila asignando su ID original
                         if existing_records:
                             record = existing_records[0]
-                            error_msg = None  # Neutralizamos el error para continuar el flujo descendiente
+                            error_msg = None
                     
-                    # Guardar el ID recuperado o creado en el linaje
+                    # Guardar el ID en el linaje de ejecución temporal
                     if record and isinstance(record, dict) and "id" in record:
                         generated_lineage_keys[table_name] = record["id"]
                     elif record and isinstance(record, list) and record and "id" in record[0]:

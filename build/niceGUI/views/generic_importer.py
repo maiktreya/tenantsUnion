@@ -141,15 +141,32 @@ class GenericRelationalImporterView:
         return container
 
     def _download_empty_csv_template(self):
-        """Reúne las columnas del mapa dinámico en una cadena plana y despacha su descarga."""
+        """
+        Genera dinámicamente un archivo CSV de plantilla con dos filas fijas:
+        Fila 1: Cabeceras relacionales legibles por la base de datos.
+        Fila 2: Etiquetas de metadatos guía (Obligatorio / Opcional) para el usuario.
+        """
+        # 1. Primera fila: Nombres exactos de las columnas
         header_row = ",".join(self.required_headers) + "\n"
         
-        # Firma criptográfica UTF-8 BOM (\xef\xbb\xbf) para compatibilidad nativa con Microsoft Excel
-        template_bytes = b"\xef\xbb\xbf" + header_row.encode("utf-8")
+        # 2. Segunda fila: Determinar dinámicamente el estado de obligatoriedad
+        meta_row_items = []
+        for header in self.required_headers:
+            if header in self.mandatory_fields:
+                meta_row_items.append("Obligatorio")
+            else:
+                meta_row_items.append("Opcional")
+        meta_row = ",".join(meta_row_items) + "\n"
+        
+        # Concatener ambas estructuras planas de texto
+        csv_content = header_row + meta_row
+        
+        # Firma UTF-8 BOM (\xef\xbb\xbf) para asegurar la compatibilidad nativa de caracteres en Excel
+        template_bytes = b"\xef\xbb\xbf" + csv_content.encode("utf-8")
         
         filename = f"plantilla_completa_afiliadas.csv"
         ui.download(template_bytes, filename)
-        ui.notify("Plantilla completa generada y lista para descargar.", type="positive")
+        ui.notify("Plantilla completa con etiquetas de guía generada con éxito.", type="positive")
 
     async def _handle_upload_flow(self, e: events.UploadEventArguments):
         """Lee el stream de bytes, extrae cabeceras y precarga la información en memoria."""
