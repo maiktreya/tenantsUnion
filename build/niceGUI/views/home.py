@@ -64,7 +64,7 @@ class HomeView(BaseView):
                         icon="upload_file",
                         title="Importar Afiliadas",
                         description="Cargar nuevas afiliadas desde un archivo CSV de WordPress.",
-                        on_click=lambda: self.navigate("afiliadas_importer"),
+                        on_click=lambda: self.navigate("generic_importer"),
                         color="text-orange-600",
                     )
                 if self.has_role("admin"):

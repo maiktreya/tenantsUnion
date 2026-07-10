@@ -7,7 +7,7 @@ from typing import Optional
 from nicegui import ui, app
 
 from logging_config import setup_logging
-from config import config
+from config import config, HOUSING_UNION_IMPORT_CONFIG
 
 setup_logging()
 
@@ -23,7 +23,7 @@ from views.home import HomeView
 from views.admin import AdminView
 from views.views_explorer import ViewsExplorerView
 from views.conflicts import ConflictsView
-from views.afiliadas_importer import AfiliadasImporterView
+from views.generic_importer import GenericRelationalImporterView
 
 from auth.login import create_login_page
 from auth.token_utils import create_db_token
@@ -137,7 +137,7 @@ class Application:
                 ui.space()
 
                 with ui.row().classes("gap-2"):
-                    if self.has_role("admin", "sistemas"):
+                    if self.has_role("admin"):
                         ui.button(
                             "Admin BBDD", on_click=lambda: self.show_view("admin")
                         ).props("flat color=red-600")
@@ -150,8 +150,8 @@ class Application:
                             "Vistas", on_click=lambda: self.show_view("views")
                         ).props("flat color=red-600")
                         ui.button(
-                            "Importar Afiliadas",
-                            on_click=lambda: self.show_view("afiliadas_importer"),
+                            "Importar datos",
+                            on_click=lambda: self.show_view("generic_importer"),
                         ).props("flat color=red-600")
                     if self.has_role("admin", "gestor", "actas"):
                         ui.button(
@@ -230,8 +230,9 @@ class Application:
                 self.views["user_management"] = UserManagementView(self.api_client)
             if self.has_role("admin", "gestor"):
                 self.views["views"] = ViewsExplorerView(self.api_client)
-                self.views["afiliadas_importer"] = AfiliadasImporterView(
-                    self.api_client
+                self.views["generic_importer"] = GenericRelationalImporterView(
+                    self.api_client, 
+                    HOUSING_UNION_IMPORT_CONFIG
                 )
             if self.has_role("admin", "gestor", "actas"):
                 self.views["conflicts"] = ConflictsView(self.api_client, self.state)

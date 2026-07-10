@@ -1,219 +1,198 @@
-import asyncio
+import sys
 import types
-
+import asyncio
 import pytest
 
-# Provide a very small stub for nicegui if it's not available during tests
+# Asegurar un entorno stub aislado de NiceGUI por si los tests corren sin dependencias de UI nativas
 try:
     import nicegui  # type: ignore
-except Exception:  # pragma: no cover - only used in environments without NiceGUI
+except Exception:  # pragma: no cover
     m = types.ModuleType("nicegui")
     class _Dummy:
-        def __call__(self, *a, **k):
-            return self
-        def __getattr__(self, _):
-            return self
-        def classes(self, *a, **k):
-            return self
-        def props(self, *a, **k):
-            return self
-        def on(self, *a, **k):
-            return self
-        def bind_value(self, *a, **k):
-            return self
-        def bind_text_from(self, *a, **k):
-            return self
-        def set_text(self, *a, **k):
-            return self
-        def set_name(self, *a, **k):
-            return self
-        def set_enabled(self, *a, **k):
-            return self
-        def open(self, *a, **k):
-            return self
-        def close(self, *a, **k):
-            return self
-        def push(self, *a, **k):
-            return self
+        def __call__(self, *a, **k): return self
+        def __getattr__(self, _): return self
+        def classes(self, *a, **k): return self
+        def props(self, *a, **k): return self
+        def set_enabled(self, *a, **k): return self
+        def clear(self, *a, **k): return self
+        def push(self, *a, **k): return self
     ui = _Dummy()
     m.ui = ui
+    m.app = _Dummy()
+    m.app.storage = types.SimpleNamespace(client={})
     m.events = types.SimpleNamespace(UploadEventArguments=object, GenericEventArguments=object)
     sys.modules['nicegui'] = m
 
-
-# Now we can safely import the app modules
-from views.afiliadas_importer import AfiliadasImporterView  # type: ignore
-from views import afiliadas_importer as afiliadas_module  # type: ignore
-from state.app_state import GenericViewState  # type: ignore
-from components.importer_utils import short_address  # type: ignore
+# Importaciones del ecosistema de ingesta relacional refactorizado
+from services.relational_import_service import MultiTableImportService
+from views.generic_importer import GenericRelationalImporterView
+from config import HOUSING_UNION_IMPORT_CONFIG
 
 
-class DummyAPI:
+class MockPostgrestAPI:
+    """
+    Simulador asíncrono que emula las inserciones en cascada de PostgREST, 
+    registrando los payloads y devolviendo identificadores secuenciales (IDs).
+    """
     def __init__(self):
-        self._bloques = {
-            1001: {"id": 1001, "direccion": "Calle de Prueba 10"},
-        }
+        self.id_counter = 5000
+        self.recorded_payloads = []
 
-    async def get_bloque_suggestions(self, addresses, score_limit: float = 0.88):
-        # Simple deterministic stub:
-        # - first address gets a match with score 0.70
-        # - others get None
-        out = []
-        for item in addresses:
-            idx = item.get("index")
-            if idx == 0 and score_limit <= 0.7:
-                out.append({
-                    "piso_id": idx,
-                    "piso_direccion": item.get("direccion"),
-                    "suggested_bloque_id": 1001,
-                    "suggested_bloque_direccion": "Calle de Prueba 10",
-                    "suggested_score": 0.70,
-                })
-            else:
-                out.append({
-                    "piso_id": idx,
-                    "piso_direccion": item.get("direccion"),
-                    "suggested_bloque_id": None,
-                    "suggested_bloque_direccion": None,
-                    "suggested_score": None,
-                })
-        return out
-
-    async def get_records(self, table: str, filters):
-        if table == "bloques":
-            try:
-                _id = int(str(filters.get("id", "eq.0").split(".")[-1]))
-                return [self._bloques[_id]] if _id in self._bloques else []
-            except Exception:
-                return []
-        return []
-
-    async def create_record(self, *a, **k):  # not used in these tests
-        return None, None
+    async def create_record(self, table_name: str, payload: dict):
+        self.id_counter += 1
+        # Captura instantáneas limpias para poder inspeccionar los payloads en las aserciones
+        self.recorded_payloads.append({
+            "table": table_name,
+            "payload": payload.copy()
+        })
+        # Estructura en formato de lista JSON idéntica a la respuesta nativa de la API
+        return [{"id": self.id_counter}]
 
 
 @pytest.fixture
-def view(monkeypatch):
-    state = GenericViewState()
-    api = DummyAPI()
-    storage = types.SimpleNamespace(client={"afiliadas_importer_state": state})
-    monkeypatch.setattr(
-        afiliadas_module.app, "storage", storage, raising=False
+def mock_api():
+    return MockPostgrestAPI()
+
+
+@pytest.fixture
+def import_service(mock_api):
+    return MultiTableImportService(mock_api, HOUSING_UNION_IMPORT_CONFIG)
+
+
+@pytest.fixture
+def mock_nicegui_storage(monkeypatch):
+    """
+    Fixture de aislamiento: Sobrescribe el almacenamiento dinámico por cliente de NiceGUI
+    para neutralizar RuntimeErrors de contexto de sesión durante la inicialización de vistas.
+    """
+    from nicegui import app
+    mock_storage = types.SimpleNamespace(client={})
+    monkeypatch.setattr(app, "storage", mock_storage, raising=False)
+    return mock_storage
+
+
+# =====================================================================
+# PRUEBAS UNITARIAS DEL MOTOR LOGICO DE CASILES (PIPELINE SERVICE)
+# =====================================================================
+
+@pytest.mark.asyncio
+async def test_csv_byte_stream_parsing(import_service):
+    """Garantiza la correcta lectura del stream de bytes plano y su descodificación con BOM UTF-8."""
+    csv_bytes = (
+        b"\xef\xbb\xbfdireccion_bloque,direccion_vivienda_completa,nombre_afiliada,cuota\n"
+        b"Calle de la lucha 12,Calle de la lucha 12 3B,Maria Gomez,15.50\n"
     )
-    v = AfiliadasImporterView(api)
-    # Avoid rendering UI during tests
-    monkeypatch.setattr(v, "_render_all_panels", lambda: None)
-    return v
-
-
-def _make_record(nombre: str, apellidos: str, piso_dir: str, email: str = "user@example.com"):
-    return {
-        "afiliada": {
-            "nombre": nombre,
-            "apellidos": apellidos,
-            "genero": "",
-            "fecha_nac": "1990-01-01",
-            "cif": "",
-            "telefono": "",
-            "email": email,
-            "fecha_alta": "2024-01-01",
-            "regimen": "",
-            "estado": "Alta",
-            "piso_id": None,
-        },
-        "piso": {
-            "direccion": piso_dir,
-            "municipio": "",
-            "cp": None,
-            "n_personas": None,
-            "inmobiliaria": "",
-            "propiedad": "",
-            "prop_vertical": "",
-            "fecha_firma": None,
-            "bloque_id": None,
-        },
-        "bloque": {"direccion": short_address(piso_dir)},
-        "facturacion": {
-            "cuota": 0.0,
-            "periodicidad": 1,
-            "forma_pago": "Otro",
-            "iban": None,
-            "afiliada_id": None,
-        },
-        "meta": {"bloque": None, "bloque_manual": None},
-        "validation": {"is_valid": True, "errors": []},
-        "ui_updaters": {},
-    }
+    
+    parsed_records = await import_service.parse_csv_bytes(csv_bytes)
+    
+    assert len(parsed_records) == 1
+    assert parsed_records[0]["direccion_bloque"] == "Calle de la lucha 12"
+    assert parsed_records[0]["nombre_afiliada"] == "Maria Gomez"
+    assert parsed_records[0]["cuota"] == "15.50"
 
 
 @pytest.mark.asyncio
-async def test_sort_by_text_and_status(view):
-    view.state.set_records([
-        _make_record("Álvaro", "Zeta", "Calle Uno 1"),
-        _make_record("beatriz", "Alfa", "Calle Dos 2"),
-    ])
+async def test_relational_insertion_and_fk_lineage(import_service, mock_api):
+    """
+    Test Crítico: Valida que un registro plano se rompa secuencialmente y que las
+    entidades hijas enlacen los IDs autogenerados de sus respectivos padres relacionales.
+    """
+    raw_csv_record = [{
+        "direccion_bloque": "Paseo de las Delicias 45",
+        "empresa_propietaria": "Rentista SL",
+        "direccion_vivienda_completa": "Paseo de las Delicias 45, Piso 4",
+        "localidad": "Madrid",
+        "codigo_postal": "28045",
+        "propiedad_vertical": "Si",
+        "nombre_afiliada": "Lucia",
+        "apellidos_afiliada": "Fernandez",
+        "dni_nie": "12345678X",
+        "cuota": "10.00",
+        "periodicidad": "1",  # Mensual
+        "cuenta_bancaria_iban": "ES9101234567890123456789"
+    }]
 
-    # Sort by nombre (accent-insensitive, case-insensitive)
-    view._sort_by_column("nombre")
-    assert view.state.records[0]["afiliada"]["nombre"].lower().startswith("álvaro")
-    # Toggle sort direction
-    view._sort_by_column("nombre")
-    assert view.state.records[0]["afiliada"]["nombre"].lower().startswith("beatriz")
+    # Ejecutar la importación simulada consumiendo los logs del generador asíncrono
+    logs = []
+    async for update in import_service.process_relational_import(raw_csv_record):
+        logs.append(update)
 
-    # Sort by status (False before True on first toggle)
-    view.state.records[0]["validation"]["is_valid"] = False
-    view.state.records[1]["validation"]["is_valid"] = True
-    view._sort_by_column("is_valid")
-    assert view.state.records[0]["validation"]["is_valid"] is False
+    # 1. Verificar inserción exitosa en las 4 tablas relacionales
+    assert len(mock_api.recorded_payloads) == 4
+    
+    bloque_entry = mock_api.recorded_payloads[0]
+    piso_entry = mock_api.recorded_payloads[1]
+    afiliada_entry = mock_api.recorded_payloads[2]
+    facturacion_entry = mock_api.recorded_payloads[3]
+
+    # 2. Corroborar el orden secuencial estricto de inserción para respetar restricciones
+    assert bloque_entry["table"] == "bloques"
+    assert piso_entry["table"] == "pisos"
+    assert afiliada_entry["table"] == "afiliadas"
+    assert facturacion_entry["table"] == "facturacion"
+
+    # 3. Validar el paso e inyección precisa de linaje de claves foráneas (FKs)
+    generated_bloque_id = 5001
+    generated_piso_id = 5002
+    generated_afiliada_id = 5003
+
+    assert piso_entry["payload"]["bloque_id"] == generated_bloque_id
+    assert afiliada_entry["payload"]["piso_id"] == generated_piso_id
+    assert facturacion_entry["payload"]["afiliada_id"] == generated_afiliada_id
+
+    # 4. Validar el mapeo de campos específicos (texto a pisos.propiedad, cuotas y periodicidad)
+    assert piso_entry["payload"]["propiedad"] == "Rentista SL"
+    assert piso_entry["payload"]["prop_vertical"] == "Si"
+    assert afiliada_entry["payload"]["nombre"] == "Lucia"
+    assert facturacion_entry["payload"]["periodicidad"] == "1"
 
 
 @pytest.mark.asyncio
-async def test_threshold_applies_and_reverts_preview(view):
-    rec = _make_record("Ana", "Beta", "Calle de Prueba 10, 1ºA, Madrid")
-    view.state.set_records([rec])
+async def test_skipping_completely_empty_optional_sub_blocks(import_service, mock_api):
+    """
+    Asegura que si un sub-bloque opcional (como la información de facturación o el bloque de finca)
+    viene completamente en blanco en el CSV del usuario, el motor lo omita limpiamente sin enviar
+    un payload vacío o corrupto a la base de datos de producción.
+    """
+    raw_record_without_billing = [{
+        "direccion_bloque": "Calle Mayor 1",
+        "empresa_propietaria": None,
+        "direccion_vivienda_completa": "Calle Mayor 1, Principal Izquierda",
+        "localidad": "Getafe",
+        "codigo_postal": "28901",
+        "propiedad_vertical": "",  # Se autocoercionará a 'No' por defecto
+        "nombre_afiliada": "Carlos",
+        "apellidos_afiliada": "Ruiz",
+        "dni_nie": "87654321Z",
+        # Parámetros explícitamente vacíos en el sub-bloque de facturación
+        "cuota": "",
+        "periodicidad": " ",
+        "cuenta_bancaria_iban": ""
+    }]
 
-    # Low threshold -> suggestion appears and fills preview direccion
-    await view._on_score_limit_change(0.6)
-    assert rec["meta"]["bloque"] is not None
-    assert rec["bloque"]["direccion"] == "Calle de Prueba 10"
+    async for _ in import_service.process_relational_import(raw_record_without_billing):
+        pass
 
-    # Increase threshold -> suggestion disappears and preview reverts
-    await view._on_score_limit_change(0.9)
-    assert rec["meta"]["bloque"] is None
-    assert rec["bloque"]["direccion"] == short_address(rec["piso"]["direccion"])  # baseline
-
-
-@pytest.mark.asyncio
-async def test_apply_and_clear_link(view):
-    rec = _make_record("Ana", "Beta", "Calle de Prueba 10, 1ºA, Madrid")
-    view.state.set_records([rec])
-
-    # Prepare a suggestion
-    await view._on_score_limit_change(0.6)
-    assert rec["meta"]["bloque"] is not None
-
-    # Vincular should set bloque_id and mirror address
-    view._apply_suggested_bloque(rec)
-    assert rec["piso"]["bloque_id"] == 1001
-    assert rec["bloque"]["direccion"] == "Calle de Prueba 10"
-
-    # Limpiar should clear link and restore baseline address
-    view._clear_bloque_assignment(rec)
-    assert rec["piso"]["bloque_id"] is None
-    assert rec["bloque"]["direccion"] == short_address(rec["piso"]["direccion"])  # baseline
+    # El flujo debe impactar bloques, pisos (con propiedad_vertical='No') y afiliadas, 
+    # pero tiene que saltarse por completo la inserción en la tabla de facturación.
+    inserted_tables = [item["table"] for item in mock_api.recorded_payloads]
+    assert "bloques" in inserted_tables
+    assert "pisos" in inserted_tables
+    assert "afiliadas" in inserted_tables
+    assert "facturacion" not in inserted_tables
+    
+    # Comprobar la aserción de coerción del valor por defecto
+    assert mock_api.recorded_payloads[1]["payload"]["prop_vertical"] == "No"
 
 
-def test_reset_bloques_entries(view):
-    r1 = _make_record("A", "B", "Calle Uno 1, 2º")
-    r2 = _make_record("C", "D", "Calle Dos 2, 3º")
-    view.state.set_records([r1, r2])
+# =====================================================================
+# PRUEBAS UNITARIAS DE LA CAPA DE PRESENTACIÓN (INTERFAZ)
+# =====================================================================
 
-    # Simulate one linked record
-    r1["piso"]["bloque_id"] = 999
-    r1["bloque"]["direccion"] = "Some Block"
-
-    view._reset_bloques_entries()
-    for rec in (r1, r2):
-        assert rec["piso"]["bloque_id"] is None
-        assert rec["bloque"]["direccion"] == short_address(rec["piso"]["direccion"])  # baseline
-
+def test_view_staging_memory_allocation(mock_nicegui_storage, mock_api):
+    """Verifica que la vista configure y reserve correctamente el almacenamiento aislado por cliente."""
+    view_instance = GenericRelationalImporterView(mock_api, HOUSING_UNION_IMPORT_CONFIG)
+    
+    # Comprobar el correcto enrutamiento del estado interno local
+    assert "generic_importer_records" in mock_nicegui_storage.client
+    assert isinstance(view_instance.raw_records, list)

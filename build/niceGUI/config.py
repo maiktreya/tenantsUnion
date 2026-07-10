@@ -467,4 +467,52 @@ FAILED_EXPORT_FIELD_MAP = {
 }
 DUPLICATE_NIF_WARNING = "La afiliada con este NIF ya existe en el sistema."
 
+# Instantiating the view anywhere inside your workspace layout tabs:
+# view = GenericRelationalImporterView(api_client, HOUSING_UNION_IMPORT_CONFIG)
+# view.create()
+HOUSING_UNION_IMPORT_CONFIG = {
+    "name": "Estructura de Ingesta de Afiliadas",
+    "execution_order": ["bloques", "pisos", "afiliadas", "facturacion"],
+    "mappings": {
+        "bloques": {
+            "direccion": "direccion_bloque"
+        },
+        "pisos": {
+            "direccion": "direccion_vivienda_completa",
+            "municipio": "localidad",
+            "cp": "codigo_postal",
+            "propiedad": "empresa_propietaria",
+            "prop_vertical": "propiedad_vertical",   # Obligatorio (Coercitivo si viene vacío)
+            "inmobiliaria": "agencia_inmobiliaria",
+            "por_habitaciones": "alquiler_por_habitaciones",
+            "n_personas": "numero_de_inquilinos",
+            "fecha_firma": "fecha_firma_contrato",
+            "vpo": "es_vpo",
+            "vpo_date": "fecha_vencimiento_vpo",
+            "ref_catastral": "referencia_catastral",
+            "bloque_id": "__fk__bloques.id"
+        },
+        "afiliadas": {
+            "num_afiliada": "numero_afiliada",
+            "nombre": "nombre_afiliada",
+            "apellidos": "apellidos_afiliada",
+            "cif": "dni_nie",
+            "fecha_nac": "fecha_nacimiento",
+            "genero": "genero",
+            "email": "email",
+            "telefono": "telefono",
+            "estado": "estado_afiliada",
+            "regimen": "regimen_arrendamiento",
+            "piso_id": "__fk__pisos.id"
+        },
+        "facturacion": {
+            "cuota": "cuota",
+            "periodicidad": "periodicidad",          # Obligatorio (1 o 12)
+            "forma_pago": "forma_pago",
+            "iban": "cuenta_bancaria_iban",
+            "afiliada_id": "__fk__afiliadas.id"
+        }
+    }
+}
+
 config = Config()

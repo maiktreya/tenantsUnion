@@ -4,12 +4,12 @@ from .home import HomeView
 from .admin import AdminView
 from .views_explorer import ViewsExplorerView
 from .conflicts import ConflictsView
-from .afiliadas_importer import AfiliadasImporterView
+from .generic_importer import GenericRelationalImporterView
 
 __all__ = [
     "HomeView",
     "AdminView",
     "ViewsExplorerView",
     "ConflictsView",
-    "AfiliadasImporterView",
+    "GenericRelationalImporterView",
 ]
