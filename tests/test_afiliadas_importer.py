@@ -31,8 +31,14 @@ from config import HOUSING_UNION_IMPORT_CONFIG
 
 class MockPostgrestAPI:
     """
-    Simulador asíncrono que emula las inserciones en cascada de PostgREST, 
+    Simulador asíncrono que emula las inserciones en cascada de PostgREST,
     registrando los payloads y devolviendo identificadores secuenciales (IDs).
+
+    NOTA: debe reproducir fielmente el contrato de `APIClient.create_record`,
+    que devuelve una tupla `(record, error_msg)` con el registro ya desempaquetado
+    en un dict (no la lista JSON cruda de PostgREST). `MultiTableImportService`
+    hace `record, error_msg = await self.api.create_record(...)`, así que
+    devolver un único valor rompe el unpacking.
     """
     def __init__(self):
         self.id_counter = 5000
@@ -45,8 +51,8 @@ class MockPostgrestAPI:
             "table": table_name,
             "payload": payload.copy()
         })
-        # Estructura en formato de lista JSON idéntica a la respuesta nativa de la API
-        return [{"id": self.id_counter}]
+        # Tupla (record, error_msg) idéntica al contrato real de APIClient.create_record
+        return {"id": self.id_counter}, None
 
 
 @pytest.fixture
@@ -82,9 +88,9 @@ async def test_csv_byte_stream_parsing(import_service):
         b"\xef\xbb\xbfdireccion_bloque,direccion_vivienda_completa,nombre_afiliada,cuota\n"
         b"Calle de la lucha 12,Calle de la lucha 12 3B,Maria Gomez,15.50\n"
     )
-    
+
     parsed_records = await import_service.parse_csv_bytes(csv_bytes)
-    
+
     assert len(parsed_records) == 1
     assert parsed_records[0]["direccion_bloque"] == "Calle de la lucha 12"
     assert parsed_records[0]["nombre_afiliada"] == "Maria Gomez"
@@ -119,7 +125,7 @@ async def test_relational_insertion_and_fk_lineage(import_service, mock_api):
 
     # 1. Verificar inserción exitosa en las 4 tablas relacionales
     assert len(mock_api.recorded_payloads) == 4
-    
+
     bloque_entry = mock_api.recorded_payloads[0]
     piso_entry = mock_api.recorded_payloads[1]
     afiliada_entry = mock_api.recorded_payloads[2]
@@ -144,7 +150,7 @@ async def test_relational_insertion_and_fk_lineage(import_service, mock_api):
     assert piso_entry["payload"]["propiedad"] == "Rentista SL"
     assert piso_entry["payload"]["prop_vertical"] == "Si"
     assert afiliada_entry["payload"]["nombre"] == "Lucia"
-    assert facturacion_entry["payload"]["periodicidad"] == "1"
+    assert facturacion_entry["payload"]["periodicidad"] == 1
 
 
 @pytest.mark.asyncio
@@ -173,14 +179,14 @@ async def test_skipping_completely_empty_optional_sub_blocks(import_service, moc
     async for _ in import_service.process_relational_import(raw_record_without_billing):
         pass
 
-    # El flujo debe impactar bloques, pisos (con propiedad_vertical='No') y afiliadas, 
+    # El flujo debe impactar bloques, pisos (con propiedad_vertical='No') y afiliadas,
     # pero tiene que saltarse por completo la inserción en la tabla de facturación.
     inserted_tables = [item["table"] for item in mock_api.recorded_payloads]
     assert "bloques" in inserted_tables
     assert "pisos" in inserted_tables
     assert "afiliadas" in inserted_tables
     assert "facturacion" not in inserted_tables
-    
+
     # Comprobar la aserción de coerción del valor por defecto
     assert mock_api.recorded_payloads[1]["payload"]["prop_vertical"] == "No"
 
@@ -191,8 +197,10 @@ async def test_skipping_completely_empty_optional_sub_blocks(import_service, moc
 
 def test_view_staging_memory_allocation(mock_nicegui_storage, mock_api):
     """Verifica que la vista configure y reserve correctamente el almacenamiento aislado por cliente."""
-    view_instance = GenericRelationalImporterView(mock_api, HOUSING_UNION_IMPORT_CONFIG)
-    
+    # GenericRelationalImporterView.__init__ solo acepta `api_client`: internamente
+    # ya fija `schema_config = HOUSING_UNION_IMPORT_CONFIG`, no se le pasa por fuera.
+    view_instance = GenericRelationalImporterView(mock_api)
+
     # Comprobar el correcto enrutamiento del estado interno local
     assert "generic_importer_records" in mock_nicegui_storage.client
     assert isinstance(view_instance.raw_records, list)
