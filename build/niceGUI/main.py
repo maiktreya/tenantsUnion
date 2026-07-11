@@ -7,7 +7,7 @@ from typing import Optional
 from nicegui import ui, app
 
 from logging_config import setup_logging
-from config import config, HOUSING_UNION_IMPORT_CONFIG
+from config import config
 
 setup_logging()
 
@@ -231,10 +231,7 @@ class Application:
                 self.views["user_management"] = UserManagementView(self.api_client)
             if self.has_role("admin", "gestor"):
                 self.views["views"] = ViewsExplorerView(self.api_client)
-                self.views["generic_importer"] = GenericRelationalImporterView(
-                    self.api_client, 
-                    HOUSING_UNION_IMPORT_CONFIG
-                )
+                self.views["generic_importer"] = GenericRelationalImporterView(self.api_client)
             if self.has_role("admin", "gestor", "actas"):
                 self.views["conflicts"] = ConflictsView(self.api_client, self.state)
             with ui.column().classes("w-full min-h-screen bg-gray-50 p-0 gap-0"):

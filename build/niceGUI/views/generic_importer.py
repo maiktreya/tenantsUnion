@@ -10,7 +10,7 @@ from components.data_table import DataTable
 from components.dialogs import ConfirmationDialog
 from components.filters import FilterPanel
 from components.upload_event_utils import read_upload_event_bytes
-from config import TABLE_INFO
+from config import TABLE_INFO, HOUSING_UNION_IMPORT_CONFIG
 from services.geolink_service import RATE_LIMIT_SLEEP, lookup_cadastral_data, to_ewkt_point
 from services.relational_import_service import MultiTableImportService
 from state.base import BaseTableState
@@ -42,11 +42,12 @@ class GenericRelationalImporterView:
          contra CartoCiudad para completar esos campos.
     """
 
-    def __init__(self, api_client: APIClient, schema_config: Dict[str, Any]):
+    def __init__(self, api_client: APIClient):
         # ---------------------------------------------------------------
         # TAB 1: estado original, intacto.
         # ---------------------------------------------------------------
         self.api = api_client
+        schema_config = HOUSING_UNION_IMPORT_CONFIG
         self.service = MultiTableImportService(api_client, schema_config)
 
         # Seguimiento en memoria por pestaña de cliente (sesión de navegador)

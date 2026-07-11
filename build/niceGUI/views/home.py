@@ -62,8 +62,8 @@ class HomeView(BaseView):
                     )
                     self._create_card(
                         icon="upload_file",
-                        title="Importar Afiliadas",
-                        description="Cargar nuevas afiliadas desde un archivo CSV de WordPress.",
+                        title="Importar Datos",
+                        description="Herramientas de carga y vinculación masiva.",
                         on_click=lambda: self.navigate("generic_importer"),
                         color="text-orange-600",
                     )
