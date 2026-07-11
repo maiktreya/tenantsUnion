@@ -45,7 +45,8 @@ services:
       POSTGREST_API_URL: ${POSTGRES_API_URL}
       NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET}
       PGRST_JWT_SECRET: ${PGRST_JWT_SECRET} 
-      INSTANCE_NAME: ${INSTANCE_NAME} # Add city here
+      INSTANCE_NAME: ${INSTANCE_NAME}
+      INSTANCE_LOGO_PATH: ${INSTANCE_LOGO_PATH}
     volumes:
       - ./build/niceGUI:/app${DEV_MODE:+:rw}${DEV_MODE:-:ro}
     working_dir: /app
