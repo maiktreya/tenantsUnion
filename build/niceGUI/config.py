@@ -412,64 +412,10 @@ VIEW_ORDER = [
     "v_consolidar_pisos_bloques",
 ]
 
-IMPORTER_HEADER_MAP = {
-    "nombre": "Nombre",
-    "apellidos": "Apellidos",
-    "cif": "CIF/NIE",
-    "email": "Email",
-    "telefono": "Teléfono",
-    "direccion": "Dirección",
-    "municipio": "Municipio",
-    "cp": "CP",
-    "fecha_nac": "Fecha Nacimiento",
-    "propiedad": "Propiedad",
-    "prop_vertical": "Prop. Vertical",
-    "fecha_alta": "Fecha Alta",
-    "n_personas": "Nº Personas",
-    "inmobiliaria": "Inmobiliaria",
-    "cuota": "Cuota (€)",
-    "periodicidad": "Periodicidad (m)",
-    "forma_pago": "Forma Pago",
-    "iban": "IBAN",
-    "bloque_id": "Bloque sugerido",
-}
+# =====================================================================
+#  GENERIC IMPORTER METADATA
+# =====================================================================
 
-FAILED_EXPORT_FIELD_MAP = {
-    "afiliada": [
-        "nombre",
-        "apellidos",
-        "cif",
-        "telefono",
-        "email",
-        "fecha_nac",
-        "regimen",
-    ],
-    "piso": [
-        "direccion",
-        "municipio",
-        "cp",
-        "bloque_id",
-        "n_personas",
-        "inmobiliaria",
-        "propiedad",
-        "prop_vertical",
-        "fecha_firma",
-    ],
-    "bloque": [
-        "direccion",
-    ],
-    "facturacion": [
-        "cuota",
-        "periodicidad",
-        "forma_pago",
-        "iban",
-    ],
-}
-DUPLICATE_NIF_WARNING = "La afiliada con este NIF ya existe en el sistema."
-
-# Instantiating the view anywhere inside your workspace layout tabs:
-# view = GenericRelationalImporterView(api_client, HOUSING_UNION_IMPORT_CONFIG)
-# view.create()
 HOUSING_UNION_IMPORT_CONFIG = {
     "name": "Estructura de Ingesta de Afiliadas",
     "execution_order": ["bloques", "pisos", "afiliadas", "facturacion"],
