@@ -13,7 +13,8 @@ Dockerfile linguist-language=Dockerfile
 
 # --- Docker Compose (YAML) ---
 *.yml linguist-detectable=true
-docker-compose.yml linguist-language=YAML
-docker-compose.yaml linguist-language=YAML
+*.yaml linguist-detectable=true
+docker-compose.yml linguist-language=Dockerfile
+docker-compose.yaml linguist-language=Dockerfile
 ci.yml linguist-language=YAML
 ci.yaml linguist-language=YAML
