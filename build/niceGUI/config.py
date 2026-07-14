@@ -515,4 +515,43 @@ HOUSING_UNION_IMPORT_CONFIG = {
     }
 }
 
+IMPORT_FIELD_DESCRIPTIONS= {
+            "direccion_bloque": "Dirección general de la finca (Opcional. Dejar vacío si se alquila a un particular sin bloque corporativo).",
+            "empresa_propietaria": "Nombre de la empresa rentista dueña del inmueble (Opcional. Volca en texto libre a pisos.propiedad).",
+            "direccion_vivienda_completa": "Dirección exacta del piso incluyendo puerta, planta, escalera y letra.",
+            "localidad": "Municipio o ciudad donde se ubica la vivienda (Opcional).",
+            "codigo_postal": "Código postal numérico oficial de 5 dígitos (Opcional).",
+            "propiedad_vertical": "Indica si el edificio entero pertenece a un único dueño. Si se deja vacío, el sistema asignará 'No' automáticamente.",
+            "agencia_inmobiliaria": "Nombre de la agencia intermediaria del alquiler (Opcional).",
+            "alquiler_por_habitaciones": "Especificar TRUE o FALSE si el contrato es por habitaciones sueltas (Opcional).",
+            "numero_de_inquilinos": "Número entero de personas que habitan el piso habitualmente (Opcional).",
+            "fecha_firma_contrato": "Fecha de formalización del contrato actual (Formato AAAA-MM-DD) (Opcional).",
+            "es_vpo": "TRUE o FALSE si la vivienda cuenta con protección oficial (Opcional).",
+            "fecha_vencimiento_vpo": "Fecha límite de la calificación VPO (Formato AAAA-MM-DD) (Opcional).",
+            "referencia_catastral": "Código oficial del catastro español de 20 caracteres (Opcional).",
+            "numero_afiliada": "Código interno del sindicato identificativo de la ficha (Opcional).",
+            "nombre_afiliada": "Nombre de pila de la afiliada inscrita.",
+            "apellidos_afiliada": "Apellidos completos de la afiliada inscrita.",
+            "dni_nie": "Documento oficial de identidad (NIF / NIE / Pasaporte) sin guiones ni espacios.",
+            "fecha_nacimiento": "Fecha de nacimiento de la afiliada (Formato AAAA-MM-DD) (Opcional).",
+            "genero": "Identidad de género declarada por la afiliada (Opcional).",
+            "email": "Correo electrónico de contacto (Opcional).",
+            "telefono": "Teléfono móvil o fijo de contacto directo (Opcional).",
+            "estado_afiliada": "Estado de la ficha dentro de la organización (Alta, Baja, Bienvenida) (Opcional).",
+            "regimen_arrendamiento": "Régimen legal del uso de la vivienda (Alquiler, LAU, etc.) (Opcional).",
+            "cuota": "Importe numérico de la cuota asignada (ejemplo: 15.00).",
+            "periodicidad": "Frecuencia de cobro obligatoria. Valores admitidos estrictamente: 1 (Mensual) o 12 (Anual).",
+            "forma_pago": "Método de abono seleccionado (ejemplo: Transferencia, Efectivo) (Opcional).",
+            "cuenta_bancaria_iban": "Código de cuenta bancaria internacional completo de la afiliada (formato IBAN) (Opcional).",
+        }
+IMPORT_MANDATORY_FIELDS = {
+            "direccion_vivienda_completa",
+            "nombre_afiliada",
+            "apellidos_afiliada",
+            "dni_nie",
+            "cuota",
+            "periodicidad",
+            "propiedad_vertical",
+        }
+
 config = Config()

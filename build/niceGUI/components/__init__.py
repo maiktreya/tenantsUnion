@@ -9,6 +9,7 @@ from .relationship_explorer import RelationshipExplorer
 from .utils import _clean_record
 from .base_view import BaseView
 from .importer_utils import parse_date, short_address, transform_and_validate_row
+from .validation_preview import ValidationPreviewPanel
 
 __all__ = [
     "DataTable",
@@ -24,4 +25,5 @@ __all__ = [
     "parse_date",
     "short_address",
     "transform_and_validate_row",
+    "ValidationPreviewPanel",
 ]

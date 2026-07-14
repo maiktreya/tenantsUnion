@@ -6,11 +6,13 @@ from typing import Any, Dict, List, Optional
 from nicegui import app, events, ui
 
 from api.client import APIClient
+from components.base_view import BaseView
 from components.data_table import DataTable
 from components.dialogs import ConfirmationDialog
 from components.filters import FilterPanel
 from components.upload_event_utils import read_upload_event_bytes
-from config import TABLE_INFO, HOUSING_UNION_IMPORT_CONFIG
+from components.validation_preview import ValidationPreviewPanel
+from config import TABLE_INFO, HOUSING_UNION_IMPORT_CONFIG, IMPORT_FIELD_DESCRIPTIONS, IMPORT_MANDATORY_FIELDS
 from services.geolink_service import RATE_LIMIT_SLEEP, lookup_cadastral_data, to_ewkt_point
 from services.relational_import_service import MultiTableImportService
 from state.base import BaseTableState
@@ -31,11 +33,12 @@ MAX_LINK_SCORE = 1.00
 DEFAULT_LINK_SCORE = 0.85
 
 
-class GenericRelationalImporterView:
+class GenericRelationalImporterView(BaseView):
     """
     Vista guiada por configuración, dividida en tres pestañas:
 
-      1. Importador CSV Relacional (comportamiento original, sin cambios).
+      1. Importador CSV Relacional, con vista previa de validación antes
+         de insertar (ver `_render_generic_importer_tab`).
       2. Vinculación automática Piso -> Bloque, basada en la vista SQL
          `v_sugerencias_pisos_huerfanos`.
       3. Enriquecimiento Geolink: relanza `pisos` sin `ref_catastral`/`coordenadas`
@@ -44,10 +47,10 @@ class GenericRelationalImporterView:
 
     def __init__(self, api_client: APIClient):
         # ---------------------------------------------------------------
-        # TAB 1: estado original, intacto.
+        # TAB 1: importador CSV + vista previa de validación.
         # ---------------------------------------------------------------
         self.api = api_client
-        schema_config = HOUSING_UNION_IMPORT_CONFIG
+        schema_config: Dict[str, Any] = HOUSING_UNION_IMPORT_CONFIG
         self.service = MultiTableImportService(api_client, schema_config)
 
         # Seguimiento en memoria por pestaña de cliente (sesión de navegador)
@@ -56,7 +59,10 @@ class GenericRelationalImporterView:
 
         self.raw_records: List[Dict[str, Any]] = app.storage.client["generic_importer_records"]
         self.import_button: Optional[ui.button] = None
+        self.download_report_button: Optional[ui.button] = None
         self.summary_log: Optional[ui.log] = None
+        self.preview_panel: Optional[ValidationPreviewPanel] = None
+        self.preview_container: Optional[ui.column] = None
 
         # ---- NÚCLEO DE INTROSPECCIÓN DINÁMICA DE CABECERAS ----
         self.required_headers: List[str] = []
@@ -66,46 +72,10 @@ class GenericRelationalImporterView:
                     self.required_headers.append(csv_header)
 
         # Campos considerados estrictamente obligatorios por el modelo de negocio
-        self.mandatory_fields = {
-            "direccion_vivienda_completa",
-            "nombre_afiliada",
-            "apellidos_afiliada",
-            "dni_nie",
-            "cuota",
-            "periodicidad",
-            "propiedad_vertical",
-        }
+        self.mandatory_fields = IMPORT_MANDATORY_FIELDS
 
         # Diccionario explicativo en castellano para la documentación interactiva
-        self.field_descriptions: Dict[str, str] = {
-            "direccion_bloque": "Dirección general de la finca (Opcional. Dejar vacío si se alquila a un particular sin bloque corporativo).",
-            "empresa_propietaria": "Nombre de la empresa rentista dueña del inmueble (Opcional. Volca en texto libre a pisos.propiedad).",
-            "direccion_vivienda_completa": "Dirección exacta del piso incluyendo puerta, planta, escalera y letra.",
-            "localidad": "Municipio o ciudad donde se ubica la vivienda (Opcional).",
-            "codigo_postal": "Código postal numérico oficial de 5 dígitos (Opcional).",
-            "propiedad_vertical": "Indica si el edificio entero pertenece a un único dueño. Si se deja vacío, el sistema asignará 'No' automáticamente.",
-            "agencia_inmobiliaria": "Nombre de la agencia intermediaria del alquiler (Opcional).",
-            "alquiler_por_habitaciones": "Especificar TRUE o FALSE si el contrato es por habitaciones sueltas (Opcional).",
-            "numero_de_inquilinos": "Número entero de personas que habitan el piso habitualmente (Opcional).",
-            "fecha_firma_contrato": "Fecha de formalización del contrato actual (Formato AAAA-MM-DD) (Opcional).",
-            "es_vpo": "TRUE o FALSE si la vivienda cuenta con protección oficial (Opcional).",
-            "fecha_vencimiento_vpo": "Fecha límite de la calificación VPO (Formato AAAA-MM-DD) (Opcional).",
-            "referencia_catastral": "Código oficial del catastro español de 20 caracteres (Opcional).",
-            "numero_afiliada": "Código interno del sindicato identificativo de la ficha (Opcional).",
-            "nombre_afiliada": "Nombre de pila de la afiliada inscrita.",
-            "apellidos_afiliada": "Apellidos completos de la afiliada inscrita.",
-            "dni_nie": "Documento oficial de identidad (NIF / NIE / Pasaporte) sin guiones ni espacios.",
-            "fecha_nacimiento": "Fecha de nacimiento de la afiliada (Formato AAAA-MM-DD) (Opcional).",
-            "genero": "Identidad de género declarada por la afiliada (Opcional).",
-            "email": "Correo electrónico de contacto (Opcional).",
-            "telefono": "Teléfono móvil o fijo de contacto directo (Opcional).",
-            "estado_afiliada": "Estado de la ficha dentro de la organización (Alta, Baja, Bienvenida) (Opcional).",
-            "regimen_arrendamiento": "Régimen legal del uso de la vivienda (Alquiler, LAU, etc.) (Opcional).",
-            "cuota": "Importe numérico de la cuota asignada (ejemplo: 15.00).",
-            "periodicidad": "Frecuencia de cobro obligatoria. Valores admitidos estrictamente: 1 (Mensual) o 12 (Anual).",
-            "forma_pago": "Método de abono seleccionado (ejemplo: Transferencia, Efectivo) (Opcional).",
-            "cuenta_bancaria_iban": "Código de cuenta bancaria internacional completo de la afiliada (formato IBAN) (Opcional).",
-        }
+        self.field_descriptions: Dict[str, str] = IMPORT_FIELD_DESCRIPTIONS
 
         # ---------------------------------------------------------------
         # TAB 2: estado del vinculador automático Piso -> Bloque.
@@ -115,6 +85,7 @@ class GenericRelationalImporterView:
         self.link_state = BaseTableState()
         self.link_state.page_size.set(10)
         self.link_table: Optional[DataTable] = None
+        self.link_table_container: Optional[ui.column] = None
         self.link_log: Optional[ui.log] = None
         self.link_execute_button: Optional[ui.button] = None
 
@@ -124,6 +95,7 @@ class GenericRelationalImporterView:
         self.geolink_state = BaseTableState()
         self.geolink_state.page_size.set(10)
         self.geolink_table: Optional[DataTable] = None
+        self.geolink_table_container: Optional[ui.column] = None
         self.geolink_filter_container: Optional[ui.column] = None
         self.geolink_filter_panel: Optional[FilterPanel] = None
         self.geolink_log: Optional[ui.log] = None
@@ -148,10 +120,10 @@ class GenericRelationalImporterView:
         return container
 
     # =====================================================================
-    # TAB 1: IMPORTADOR CSV GENÉRICO (comportamiento original, sin cambios)
+    # TAB 1: IMPORTADOR CSV GENÉRICO + VISTA PREVIA DE VALIDACIÓN
     # =====================================================================
     def _render_generic_importer_tab(self):
-        """Dibuja el espacio de trabajo con autodocumentación y subida de archivos."""
+        """Dibuja el espacio de trabajo con autodocumentación, subida y vista previa."""
         with ui.column().classes("w-full p-4 gap-4"):
             # Sección de Cabecera Principal
             with ui.row().classes("w-full items-center justify-between"):
@@ -196,8 +168,27 @@ class GenericRelationalImporterView:
                 ).props('accept=".csv"').classes("w-1/2")
 
                 self.import_button = ui.button(
-                    "Procesar e Insertar", icon="play_arrow", on_click=self._execute_pipeline
+                    "Procesar e Insertar", icon="play_arrow", on_click=self._confirm_and_execute_pipeline
                 ).props("color=orange-600").set_enabled(len(self.raw_records) > 0)
+
+                self.download_report_button = ui.button(
+                    "Descargar Informe de Validación",
+                    icon="fact_check",
+                    on_click=self._download_validation_report,
+                ).props("color=blue-grey-7 outline").set_enabled(False)
+
+            # ---- Vista Previa de Validación (dry-run, no toca la base de datos) ----
+            with ui.card().classes("w-full p-3"):
+                ui.label("Vista Previa de Validación").classes("text-subtitle2 mb-1")
+                ui.markdown(
+                    "Cada fila se valida contra las reglas de campo obligatorio, formato y "
+                    "opciones válidas *antes* de intentar insertarla, para saber de antemano "
+                    "qué filas es probable que la base de datos rechace."
+                ).classes("text-xs text-gray-500 mb-2")
+                self.preview_container = ui.column().classes("w-full relative")
+                with self.preview_container:
+                    self.preview_panel = ValidationPreviewPanel()
+                    self.preview_panel.create()
 
             # Mapa de Ruta Visual de Inserción Relacional
             with ui.card().classes("w-full p-4"):
@@ -219,6 +210,12 @@ class GenericRelationalImporterView:
         ui.download(template_bytes, "plantilla_completa_afiliadas.csv")
         ui.notify("Plantilla completa generada y lista para descargar.", type="positive")
 
+    def _download_validation_report(self):
+        if not self.preview_panel or self.preview_panel.total_count == 0:
+            ui.notify("No hay resultados de validación para descargar todavía.", type="warning")
+            return
+        ui.download(self.preview_panel.to_csv_bytes(), "informe_validacion_importacion.csv")
+
     async def _handle_upload_flow(self, e: events.UploadEventArguments):
         try:
             csv_bytes = await read_upload_event_bytes(e)
@@ -235,9 +232,53 @@ class GenericRelationalImporterView:
                 self.import_button.set_enabled(len(self.raw_records) > 0)
 
             ui.notify(f"Archivo cargado: {len(self.raw_records)} registros listos para procesar.", type="info")
+
+            await self._run_validation_preview()
         except Exception as ex:
             log.error("Fallo de pre-extracción en el flujo de subida de datos", exc_info=True)
             ui.notify(f"Error procesando archivo CSV: {ex}", type="negative")
+
+    async def _run_validation_preview(self):
+        """Ejecuta el dry-run de validación y refresca el panel de vista previa."""
+        if not self.raw_records or not self.preview_panel or not self.preview_container:
+            return
+
+        with self.preview_container:
+            spinner = ui.spinner(size="lg", color="orange-600").classes("absolute-center")
+        try:
+            results = await self.service.validate_relational_import(
+                self.raw_records, self.mandatory_fields
+            )
+            self.preview_panel.set_results(results)
+            if self.download_report_button:
+                self.download_report_button.set_enabled(len(results) > 0)
+        except Exception as ex:
+            log.error("Fallo al ejecutar la vista previa de validación", exc_info=True)
+            ui.notify(f"Error al validar la vista previa: {ex}", type="negative")
+        finally:
+            spinner.delete()
+
+    async def _confirm_and_execute_pipeline(self):
+        """Avisa antes de insertar si la vista previa ya detectó filas con errores."""
+        if not self.raw_records:
+            return
+
+        error_count = self.preview_panel.error_count if self.preview_panel else 0
+        if error_count > 0:
+            ConfirmationDialog(
+                title="Filas con errores detectados",
+                message=(
+                    f"La vista previa marcó {error_count} de {self.preview_panel.total_count} filas "
+                    "con problemas de formato o campos obligatorios ausentes. Es probable que esas "
+                    "filas concretas sean rechazadas durante la inserción, mientras que el resto se "
+                    "procesará con normalidad. ¿Deseas continuar de todos modos?"
+                ),
+                on_confirm=self._execute_pipeline,
+                confirm_button_text="Continuar de todos modos",
+                confirm_button_color="warning",
+            )
+        else:
+            await self._execute_pipeline()
 
     async def _execute_pipeline(self):
         if not self.raw_records:
@@ -253,11 +294,18 @@ class GenericRelationalImporterView:
                     self.summary_log.push(status_update)
 
             self.raw_records.clear()
+            if self.preview_panel:
+                self.preview_panel.clear()
+            if self.download_report_button:
+                self.download_report_button.set_enabled(False)
             ui.notify("Proceso de carga de afiliadas finalizado con éxito.", type="positive")
         except Exception as ex:
             ui.notify(f"Fallo crítico en ejecución: {ex}", type="negative")
             if self.summary_log:
                 self.summary_log.push(f"\nCRITICAL TRACEBACK: {str(ex)}")
+        finally:
+            if self.import_button:
+                self.import_button.set_enabled(len(self.raw_records) > 0)
 
     # =====================================================================
     # TAB 2: VINCULACIÓN AUTOMÁTICA PISO -> BLOQUE
@@ -294,12 +342,14 @@ class GenericRelationalImporterView:
             # La tabla se crea una sola vez: como referencia un objeto `state` (no una
             # copia de sus registros), basta con reasignar `state.records` y llamar a
             # `.refresh()` cada vez que cambian los datos o el umbral.
-            self.link_table = DataTable(
-                state=self.link_state,
-                show_actions=False,
-                hidden_columns=["id"],  # duplica piso_id; se oculta para evitar confusión
-            )
-            self.link_table.create()
+            self.link_table_container = ui.column().classes("w-full relative")
+            with self.link_table_container:
+                self.link_table = DataTable(
+                    state=self.link_state,
+                    show_actions=False,
+                    hidden_columns=["id"],  # duplica piso_id; se oculta para evitar confusión
+                )
+                self.link_table.create()
 
             with ui.card().classes("w-full p-2 h-40 bg-gray-50"):
                 ui.label("Registro de Vinculación").classes("text-caption text-gray-600 mb-1")
@@ -316,19 +366,21 @@ class GenericRelationalImporterView:
 
     async def _load_link_suggestions(self):
         """Recarga todas las sugerencias (la vista ya filtra score > 0.5) y vuelve a aplicar el umbral local."""
+        with self.link_table_container:
+            spinner = ui.spinner(size="lg", color="orange-600").classes("absolute-center")
         try:
             self._all_link_suggestions = await self.api.get_records(
                 PISOS_HUERFANOS_VIEW, order=f"{COL_SCORE}.desc", limit=5000
             )
+            self._refresh_link_table()
+            ui.notify(
+                f"Se encontraron {len(self._all_link_suggestions)} sugerencias candidatas (score > 0.50).",
+                type="info",
+            )
         except Exception as ex:
             ui.notify(f"Error al consultar sugerencias: {ex}", type="negative")
-            return
-
-        self._refresh_link_table()
-        ui.notify(
-            f"Se encontraron {len(self._all_link_suggestions)} sugerencias candidatas (score > 0.50).",
-            type="info",
-        )
+        finally:
+            spinner.delete()
 
     def _refresh_link_table(self):
         """Filtra las sugerencias ya cargadas por el umbral actual y refresca la tabla."""
@@ -420,8 +472,10 @@ class GenericRelationalImporterView:
             # por lo que si `BaseTableState.set_records()` la reemplaza por una lista nueva,
             # un FilterPanel ya creado quedaría apuntando a la lista vieja. Este es el mismo
             # patrón que ya usa `views/views_explorer.py`.
-            self.geolink_table = DataTable(state=self.geolink_state, show_actions=False)
-            self.geolink_table.create()
+            self.geolink_table_container = ui.column().classes("w-full relative")
+            with self.geolink_table_container:
+                self.geolink_table = DataTable(state=self.geolink_state, show_actions=False)
+                self.geolink_table.create()
 
             with ui.row().classes("w-full justify-end"):
                 self.geolink_execute_button = ui.button(
@@ -435,6 +489,8 @@ class GenericRelationalImporterView:
         ui.timer(0.1, self._load_problematic_pisos, once=True)
 
     async def _load_problematic_pisos(self):
+        with self.geolink_table_container:
+            spinner = ui.spinner(size="lg", color="orange-600").classes("absolute-center")
         try:
             records = await self.api.get_records(
                 "pisos",
@@ -442,30 +498,31 @@ class GenericRelationalImporterView:
                 order="direccion.asc",
                 limit=5000,
             )
+
+            pisos_config = TABLE_INFO.get("pisos", {})
+            self.geolink_state.set_records(records or [], pisos_config)
+
+            self.geolink_filter_container.clear()
+            with self.geolink_filter_container:
+                self.geolink_filter_panel = FilterPanel(
+                    records=self.geolink_state.records,
+                    on_filter_change=self._update_geolink_filter,
+                    table_config=pisos_config,
+                )
+                self.geolink_filter_panel.create()
+
+            if self.geolink_table:
+                self.geolink_table.refresh()
+
+            self._sync_geolink_execute_button()
+            ui.notify(
+                f"{len(self.geolink_state.records)} pisos con datos catastrales/espaciales incompletos.",
+                type="info",
+            )
         except Exception as ex:
             ui.notify(f"Error al consultar pisos incompletos: {ex}", type="negative")
-            return
-
-        pisos_config = TABLE_INFO.get("pisos", {})
-        self.geolink_state.set_records(records or [], pisos_config)
-
-        self.geolink_filter_container.clear()
-        with self.geolink_filter_container:
-            self.geolink_filter_panel = FilterPanel(
-                records=self.geolink_state.records,
-                on_filter_change=self._update_geolink_filter,
-                table_config=pisos_config,
-            )
-            self.geolink_filter_panel.create()
-
-        if self.geolink_table:
-            self.geolink_table.refresh()
-
-        self._sync_geolink_execute_button()
-        ui.notify(
-            f"{len(self.geolink_state.records)} pisos con datos catastrales/espaciales incompletos.",
-            type="info",
-        )
+        finally:
+            spinner.delete()
 
     def _update_geolink_filter(self, column: str, value: Any):
         self.geolink_state.filters[column] = value

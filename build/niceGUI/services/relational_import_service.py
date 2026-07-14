@@ -1,17 +1,20 @@
+# build/niceGUI/services/relational_import_service.py
 import csv
 import io
 import logging
-from datetime import datetime
-from typing import Dict, Any, List, Generator, AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Dict, List, Set, Tuple
+
 from api.client import APIClient
 
 log = logging.getLogger(__name__)
 
+
 class MultiTableImportService:
     """
-    Gestiona la lectura de filas planas de un CSV y puebla secuencialmente las tablas
-    relacionales manteniendo la integridad del linaje de claves foráneas.
+    Handles parsing de-normalized flat rows and sequentially populating
+    relational target database tables while maintaining foreign key lineage.
     """
+
     def __init__(self, api_client: APIClient, schema_config: Dict[str, Any]):
         self.api = api_client
         self.config = schema_config
@@ -19,148 +22,183 @@ class MultiTableImportService:
         self.table_mappings: Dict[str, Dict[str, str]] = schema_config.get("mappings", {})
 
     async def parse_csv_bytes(self, csv_bytes: bytes) -> List[Dict[str, Any]]:
-        """Descodifica de forma segura el stream de bytes del archivo CSV cargado."""
+        """Safely decodes and extracts structured raw records."""
         try:
-            content = csv_bytes.decode('utf-8-sig')
+            content = csv_bytes.decode("utf-8-sig")
             file_like = io.StringIO(content)
             reader = csv.DictReader(file_like)
             return list(reader)
         except Exception as e:
-            log.error(f"Error parsing CSV byte stream: {e}")
-            raise RuntimeError(f"Error en parseo de datos CSV: {str(e)}")
+            log.error(f"Failed to parse CSV byte stream: {e}")
+            raise RuntimeError(f"CSV data parsing failure: {str(e)}")
 
-    def _normalize_date_string(self, val: str) -> str:
+    # =====================================================================
+    # Shared payload construction.
+    #
+    # This used to live inline inside `process_relational_import` only.
+    # It is now factored out so that the dry-run preview
+    # (`validate_relational_import`) and the real import run build the
+    # *exact* same per-table payload from a CSV row — including the
+    # `prop_vertical` default-coercion rule — so the two can never quietly
+    # drift apart and report different things to the user.
+    # =====================================================================
+    def _build_table_payload(
+        self, table_name: str, raw_row: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], bool, bool]:
         """
-        Intenta parsear cadenas de texto con fechas en formatos comunes y las
-        homogeneiza estrictamente al formato requerido por el validador (AAAA-MM-DD).
+        Extracts and cleans the user-supplied (non-FK) columns for one table
+        from a single flat CSV row.
+
+        Returns (payload, has_user_mappings, has_user_data):
+          - has_user_mappings: this table has at least one non-FK column mapped
+            in the schema config.
+          - has_user_data: at least one of those mapped columns was non-blank
+            in this particular row.
         """
-        cleaned = val.strip()
-        if not cleaned:
-            return val
+        mapping = self.table_mappings.get(table_name, {})
+        payload: Dict[str, Any] = {}
+        has_user_data = False
+        has_user_mappings = False
 
-        formats_to_try = [
-            "%Y-%m-%d",  # 2026-07-10 (Estándar)
-            "%d/%m/%Y",  # 10/07/2026 (Español con barras)
-            "%d-%m-%Y",  # 10-02-2026 (Español con guiones)
-            "%Y/%m/%d",  # 2026/07/10 (Alternativo)
-        ]
+        for db_column, csv_header in mapping.items():
+            if str(csv_header).startswith("__fk__"):
+                continue  # hydrated separately; only meaningful during the real run
 
-        for fmt in formats_to_try:
-            try:
-                dt = datetime.strptime(cleaned, fmt)
-                return dt.strftime("%Y-%m-%d")
-            except ValueError:
-                continue
+            has_user_mappings = True
+            val = raw_row.get(csv_header)
+            cleaned_val = val.strip() if (val and val.strip()) else None
 
-        return cleaned
+            # Coerción de Propiedad Vertical obligatoria por defecto si viene vacía
+            if db_column == "prop_vertical" and cleaned_val is None:
+                cleaned_val = "No"
 
-    async def process_relational_import(self, raw_records: List[Dict[str, Any]]) -> AsyncGenerator[str, None]:
+            if cleaned_val is not None:
+                has_user_data = True
+            payload[db_column] = cleaned_val
+
+        return payload, has_user_mappings, has_user_data
+
+    def _preview_label(self, raw_row: Dict[str, Any]) -> str:
+        """Builds a human-readable row identifier from the row's first non-blank values."""
+        values = [v.strip() for v in raw_row.values() if v and v.strip()]
+        return " / ".join(values[:3]) if values else "(fila vacía)"
+
+    # =====================================================================
+    # Dry-run validation — never calls create_record, never touches the DB.
+    # =====================================================================
+    async def validate_relational_import(
+        self, raw_records: List[Dict[str, Any]], mandatory_headers: Set[str]
+    ) -> List[Dict[str, Any]]:
         """
-        Itera las filas del CSV, extrae los esquemas de datos por entidad, realiza las llamadas
-        a PostgREST y propaga los IDs de los padres hacia las claves foráneas de los hijos.
+        Replays the exact same field-mapping/cleaning logic used by
+        `process_relational_import`, but instead of inserting rows, checks
+        each table's resulting payload against `TableValidator` (through
+        `api.validate_record_data`, which performs no network I/O at all)
+        and against the caller-supplied set of mandatory CSV headers.
+
+        Known limitation: this cannot detect DB-side uniqueness conflicts
+        (e.g. a CIF that already exists) since that requires a live query
+        against current table state, not just the config-driven rules
+        `TableValidator` knows about. Those are still only caught when the
+        real import actually runs.
+        """
+        results: List[Dict[str, Any]] = []
+
+        for idx, raw_row in enumerate(raw_records, start=1):
+            issues: List[str] = []
+
+            for table_name in self.execution_order:
+                payload, has_user_mappings, has_user_data = self._build_table_payload(
+                    table_name, raw_row
+                )
+
+                if has_user_mappings and not has_user_data:
+                    continue  # mirrors the "skip empty optional sub-block" rule below
+
+                mapping = self.table_mappings.get(table_name, {})
+                for db_column, csv_header in mapping.items():
+                    if csv_header in mandatory_headers and not payload.get(db_column):
+                        issues.append(f"Falta el campo obligatorio: {csv_header}")
+
+                _, table_errors = await self.api.validate_record_data(
+                    table_name, payload, "create"
+                )
+                issues.extend(table_errors)
+
+            results.append(
+                {
+                    "row_number": idx,
+                    "status": "error" if issues else "valid",
+                    "preview_label": self._preview_label(raw_row),
+                    "issues": issues,
+                }
+            )
+
+        return results
+
+    # =====================================================================
+    # Real import run.
+    # =====================================================================
+    async def process_relational_import(
+        self, raw_records: List[Dict[str, Any]]
+    ) -> AsyncGenerator[str, None]:
+        """
+        Sequentially loops rows, extracts specific target schemas, posts
+        records via PostgREST, and binds child foreign keys down the pipeline.
         """
         total = len(raw_records)
         success_count = 0
         failed_count = 0
 
-        yield f"Iniciando bucle de procesamiento para {total} filas relacionales...\n"
+        yield f"Starting processing loop for {total} relational rows...\n"
 
         for idx, raw_row in enumerate(raw_records, start=1):
-            # GANCHO DE SEGURIDAD PREVENTIVO: Ignorar silenciosamente la fila de metadatos guía del CSV
-            if raw_row.get("nombre_afiliada") == "Obligatorio":
-                continue
-
             generated_lineage_keys: Dict[str, int] = {}
             row_failed = False
-            
-            yield f"[{idx}/{total}] Procesando linaje de la fila..."
+
+            yield f"[{idx}/{total}] Processing row lineage keys..."
 
             for table_name in self.execution_order:
                 mapping = self.table_mappings.get(table_name, {})
-                db_payload: Dict[str, Any] = {}
-                
-                # ---- PASO 1: EXTRAER Y LIMPIAR ÚNICAMENTE LOS DATOS DEL CSV ----
-                has_user_data = False
-                has_user_mappings = False
-                
-                for db_column, csv_header in mapping.items():
-                    if not str(csv_header).startswith("__fk__"):
-                        has_user_mappings = True
-                        val = raw_row.get(csv_header)
-                        cleaned_val = val.strip() if (val and val.strip()) else None
-                        
-                        # Coerción imperativa de Propiedad Vertical por defecto
-                        if db_column == "prop_vertical" and cleaned_val is None:
-                            cleaned_val = "No"
-                        
-                        # ---- GANCHO DE TOLERANCIA DE FECHAS ----
-                        if cleaned_val is not None and ("fecha" in db_column or "date" in db_column):
-                            cleaned_val = self._normalize_date_string(cleaned_val)
-                        
-                        # ---- GANCHO DE TOLERANCIA DE PERIODICIDAD (Mensual -> 1, Anual -> 12) ----
-                        if db_column == "periodicidad" and cleaned_val is not None:
-                            norm_p = cleaned_val.lower()
-                            if "mensual" in norm_p or norm_p == "1":
-                                cleaned_val = 1
-                            elif "anual" in norm_p or norm_p == "12":
-                                cleaned_val = 12
-                        
-                        if cleaned_val is not None:
-                            has_user_data = True
-                        db_payload[db_column] = cleaned_val
 
-                # ---- PASO 2: OMITIR SUB-BLOQUES OPCIONALES VACÍOS ----
+                db_payload, has_user_mappings, has_user_data = self._build_table_payload(
+                    table_name, raw_row
+                )
+
                 if has_user_mappings and not has_user_data:
                     continue
 
-                # ---- PASO 3: INYECTAR LAS CLAVES FORÁNEAS (FK) DEL LINAJE PADRE ----
+                # ---- Hydrate the registered foreign key lineage ----
                 for db_column, csv_header in mapping.items():
                     if str(csv_header).startswith("__fk__"):
                         parent_table = csv_header.replace("__fk__", "").split(".")[0]
                         parent_id = generated_lineage_keys.get(parent_table)
-                        
+                        # Si el padre opcional (ej: bloques) se omitió, la FK se asigna como None
                         db_payload[db_column] = parent_id if parent_id else None
 
-                if row_failed:
-                    break
-
                 try:
-                    # Intentar la creación del registro a través de la API PostgREST
+                    # `create_record` returns a (record, error_message) tuple — NOT the
+                    # raw record itself. The previous version of this loop checked
+                    # `isinstance(result, list)` / `isinstance(result, dict)` against
+                    # that tuple, which is neither, so it always fell through to the
+                    # "error" branch even on a successful insert, marking every row
+                    # failed and aborting the chain after the very first table. Fixed
+                    # by unpacking the tuple, matching how `api.batch_create` already
+                    # consumes `create_record` elsewhere in this codebase.
                     record, error_msg = await self.api.create_record(table_name, db_payload)
-                    
-                    # ---- NÚCLEO DE IDEMPOTENCIA: GANCHO DE SALVAMENTO RELACIONAL ----
-                    if error_msg and "Error de Duplicado" in error_msg:
-                        existing_records = []
-                        
-                        if table_name in ["bloques", "pisos"] and db_payload.get("direccion"):
-                            existing_records = await self.api.get_records(
-                                table_name, 
-                                filters={"direccion": f"eq.{db_payload['direccion']}"}
-                            )
-                        elif table_name == "afiliadas" and db_payload.get("cif"):
-                            existing_records = await self.api.get_records(
-                                table_name, 
-                                filters={"cif": f"eq.{db_payload['cif']}"}
-                            )
-                        
-                        if existing_records:
-                            record = existing_records[0]
-                            error_msg = None
-                    
-                    # Guardar el ID en el linaje de ejecución temporal
-                    if record and isinstance(record, dict) and "id" in record:
+
+                    if record and "id" in record:
                         generated_lineage_keys[table_name] = record["id"]
-                    elif record and isinstance(record, list) and record and "id" in record[0]:
-                        generated_lineage_keys[table_name] = record[0]["id"]
                     else:
-                        err_detail = f" Detalle: {error_msg}" if error_msg else ""
-                        yield f" -> Error cargando en tabla '{table_name}'.{err_detail}\n"
+                        yield f" -> Error loading into table '{table_name}': {error_msg}\n"
                         row_failed = True
                         break
-                        
+
                 except Exception as ex:
-                    log.error(f"Fallo de inserción relacional en tabla {table_name}: {ex}")
-                    yield f" -> Excepción crítica en tabla '{table_name}': {str(ex)}\n"
+                    log.error(
+                        f"API relational block insertion failure on table {table_name}: {ex}"
+                    )
+                    yield f" -> Critical Exception on table '{table_name}': {str(ex)}\n"
                     row_failed = True
                     break
 
@@ -169,4 +207,7 @@ class MultiTableImportService:
             else:
                 success_count += 1
 
-        yield f"\n*** Pipeline de Importación Finalizado ***\nFilas procesadas con éxito: {success_count}\nFilas fallidas: {failed_count}\n"
+        yield (
+            f"\n*** Import Pipeline Finished ***\n"
+            f"Success rows: {success_count}\nFailed entries: {failed_count}\n"
+        )
