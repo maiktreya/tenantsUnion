@@ -11,7 +11,7 @@ cd "$repo_root"
 # Read HOSTNAME and DUCKDNS_TOKEN from repo .env without sourcing it
 HOSTNAME="$(grep -m1 '^HOSTNAME=' "$repo_root/.env" 2>/dev/null | cut -d= -f2- || echo '')"
 DUCKDNS_TOKEN="$(grep -m1 '^DUCKDNS_TOKEN=' "$repo_root/.env" 2>/dev/null | cut -d= -f2- || echo '')"
-HOSTNAME="${HOSTNAME:-inquilinato.duckdns.org}"
+HOSTNAME="${HOSTNAME:-dominio.duckdns.org}"
 
 if [ -z "$DUCKDNS_TOKEN" ]; then
     echo "Error: DUCKDNS_TOKEN missing in $repo_root/.env" >&2
