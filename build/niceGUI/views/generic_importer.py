@@ -205,8 +205,13 @@ class GenericRelationalImporterView(BaseView):
                 self.summary_log = ui.log(max_lines=50).classes("w-full h-48 bg-white font-mono text-xs border rounded p-2")
 
     def _download_empty_csv_template(self):
-        header_row = ",".join(self.required_headers) + "\n"
-        template_bytes = b"\xef\xbb\xbf" + header_row.encode("utf-8")
+        """Generates a CSV template with a header row and a second row indicating if fields are mandatory."""
+        header_row = ",".join(self.required_headers) + "\n"        
+        info_row_values = []
+        for header in self.required_headers:
+            info_row_values.append("Obligatorio" if header in self.mandatory_fields else "Opcional")
+        info_row = ",".join(info_row_values) + "\n"
+        template_bytes = b"\xef\xbb\xbf" + header_row.encode("utf-8") + info_row.encode("utf-8")
         ui.download(template_bytes, "plantilla_completa_afiliadas.csv")
         ui.notify("Plantilla completa generada y lista para descargar.", type="positive")
 
