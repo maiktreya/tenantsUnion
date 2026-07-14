@@ -544,6 +544,7 @@ IMPORT_FIELD_DESCRIPTIONS= {
             "forma_pago": "Método de abono seleccionado (ejemplo: Transferencia, Efectivo) (Opcional).",
             "cuenta_bancaria_iban": "Código de cuenta bancaria internacional completo de la afiliada (formato IBAN) (Opcional).",
         }
+
 IMPORT_MANDATORY_FIELDS = {
             "direccion_vivienda_completa",
             "nombre_afiliada",
