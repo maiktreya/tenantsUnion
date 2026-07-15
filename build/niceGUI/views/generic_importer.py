@@ -19,9 +19,6 @@ from state.base import BaseTableState
 
 log = logging.getLogger(__name__)
 
-# View exposed by build/postgreSQL/init-scripts/03-init-createViews.sql.
-# Columns: id, piso_id, "Dirección Piso", "Municipio", "ID Bloque Sugerido",
-# "Dirección Bloque Sugerido", "Score" (already floored at score > 0.5 by the view itself).
 PISOS_HUERFANOS_VIEW = "v_sugerencias_pisos_huerfanos"
 COL_PISO_ID = "piso_id"
 COL_BLOQUE_ID = "ID Bloque Sugerido"
@@ -43,43 +40,52 @@ class GenericRelationalImporterView(BaseView):
          `v_sugerencias_pisos_huerfanos`.
       3. Enriquecimiento Geolink: relanza `pisos` sin `ref_catastral`/`coordenadas`
          contra CartoCiudad para completar esos campos.
+
+    ESTADO Y CICLO DE VIDA (importante para no repetir el bug corregido aquí):
+    `main.py` construye TODAS las vistas de golpe al iniciar sesión
+    (`create_views()` llama a `.create()` de cada vista y solo entonces
+    alterna la visibilidad de sus contenedores; `show_view()` solo cambia
+    `.visible`, nunca reconstruye nada). Por eso, un `ui.timer(..., once=True)`
+    colocado al final de `_render_piso_bloque_linker_tab`/`_render_geolink_enrichment_tab`
+    se disparaba a los pocos milisegundos de iniciar sesión, para las tres
+    pestañas a la vez, aunque el usuario todavía no hubiera entrado en ellas
+    — de ahí las notificaciones "fantasma" justo tras el login.
+
+    La carga de datos de las pestañas 2 y 3 ahora es perezosa: se engancha
+    al cambio de valor de `ui.tabs()` (`_on_tab_change`) y solo se dispara la
+    primera vez que el usuario entra en esa pestaña concreta, nunca antes ni
+    para las otras. A partir de ahí, los botones "Buscar Sugerencias" /
+    "Refrescar Listado" permiten recargar manualmente cuantas veces se quiera,
+    con su notificación de resultado normal en cada caso.
     """
 
+    TAB_IMPORTER_NAME = "1. Importador CSV"
+    TAB_LINKER_NAME = "2. Vinculación Piso-Bloque"
+    TAB_GEOLINK_NAME = "3. Enriquecimiento Geolink"
+
     def __init__(self, api_client: APIClient):
-        # ---------------------------------------------------------------
-        # TAB 1: importador CSV + vista previa de validación.
-        # ---------------------------------------------------------------
+
+        # TAB 1: IMPORTADOR CSV GENÉRICO + VISTA PREVIA DE VALIDACIÓN
         self.api = api_client
         schema_config: Dict[str, Any] = HOUSING_UNION_IMPORT_CONFIG
         self.service = MultiTableImportService(api_client, schema_config)
-
-        # Seguimiento en memoria por pestaña de cliente (sesión de navegador)
         if "generic_importer_records" not in app.storage.client:
             app.storage.client["generic_importer_records"] = []
-
         self.raw_records: List[Dict[str, Any]] = app.storage.client["generic_importer_records"]
         self.import_button: Optional[ui.button] = None
         self.download_report_button: Optional[ui.button] = None
         self.summary_log: Optional[ui.log] = None
         self.preview_panel: Optional[ValidationPreviewPanel] = None
         self.preview_container: Optional[ui.column] = None
-
-        # ---- NÚCLEO DE INTROSPECCIÓN DINÁMICA DE CABECERAS ----
         self.required_headers: List[str] = []
         for table, field_map in self.service.table_mappings.items():
             for db_col, csv_header in field_map.items():
                 if not str(csv_header).startswith("__fk__") and csv_header not in self.required_headers:
                     self.required_headers.append(csv_header)
-
-        # Campos considerados estrictamente obligatorios por el modelo de negocio
+        self.field_descriptions: Dict[str, str] = IMPORT_FIELD_DESCRIPTIONS
         self.mandatory_fields = IMPORT_MANDATORY_FIELDS
 
-        # Diccionario explicativo en castellano para la documentación interactiva
-        self.field_descriptions: Dict[str, str] = IMPORT_FIELD_DESCRIPTIONS
-
-        # ---------------------------------------------------------------
-        # TAB 2: estado del vinculador automático Piso -> Bloque.
-        # ---------------------------------------------------------------
+        # TAB 2: VINCULACIÓN AUTOMÁTICA PISO -> BLOQUE
         self.link_threshold: float = DEFAULT_LINK_SCORE
         self._all_link_suggestions: List[Dict[str, Any]] = []
         self.link_state = BaseTableState()
@@ -88,10 +94,9 @@ class GenericRelationalImporterView(BaseView):
         self.link_table_container: Optional[ui.column] = None
         self.link_log: Optional[ui.log] = None
         self.link_execute_button: Optional[ui.button] = None
-
-        # ---------------------------------------------------------------
-        # TAB 3: estado del enriquecimiento Geolink.
-        # ---------------------------------------------------------------
+        self._link_tab_loaded = False  # lazy loading
+        
+        # TAB 3: ENRIQUECIMIENTO GEOLINK (ref_catastral + coordenadas)
         self.geolink_state = BaseTableState()
         self.geolink_state.page_size.set(10)
         self.geolink_table: Optional[DataTable] = None
@@ -100,14 +105,15 @@ class GenericRelationalImporterView(BaseView):
         self.geolink_filter_panel: Optional[FilterPanel] = None
         self.geolink_log: Optional[ui.log] = None
         self.geolink_execute_button: Optional[ui.button] = None
+        self._geolink_tab_loaded = False  # lazy loadginh
 
     def create(self) -> ui.column:
         """Construye el contenedor de pestañas y delega cada panel a su renderer."""
         with ui.column().classes("w-full") as container:
-            with ui.tabs().classes("w-full border-b") as tabs:
-                tab_importer = ui.tab("1. Importador CSV", icon="cloud_upload")
-                tab_linker = ui.tab("2. Vinculación Piso-Bloque", icon="hub")
-                tab_geolink = ui.tab("3. Enriquecimiento Geolink", icon="explore")
+            with ui.tabs(on_change=self._on_tab_change).classes("w-full border-b") as tabs:
+                tab_importer = ui.tab(self.TAB_IMPORTER_NAME, icon="cloud_upload")
+                tab_linker = ui.tab(self.TAB_LINKER_NAME, icon="hub")
+                tab_geolink = ui.tab(self.TAB_GEOLINK_NAME, icon="explore")
 
             with ui.tab_panels(tabs, value=tab_importer).classes("w-full bg-transparent p-0"):
                 with ui.tab_panel(tab_importer):
@@ -119,9 +125,23 @@ class GenericRelationalImporterView(BaseView):
 
         return container
 
-    # =====================================================================
+    async def _on_tab_change(self, e: Any):
+        """
+        Carga perezosa de las pestañas 2 y 3: cada una dispara su consulta (y su
+        notificación de resultado) únicamente la primera vez que el usuario
+        entra en ella, nunca antes ni para las demás. Pestañas ya cargadas no
+        se vuelven a recargar automáticamente al revisitarlas — para eso están
+        los botones manuales "Buscar Sugerencias" / "Refrescar Listado".
+        """
+        selected = e.value
+        if selected == self.TAB_LINKER_NAME and not self._link_tab_loaded:
+            self._link_tab_loaded = True
+            await self._load_link_suggestions()
+        elif selected == self.TAB_GEOLINK_NAME and not self._geolink_tab_loaded:
+            self._geolink_tab_loaded = True
+            await self._load_problematic_pisos()
+
     # TAB 1: IMPORTADOR CSV GENÉRICO + VISTA PREVIA DE VALIDACIÓN
-    # =====================================================================
     def _render_generic_importer_tab(self):
         """Dibuja el espacio de trabajo con autodocumentación, subida y vista previa."""
         with ui.column().classes("w-full p-4 gap-4"):
@@ -137,7 +157,7 @@ class GenericRelationalImporterView(BaseView):
                     on_click=self._download_empty_csv_template,
                 ).props("color=blue-grey-7 outline").tooltip("Descargar un archivo CSV vacío configurado con todas las columnas relacionales")
 
-            # Panel de Especificaciones Técnicas (Instrucciones en Castellano)
+            # UI importer requirements panel
             with ui.expansion("📋 Ver Especificaciones de las Columnas del Archivo", icon="help_outline").classes("w-full border rounded-md bg-slate-50"):
                 with ui.column().classes("p-2 gap-2 w-full"):
                     ui.markdown(
@@ -159,7 +179,7 @@ class GenericRelationalImporterView(BaseView):
                                 desc = self.field_descriptions.get(header, "Campo de datos relacionales configurado en la cadena de importación.")
                                 ui.label(desc).classes("text-xs text-gray-600 mt-1")
 
-            # Zona de Carga y Ingesta
+            # Loading zone
             with ui.row().classes("w-full gap-4 items-center mt-2"):
                 ui.upload(
                     on_upload=self._handle_upload_flow,
@@ -177,7 +197,7 @@ class GenericRelationalImporterView(BaseView):
                     on_click=self._download_validation_report,
                 ).props("color=blue-grey-7 outline").set_enabled(False)
 
-            # ---- Vista Previa de Validación (dry-run, no toca la base de datos) ----
+            # Validation preview
             with ui.card().classes("w-full p-3"):
                 ui.label("Vista Previa de Validación").classes("text-subtitle2 mb-1")
                 ui.markdown(
@@ -190,7 +210,6 @@ class GenericRelationalImporterView(BaseView):
                     self.preview_panel = ValidationPreviewPanel()
                     self.preview_panel.create()
 
-            # Mapa de Ruta Visual de Inserción Relacional
             with ui.card().classes("w-full p-4"):
                 ui.label("Estructura de Destino Mapeada (Orden de Inserción Automatizado)").classes("text-subtitle2 mb-2")
                 with ui.row().classes("gap-2 items-center"):
@@ -199,14 +218,13 @@ class GenericRelationalImporterView(BaseView):
                             ui.icon("arrow_forward_ios", size="xs").classes("text-gray-400")
                         ui.chip(f"{table}").props("icon=lan color=blue-10 text-white")
 
-            # Consola Logger Terminal del Pipeline
             with ui.card().classes("w-full p-2 h-64 bg-gray-50"):
                 ui.label("Consola de Operaciones Directas").classes("text-caption text-gray-600 mb-1")
                 self.summary_log = ui.log(max_lines=50).classes("w-full h-48 bg-white font-mono text-xs border rounded p-2")
 
     def _download_empty_csv_template(self):
         """Generates a CSV template with a header row and a second row indicating if fields are mandatory."""
-        header_row = ",".join(self.required_headers) + "\n"        
+        header_row = ",".join(self.required_headers) + "\n"
         info_row_values = []
         for header in self.required_headers:
             info_row_values.append("Obligatorio" if header in self.mandatory_fields else "Opcional")
@@ -312,9 +330,7 @@ class GenericRelationalImporterView(BaseView):
             if self.import_button:
                 self.import_button.set_enabled(len(self.raw_records) > 0)
 
-    # =====================================================================
     # TAB 2: VINCULACIÓN AUTOMÁTICA PISO -> BLOQUE
-    # =====================================================================
     def _render_piso_bloque_linker_tab(self):
         with ui.column().classes("w-full p-4 gap-4"):
             with ui.column():
@@ -344,9 +360,6 @@ class GenericRelationalImporterView(BaseView):
                     "Vincular Automáticamente", icon="bolt", on_click=self._confirm_bulk_link
                 ).props("color=positive").set_enabled(False)
 
-            # La tabla se crea una sola vez: como referencia un objeto `state` (no una
-            # copia de sus registros), basta con reasignar `state.records` y llamar a
-            # `.refresh()` cada vez que cambian los datos o el umbral.
             self.link_table_container = ui.column().classes("w-full relative")
             with self.link_table_container:
                 self.link_table = DataTable(
@@ -360,8 +373,6 @@ class GenericRelationalImporterView(BaseView):
                 ui.label("Registro de Vinculación").classes("text-caption text-gray-600 mb-1")
                 self.link_log = ui.log(max_lines=50).classes("w-full h-28 bg-white font-mono text-xs border rounded p-2")
 
-        ui.timer(0.1, self._load_link_suggestions, once=True)
-
     def _on_link_threshold_change(self, value: Any):
         try:
             self.link_threshold = float(value)
@@ -370,7 +381,11 @@ class GenericRelationalImporterView(BaseView):
         self._refresh_link_table()
 
     async def _load_link_suggestions(self):
-        """Recarga todas las sugerencias (la vista ya filtra score > 0.5) y vuelve a aplicar el umbral local."""
+        """
+        Recarga todas las sugerencias (la vista ya filtra score > 0.5) y vuelve a
+        aplicar el umbral local. Se dispara la primera vez que se entra en esta
+        pestaña (vía `_on_tab_change`) y también al pulsar "Buscar Sugerencias".
+        """
         with self.link_table_container:
             spinner = ui.spinner(size="lg", color="orange-600").classes("absolute-center")
         try:
@@ -379,7 +394,7 @@ class GenericRelationalImporterView(BaseView):
             )
             self._refresh_link_table()
             ui.notify(
-                f"Se encontraron {len(self._all_link_suggestions)} sugerencias candidatas (score > 0.50).",
+                f"Se encontraron {len(self._all_link_suggestions)} sugerencias candidatas.",
                 type="info",
             )
         except Exception as ex:
@@ -450,9 +465,7 @@ class GenericRelationalImporterView(BaseView):
         )
         await self._load_link_suggestions()
 
-    # =====================================================================
     # TAB 3: ENRIQUECIMIENTO GEOLINK (ref_catastral + coordenadas)
-    # =====================================================================
     def _render_geolink_enrichment_tab(self):
         with ui.column().classes("w-full p-4 gap-4"):
             with ui.row().classes("w-full items-center justify-between"):
@@ -470,13 +483,6 @@ class GenericRelationalImporterView(BaseView):
                 ).props("color=blue-grey-7 outline")
 
             self.geolink_filter_container = ui.column().classes("w-full")
-
-            # La tabla se crea una sola vez (misma lógica que en Tab 2). El FilterPanel,
-            # en cambio, SÍ debe recrearse en cada carga de datos: captura una referencia
-            # propia a la lista de registros en su constructor (`self.records = records`),
-            # por lo que si `BaseTableState.set_records()` la reemplaza por una lista nueva,
-            # un FilterPanel ya creado quedaría apuntando a la lista vieja. Este es el mismo
-            # patrón que ya usa `views/views_explorer.py`.
             self.geolink_table_container = ui.column().classes("w-full relative")
             with self.geolink_table_container:
                 self.geolink_table = DataTable(state=self.geolink_state, show_actions=False)
@@ -491,9 +497,11 @@ class GenericRelationalImporterView(BaseView):
                 ui.label("Registro de Enriquecimiento").classes("text-caption text-gray-600 mb-1")
                 self.geolink_log = ui.log(max_lines=50).classes("w-full h-28 bg-white font-mono text-xs border rounded p-2")
 
-        ui.timer(0.1, self._load_problematic_pisos, once=True)
-
     async def _load_problematic_pisos(self):
+        """
+        Se dispara la primera vez que se entra en esta pestaña (vía
+        `_on_tab_change`) y también al pulsar "Refrescar Listado".
+        """
         with self.geolink_table_container:
             spinner = ui.spinner(size="lg", color="orange-600").classes("absolute-center")
         try:
@@ -594,6 +602,5 @@ class GenericRelationalImporterView(BaseView):
             f"Enriquecimiento finalizado: {updated}/{len(targets)} pisos actualizados.",
             type="positive",
         )
-        # Los pisos recién completados dejan de cumplir el filtro `is.null` y
-        # desaparecerán solos de la lista al recargar.
+        # autofilled pisos would automatically drop from the list
         await self._load_problematic_pisos()
