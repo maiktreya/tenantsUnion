@@ -52,6 +52,21 @@ def setup_nicegui_app():
     # Set environment variable to indicate we're in test mode
     os.environ["TESTING"] = "true"
 
+    # The nicegui.testing User fixture runs main.py via runpy.run_path with
+    # run_name='__main__', so ui.run() executes and reads these env vars.
+    # They must be set before the user fixture runs.
+    os.environ.setdefault("NICEGUI_STORAGE_SECRET", "test-storage-secret")
+    os.environ.setdefault("POSTGREST_API_URL", "http://localhost:3001")
+    os.environ.setdefault("PGRST_JWT_SECRET", "test-jwt-secret")
+
+    # config.py and token_utils.py were already imported via debug_client
+    # at top of this file, so their env-var reads happened before the
+    # setdefault calls above. Refresh the cached values.
+    from config import config
+    config.API_BASE_URL = os.environ["POSTGREST_API_URL"]
+    import auth.token_utils
+    auth.token_utils.SECRET = os.environ["PGRST_JWT_SECRET"]
+
     # Import and initialize your main application
     # This should register all your @ui.page decorators
     try:

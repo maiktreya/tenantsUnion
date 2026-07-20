@@ -238,13 +238,6 @@ class AdminView(BaseView):
             ui.notify("Registro eliminado con éxito", type="positive")
             await self._refresh_data()
 
-    async def _confirm_delete(self, record_id: int):
-        if await self.api.delete_record(
-            self.state.selected_entity_name.value, record_id
-        ):
-            ui.notify("Registro eliminado con éxito", type="positive")
-            await self._refresh_data()
-
     def _export_data(self):
         if self.state.selected_entity_name.value:
             export_to_csv(

@@ -72,6 +72,13 @@ class MultiTableImportService:
             if db_column == "prop_vertical" and cleaned_val is None:
                 cleaned_val = "No"
 
+            # Coerción de periodicidad a SMALLINT (csv.DictReader entrega strings)
+            if db_column == "periodicidad" and cleaned_val is not None:
+                try:
+                    cleaned_val = int(cleaned_val)
+                except (ValueError, TypeError):
+                    pass
+
             if cleaned_val is not None:
                 has_user_data = True
             payload[db_column] = cleaned_val

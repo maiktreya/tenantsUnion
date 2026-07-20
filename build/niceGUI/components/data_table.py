@@ -6,17 +6,6 @@ from .utils import format_date_es
 
 
 def _format_cell_value(column: str, value: any) -> str:
-    """Format a cell value: dates/timestamps get parsed and localized, blanks become '-'."""
-    if value and isinstance(value, str) and any(k in column.lower() for k in ["fecha", "updated", "_at"]):
-        try:
-            clean_str = value.replace("T", " ").replace("Z", "").split(".")[0]
-            dt = datetime.fromisoformat(clean_str)
-            return dt.strftime("%d/%m/%Y" if dt.hour == 0 and dt.minute == 0 else "%d/%m/%Y %H:%M")
-        except Exception:
-            return format_date_es(value)  # Fallback parser for non-ISO date strings
-    return value if value is not None and value != "" else "-"
-
-def _format_cell_value(column: str, value: any) -> str:
     """Format a cell value: coordinates get unpushed from GeoJSON, dates get localized, blanks become '-'."""
     # 1. GeoJSON PostGIS Geometry Formatter
     # Catches the dictionary response passed down by PostgREST spatial types

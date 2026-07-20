@@ -3,7 +3,7 @@ import time
 import os
 import json
 
-SECRET = os.environ.get("PGRST_JWT_SECRET", "default-secret")
+SECRET = os.environ.get("PGRST_JWT_SECRET")
 
 
 def create_db_token(username: str, roles: list[str]) -> str:
