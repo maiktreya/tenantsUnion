@@ -42,7 +42,7 @@ services:
       - "8081" # Internal only - no external access
     environment:
       PYTHONUNBUFFERED: 1
-      POSTGREST_API_URL: ${POSTGRES_API_URL}
+      POSTGREST_API_URL: ${POSTGREST_API_URL}
       NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET}
       PGRST_JWT_SECRET: ${PGRST_JWT_SECRET} 
       INSTANCE_NAME: ${INSTANCE_NAME}

@@ -30,7 +30,7 @@ jobs:
                   echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env
                   echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> .env
                   echo "POSTGRES_DB_SCHEMA=${{ secrets.POSTGRES_DB_SCHEMA }}" >> .env
-                  echo "POSTGRES_API_URL=${{ secrets.POSTGRES_API_URL }}" >> .env
+                  echo "POSTGREST_API_URL=${{ secrets.POSTGREST_API_URL }}" >> .env
                   echo "NICEGUI_STORAGE_SECRET=${{ secrets.NICEGUI_STORAGE_SECRET }}" >> .env
                   echo "DEV_MODE=${{ secrets.DEV_MODE }}" >> .env
                   echo "HOSTNAME=localhost" >> .env # Use a simple hostname for testing

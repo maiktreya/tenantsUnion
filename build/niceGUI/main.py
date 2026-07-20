@@ -304,7 +304,7 @@ if __name__ in {"__main__", "__mp_main__"}:
         host=config.APP_HOST,
         port=config.APP_PORT,
         title=config.APP_TITLE,
-        storage_secret=os.environ.get("NICEGUI_STORAGE_SECRET", "a-key-here"),
+        storage_secret=os.environ.get("NICEGUI_STORAGE_SECRET"),
         favicon="🎯",
         language="es"
     )

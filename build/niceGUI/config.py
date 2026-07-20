@@ -8,16 +8,18 @@ import os
 class Config:
     """Application configuration settings."""
 
-    API_BASE_URL: str = os.environ.get("POSTGREST_API_URL", "http://localhost:3001")
+    API_BASE_URL: str = os.environ.get("POSTGREST_API_URL")
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8081
-    INSTANCE_NAME: str = os.environ.get("INSTANCE_NAME", "Madrid")
-    APP_TITLE: str = f"Gestión Sindicato de Inquilinas {os.environ.get('INSTANCE_NAME', 'Madrid')}"
+    INSTANCE_NAME: str = os.environ.get("INSTANCE_NAME")
+    APP_TITLE: str = (
+        f"Gestión Sindicato de Inquilinas {os.environ.get('INSTANCE_NAME')}"
+    )
     PAGE_SIZE_OPTIONS: list = None
 
     def __post_init__(self):
         if self.PAGE_SIZE_OPTIONS is None:
-               self.PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100]
+            self.PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100]
 
 
 # =====================================================================
@@ -48,7 +50,7 @@ TABLE_INFO = {
             "directivos",
             "direccion_fiscal",
             "entramado_id",
-            "url_notas"
+            "url_notas",
         ],
         "relations": {
             "entramado_id": {"view": "entramado_empresas", "display_field": "nombre"}
@@ -57,7 +59,7 @@ TABLE_INFO = {
             {"table": "bloques", "foreign_key": "empresa_id"},
         ],
     },
-        "agrupacion_bloques": {
+    "agrupacion_bloques": {
         "display_name": "Agrupación de bloques",
         "id_field": "id",
         "hidden_fields": ["id"],
@@ -70,10 +72,19 @@ TABLE_INFO = {
         "display_name": "Bloques",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["direccion", "empresa_id", "agrupacion_bloque_id", "fecha_alta", "updated_at"],
+        "fields": [
+            "direccion",
+            "empresa_id",
+            "agrupacion_bloque_id",
+            "fecha_alta",
+            "updated_at",
+        ],
         "relations": {
             "empresa_id": {"view": "empresas", "display_field": "nombre"},
-            "agrupacion_bloque_id": {"view": "agrupacion_bloques", "display_field": "nombre"},
+            "agrupacion_bloque_id": {
+                "view": "agrupacion_bloques",
+                "display_field": "nombre",
+            },
         },
         "child_relations": [
             {
@@ -96,7 +107,7 @@ TABLE_INFO = {
             "propiedad",
             "prop_vertical",
             "n_personas",
-            "fecha_firma"
+            "fecha_firma",
         ],
         "fields": [
             "direccion",
@@ -105,7 +116,7 @@ TABLE_INFO = {
             "fecha_alta",
             "updated_at",
             "coordenadas",
-            "ref_catastral"
+            "ref_catastral",
         ],
         "relations": {
             "bloque_id": {
@@ -139,7 +150,7 @@ TABLE_INFO = {
             "afiliacion",
             "fecha_alta",
             "fecha_baja",
-            "updated_at"
+            "updated_at",
         ],
         "field_options": {
             "estado": sorted(["Alta", "Baja", "Bienvenida"]),
@@ -183,14 +194,7 @@ TABLE_INFO = {
         "display_name": "Usuarios",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": [
-            "alias",
-            "nombre",
-            "apellidos",
-            "email",
-            "is_active",
-            "created_at"
-        ],
+        "fields": ["alias", "nombre", "apellidos", "email", "is_active", "created_at"],
         "child_relations": [
             {"table": "usuario_credenciales", "foreign_key": "usuario_id"},
             {"table": "usuario_roles", "foreign_key": "usuario_id"},
@@ -233,7 +237,7 @@ TABLE_INFO = {
             "tipo",
             "resultado",
             "afiliada_id",
-            "tecnica_id"
+            "tecnica_id",
         ],
         "relations": {
             "afiliada_id": {
@@ -249,13 +253,7 @@ TABLE_INFO = {
         "display_name": "Conflictos",
         "id_field": "id",
         "hidden_fields": ["id", "fecha_cierre", "estado", "tarea_actual", "resolucion"],
-        "fields": [
-            "ambito",
-            "afiliada_id",
-            "causa",
-            "fecha_apertura",
-            "descripcion"
-        ],
+        "fields": ["ambito", "afiliada_id", "causa", "fecha_apertura", "descripcion"],
         "field_options": {
             "estado": sorted(["Abierto", "Victoria", "Cerrado"]),
             "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"],
@@ -274,7 +272,7 @@ TABLE_INFO = {
                     "Impago",
                     "Actualización del precio (IPC)",
                     "Negociación del contrato",
-                    "Otros"
+                    "Otros",
                 ]
             ),
             "tipo": sorted([]),
@@ -301,7 +299,7 @@ TABLE_INFO = {
             "accion",
             "estado",
             "conflicto_id",
-            "usuario_id"
+            "usuario_id",
         ],
         "field_options": {
             "estado": sorted(["Abierto", "Victoria", "Cerrado"]),
@@ -336,7 +334,15 @@ TABLE_INFO = {
         "display_name": "Facturación",
         "id_field": "id",
         "hidden_fields": ["id"],
-        "fields": ["cuota", "periodicidad", "forma_pago", "iban", "afiliada_id", "fecha_alta", "updated_at"],
+        "fields": [
+            "cuota",
+            "periodicidad",
+            "forma_pago",
+            "iban",
+            "afiliada_id",
+            "fecha_alta",
+            "updated_at",
+        ],
         "relations": {
             "afiliada_id": {
                 "view": "afiliadas",
@@ -392,7 +398,7 @@ VIEW_INFO = {
     "v_sugerencias_pisos_huerfanos": {
         "display_name": "Sugerencias pisos",
         "base_table": "pisos",
-       "hidden_fields": ["id"],
+        "hidden_fields": ["id"],
     },
     "v_consolidar_pisos_bloques": {
         "display_name": "Vista consolidada de Pisos-Bloques",
@@ -420,15 +426,13 @@ HOUSING_UNION_IMPORT_CONFIG = {
     "name": "Estructura de Ingesta de Afiliadas",
     "execution_order": ["bloques", "pisos", "afiliadas", "facturacion"],
     "mappings": {
-        "bloques": {
-            "direccion": "direccion_bloque"
-        },
+        "bloques": {"direccion": "direccion_bloque"},
         "pisos": {
             "direccion": "direccion_vivienda_completa",
             "municipio": "localidad",
             "cp": "codigo_postal",
             "propiedad": "empresa_propietaria",
-            "prop_vertical": "propiedad_vertical",   # Obligatorio (Coercitivo si viene vacío)
+            "prop_vertical": "propiedad_vertical",  # Obligatorio (Coercitivo si viene vacío)
             "inmobiliaria": "agencia_inmobiliaria",
             "por_habitaciones": "alquiler_por_habitaciones",
             "n_personas": "numero_de_inquilinos",
@@ -436,7 +440,7 @@ HOUSING_UNION_IMPORT_CONFIG = {
             "vpo": "es_vpo",
             "vpo_date": "fecha_vencimiento_vpo",
             "ref_catastral": "referencia_catastral",
-            "bloque_id": "__fk__bloques.id"
+            "bloque_id": "__fk__bloques.id",
         },
         "afiliadas": {
             "num_afiliada": "numero_afiliada",
@@ -449,56 +453,56 @@ HOUSING_UNION_IMPORT_CONFIG = {
             "telefono": "telefono",
             "estado": "estado_afiliada",
             "regimen": "regimen_arrendamiento",
-            "piso_id": "__fk__pisos.id"
+            "piso_id": "__fk__pisos.id",
         },
         "facturacion": {
             "cuota": "cuota",
-            "periodicidad": "periodicidad",          # Obligatorio (1 o 12)
+            "periodicidad": "periodicidad",  # Obligatorio (1 o 12)
             "forma_pago": "forma_pago",
             "iban": "cuenta_bancaria_iban",
-            "afiliada_id": "__fk__afiliadas.id"
-        }
-    }
+            "afiliada_id": "__fk__afiliadas.id",
+        },
+    },
 }
 
-IMPORT_FIELD_DESCRIPTIONS= {
-            "direccion_bloque": "Dirección general de la finca (Opcional. Dejar vacío si se alquila a un particular sin bloque corporativo).",
-            "empresa_propietaria": "Nombre de la empresa rentista dueña del inmueble (Opcional. Volca en texto libre a pisos.propiedad).",
-            "direccion_vivienda_completa": "Dirección exacta del piso incluyendo puerta, planta, escalera y letra.",
-            "localidad": "Municipio o ciudad donde se ubica la vivienda (Opcional).",
-            "codigo_postal": "Código postal numérico oficial de 5 dígitos (Opcional).",
-            "propiedad_vertical": "Indica si el edificio entero pertenece a un único dueño. Si se deja vacío, el sistema asignará 'No' automáticamente.",
-            "agencia_inmobiliaria": "Nombre de la agencia intermediaria del alquiler (Opcional).",
-            "alquiler_por_habitaciones": "Especificar TRUE o FALSE si el contrato es por habitaciones sueltas (Opcional).",
-            "numero_de_inquilinos": "Número entero de personas que habitan el piso habitualmente (Opcional).",
-            "fecha_firma_contrato": "Fecha de formalización del contrato actual (Formato AAAA-MM-DD) (Opcional).",
-            "es_vpo": "TRUE o FALSE si la vivienda cuenta con protección oficial (Opcional).",
-            "fecha_vencimiento_vpo": "Fecha límite de la calificación VPO (Formato AAAA-MM-DD) (Opcional).",
-            "referencia_catastral": "Código oficial del catastro español de 20 caracteres (Opcional).",
-            "numero_afiliada": "Código interno del sindicato identificativo de la ficha (Opcional).",
-            "nombre_afiliada": "Nombre de pila de la afiliada inscrita.",
-            "apellidos_afiliada": "Apellidos completos de la afiliada inscrita.",
-            "dni_nie": "Documento oficial de identidad (NIF / NIE / Pasaporte) sin guiones ni espacios.",
-            "fecha_nacimiento": "Fecha de nacimiento de la afiliada (Formato AAAA-MM-DD) (Opcional).",
-            "genero": "Identidad de género declarada por la afiliada (Opcional).",
-            "email": "Correo electrónico de contacto (Opcional).",
-            "telefono": "Teléfono móvil o fijo de contacto directo (Opcional).",
-            "estado_afiliada": "Estado de la ficha dentro de la organización (Alta, Baja, Bienvenida) (Opcional).",
-            "regimen_arrendamiento": "Régimen legal del uso de la vivienda (Alquiler, LAU, etc.) (Opcional).",
-            "cuota": "Importe numérico de la cuota asignada (ejemplo: 15.00).",
-            "periodicidad": "Frecuencia de cobro obligatoria. Valores admitidos estrictamente: 1 (Mensual) o 12 (Anual).",
-            "forma_pago": "Método de abono seleccionado (ejemplo: Transferencia, Efectivo) (Opcional).",
-            "cuenta_bancaria_iban": "Código de cuenta bancaria internacional completo de la afiliada (formato IBAN) (Opcional).",
-        }
+IMPORT_FIELD_DESCRIPTIONS = {
+    "direccion_bloque": "Dirección general de la finca (Opcional. Dejar vacío si se alquila a un particular sin bloque corporativo).",
+    "empresa_propietaria": "Nombre de la empresa rentista dueña del inmueble (Opcional. Volca en texto libre a pisos.propiedad).",
+    "direccion_vivienda_completa": "Dirección exacta del piso incluyendo puerta, planta, escalera y letra.",
+    "localidad": "Municipio o ciudad donde se ubica la vivienda (Opcional).",
+    "codigo_postal": "Código postal numérico oficial de 5 dígitos (Opcional).",
+    "propiedad_vertical": "Indica si el edificio entero pertenece a un único dueño. Si se deja vacío, el sistema asignará 'No' automáticamente.",
+    "agencia_inmobiliaria": "Nombre de la agencia intermediaria del alquiler (Opcional).",
+    "alquiler_por_habitaciones": "Especificar TRUE o FALSE si el contrato es por habitaciones sueltas (Opcional).",
+    "numero_de_inquilinos": "Número entero de personas que habitan el piso habitualmente (Opcional).",
+    "fecha_firma_contrato": "Fecha de formalización del contrato actual (Formato AAAA-MM-DD) (Opcional).",
+    "es_vpo": "TRUE o FALSE si la vivienda cuenta con protección oficial (Opcional).",
+    "fecha_vencimiento_vpo": "Fecha límite de la calificación VPO (Formato AAAA-MM-DD) (Opcional).",
+    "referencia_catastral": "Código oficial del catastro español de 20 caracteres (Opcional).",
+    "numero_afiliada": "Código interno del sindicato identificativo de la ficha (Opcional).",
+    "nombre_afiliada": "Nombre de pila de la afiliada inscrita.",
+    "apellidos_afiliada": "Apellidos completos de la afiliada inscrita.",
+    "dni_nie": "Documento oficial de identidad (NIF / NIE / Pasaporte) sin guiones ni espacios.",
+    "fecha_nacimiento": "Fecha de nacimiento de la afiliada (Formato AAAA-MM-DD) (Opcional).",
+    "genero": "Identidad de género declarada por la afiliada (Opcional).",
+    "email": "Correo electrónico de contacto (Opcional).",
+    "telefono": "Teléfono móvil o fijo de contacto directo (Opcional).",
+    "estado_afiliada": "Estado de la ficha dentro de la organización (Alta, Baja, Bienvenida) (Opcional).",
+    "regimen_arrendamiento": "Régimen legal del uso de la vivienda (Alquiler, LAU, etc.) (Opcional).",
+    "cuota": "Importe numérico de la cuota asignada (ejemplo: 15.00).",
+    "periodicidad": "Frecuencia de cobro obligatoria. Valores admitidos estrictamente: 1 (Mensual) o 12 (Anual).",
+    "forma_pago": "Método de abono seleccionado (ejemplo: Transferencia, Efectivo) (Opcional).",
+    "cuenta_bancaria_iban": "Código de cuenta bancaria internacional completo de la afiliada (formato IBAN) (Opcional).",
+}
 
 IMPORT_MANDATORY_FIELDS = {
-            "direccion_vivienda_completa",
-            "nombre_afiliada",
-            "apellidos_afiliada",
-            "dni_nie",
-            "cuota",
-            "periodicidad",
-            "propiedad_vertical",
-        }
+    "direccion_vivienda_completa",
+    "nombre_afiliada",
+    "apellidos_afiliada",
+    "dni_nie",
+    "cuota",
+    "periodicidad",
+    "propiedad_vertical",
+}
 
 config = Config()
