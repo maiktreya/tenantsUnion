@@ -63,7 +63,7 @@ services:
       - certbot: SSL certs via cronjob (automated renewal)
 ```
 
-**Results:** 15+ tables → 15+ endpoints, instant UI updates from schema changes, secure & production-ready with Docker + firewall.
+**Results:** 16 tables → 16+ endpoints (plus materialized views), instant UI updates from schema changes, secure & production-ready with Docker + firewall.
 
 ---
 

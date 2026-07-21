@@ -71,13 +71,14 @@ ansible-playbook deploy_schema.yml
 ```
 
 #### The Internal Automation Pipeline
-1. **Ephemeral Instance Provisioning:** The playbook initializes a temporary, isolated target database container (`postgres:16-alpine`) running completely in memory.
+1. **Ephemeral Instance Provisioning:** The playbook initializes a temporary, isolated target database container (`postgres:17-alpine`, matching the production major version so `migra` produces accurate diffs) running completely in memory.
 2. **Source-of-Truth Convergence:** The playbook sequentially injects the entire versioned repository database initialization flow into the empty sandbox instance to build a complete architectural map:
    * `01-init-schemaDBdef.sql` (Tables & Primary Indices)
    * `02-init-plpgsql_functions.sql` (Procedural Business Logic)
    * `03-init-createViews.sql` (Relational Application Interfaces)
-   * `04-init-user_roles.sql` (Database Privileges)
-   * `06-init-rls.sql` (Row-Level Security)
+   * `04-init-user_roles.sql` (Roles & Seed Users — `web_anon` / `web_user` are not created here; they come from `06`)
+   * `05-init-artificial_data.sql` (Artificial Data — empty stub in `init-scripts/`, populated only by the `-dev` override)
+   * `06-init-rls.sql` (Database Privileges, Role Grants & Row-Level Security)
 3. **State Differentiation Engine (`migra`):** The tool automatically inspects the live production database schemas and structural components of individual city databases against the compiled target repository sandbox.
 4. **Data Protection Guardrail (Drop Interceptor):** A built-in regex scanner monitors the calculated migration block. If a column or table rename is misidentified as a destructive `DROP COLUMN` or `DROP TABLE` command, **the playbook instantly triggers a hard failure abort**, freezing the deployment pipeline before live production storage arrays are touched.
 5. **Atomic Transaction Injection:** Valid additive operations (new tracking arrays, updated query views, or modified constraints) are encapsulated inside a strict explicit transaction block:
@@ -88,5 +89,3 @@ ansible-playbook deploy_schema.yml
    COMMIT;
    ```
    This ensures that if any patch execution errors occur on any individual host, the target instance automatically performs a full, non-destructive state rollback.
-
-```

@@ -4,177 +4,47 @@ This guide explains how to run the application on your local machine for develop
 
 ## 1. Environment Setup
 
-Before running the application, configure your `.env` file for a development environment. This ensures you're using the correct database scripts and port settings.
+Before running the application, configure your `.env` file for a development environment (copy `.env.example` to `.env` and adjust as needed). The dev profile does **not** read a custom `INIT_SCRIPTS_PATH` variable — the dev data seed is wired directly into `docker-compose-dev.yaml`, which bind-mounts `build/postgreSQL/init-scripts-dev/05-init-artificial_data.sql` on top of the empty production stub at `/docker-entrypoint-initdb.d/05-init-artificial_data.sql`.
 
-Open your `.env` file and make sure the following variables are set:
+What each relevant variable does:
 
-- For development data (artificial, from a single SQL file):
-  `INIT_SCRIPTS_PATH=./build/postgreSQL/init-scripts-dev`
-
-- For direct access on `http://localhost:8081`:
-
-- `INIT_SCRIPTS_PATH`: This points to the directory containing the `artificial_data.sql` script, which will populate the database with safe, fictional data.
-
-- `DEV_MODE`: If set to true makes niceGUI bind mount "rw". If left blank the default for the folder is a more secure "ro".
+- `DEV_MODE`: when non-empty, the `nicegui-app` volume is mounted `rw` so you can hot-reload Python source from the host; when blank it falls back to the more secure `ro` mount.
+- `POSTGRES_USER` / `POSTGRES_DB` / `POSTGRES_DB_SCHEMA`: must match the values expected by `04-init-user_roles.sql` and the PostgREST URI in `docker-compose.yaml`.
+- `PGRST_JWT_SECRET` / `NICEGUI_STORAGE_SECRET`: must be set to strong random values (the defaults baked into source are placeholders and will refuse to boot in hardened deployments).
 
 ## 2. Exposing ports externally
 
-You have to force upserting `docker-compose-dev.yaml` over `docker-compose.yaml` to get ports **5432(postgreSQL)**, **3000(postgREST)** and **8081(niceGUI)** externally exposed (bear in mind nginx, in production, provides additional security layers).
+You have to force-overlay `docker-compose-dev.yaml` over `docker-compose.yaml` to get ports **5432 (PostgreSQL)**, **3001 (PostgREST — mapped to the container's internal 3000)** and **8081 (NiceGUI)** externally exposed (bear in mind nginx, in production, provides additional security layers).
 
-## 3. Initial Credential Setup (CRITICAL SECURITY STEP)
+## 3. Default Seed Credentials (CRITICAL SECURITY STEP)
 
-### Generate Hashed Credentials Locally
+The repo ships with three pre-hashed development users defined in `build/postgreSQL/init-scripts/04-init-user_roles.sql`. They are inserted automatically the first time the `db` container initializes an empty data directory — **no manual hash generation is required for local dev**.
 
-Before starting the application for the first time, you **MUST** generate secure password hashes for development users. Never use plaintext credentials in documentation or repository files.
+| Alias | Role | Notes |
+| --- | --- | --- |
+| `sumate` | `admin` | Full CRUD on every table, user management, system administration. |
+| `gestor` | `gestor` | Conflicts management, afiliadas importer, read-only views. |
+| `actas` | `actas` | Conflicts module only. |
 
-#### Step 1: Create a Python script to generate password hashes
+The bcrypt hashes for these accounts are committed in plain sight inside `04-init-user_roles.sql` (`$2b$12$…`). They are **intentionally public** so anyone can boot the dev stack, and they must **never** reach a production deployment. Change them before exposing any instance to the internet.
 
-Create a temporary file named `generate_dev_credentials.py` in your project root:
+### Rotating the dev credentials (optional, recommended before any shared demo)
 
-```python
-#!/usr/bin/env python3
-"""
-Generate secure bcrypt password hashes for development users.
-Run this script locally to create credentials for the artificial_data.sql initialization.
-"""
-
-from passlib.context import CryptContext
-import json
-from pathlib import Path
-
-# Use the same context as the application
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def generate_credentials():
-    """
-    Generate test user credentials with hashed passwords.
-    
-    IMPORTANT:
-    - Do NOT commit plaintext passwords to the repository.
-    - Do NOT share generated hashes publicly (they can still be targeted).
-    - Change these credentials for production environments.
-    - Use strong, unique passwords for actual deployments.
-    """
-    
-    # Define test users with temporary development passwords
-    test_users = {
-        "admin_user": {
-            "alias": "admin_dev",
-            "nombre": "Administrador",
-            "apellidos": "Desarrollo",
-            "email": "admin@development.local",
-            "temp_password": "AdminDev2025!Secure"  # Change this
-        },
-        "gestor_user": {
-            "alias": "gestor_dev",
-            "nombre": "Gestor",
-            "apellidos": "Desarrollo",
-            "email": "gestor@development.local",
-            "temp_password": "GestorDev2025!Secure"  # Change this
-        },
-        "actas_user": {
-            "alias": "actas_dev",
-            "nombre": "Actas",
-            "apellidos": "Desarrollo",
-            "email": "actas@development.local",
-            "temp_password": "ActasDev2025!Secure"  # Change this
-        }
-    }
-    
-    # Generate hashes
-    credentials = {}
-    for user_key, user_data in test_users.items():
-        hashed_password = pwd_context.hash(user_data["temp_password"])
-        credentials[user_key] = {
-            "alias": user_data["alias"],
-            "nombre": user_data["nombre"],
-            "apellidos": user_data["apellidos"],
-            "email": user_data["email"],
-            "password_hash": hashed_password
-        }
-        print(f"\n✅ User '{user_data['alias']}':")
-        print(f"   Username: {user_data['alias']}")
-        print(f"   Temporary password: {user_data['temp_password']}")
-        print(f"   Bcrypt hash: {hashed_password}")
-        print(f"   ⚠️  SAVE the password above - you'll need it to log in for the FIRST TIME ONLY")
-    
-    # Optionally save hashes to a file (FOR LOCAL USE ONLY)
-    output_file = Path("dev_credentials.json")
-    with open(output_file, "w") as f:
-        json.dump(credentials, f, indent=2)
-    
-    print(f"\n📄 Credentials saved to: {output_file}")
-    print("⚠️  CRITICAL: Never commit this file to git or share publicly!")
-    print("⚠️  Add 'dev_credentials.json' to your .gitignore immediately!")
-    
-    return credentials
-
-if __name__ == "__main__":
-    print("🔐 TenantsUnion Development Credential Generator")
-    print("=" * 60)
-    print("⚠️  This script generates test credentials for LOCAL development only.")
-    print("=" * 60)
-    
-    try:
-        credentials = generate_credentials()
-        
-        print("\n" + "=" * 60)
-        print("✅ NEXT STEPS:")
-        print("=" * 60)
-        print("1. Copy the password hashes above into your artificial_data.sql file")
-        print("2. Update the INSERT INTO usuarios statement with the generated hashes")
-        print("3. Delete this script and dev_credentials.json after setup")
-        print("4. Start the application with: docker compose --profile Frontend up -d")
-        print("5. On first login, change your password via 'Mi Perfil' (My Profile)")
-        print("=" * 60 + "\n")
-        
-    except ImportError:
-        print("❌ ERROR: passlib not installed!")
-        print("Install it with: pip install passlib")
-        exit(1)
-```
-
-#### Step 2: Run the script
+If you want to replace the committed hashes with your own, regenerate them locally and patch the `INSERT INTO usuario_credenciales` block in `build/postgreSQL/init-scripts/04-init-user_roles.sql`:
 
 ```bash
-# Install required dependency (if not already installed)
-pip install passlib
-
-# Run the credential generator
-python generate_dev_credentials.py
+pip install passlib bcrypt
+python -c "from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt'], deprecated='auto').hash('YourNewStrongPassword!'))"
 ```
 
-This will output:
-```
-✅ User 'admin_dev':
-   Username: admin_dev
-   Temporary password: AdminDev2025!Secure
-   Bcrypt hash: $2b$12$...
-```
+Paste the resulting `$2b$12$…` string into the SQL file, then tear down and recreate the `db` container so the init scripts re-run on an empty data dir (see Section 8). Do **not** commit a real production hash — by convention this file holds only throwaway dev credentials.
 
-#### Step 3: Update artificial_data.sql
+### For production
 
-Locate `build/postgreSQL/init-scripts-dev/artificial_data.sql` and update the user insertion section with the generated hashes:
+Production instances must not rely on `04-init-user_roles.sql` at all. Either:
 
-```sql
--- INSERT sample users with HASHED passwords
--- Passwords are bcrypt hashed using passlib.CryptContext
-INSERT INTO usuarios (alias, nombre, apellidos, email, password_hash, created_at, updated_at) VALUES
-  ('admin_dev', 'Administrador', 'Desarrollo', 'admin@development.local', '$2b$12$YOUR_GENERATED_ADMIN_HASH_HERE', now(), now()),
-  ('gestor_dev', 'Gestor', 'Desarrollo', 'gestor@development.local', '$2b$12$YOUR_GENERATED_GESTOR_HASH_HERE', now(), now()),
-  ('actas_dev', 'Actas', 'Desarrollo', 'actas@development.local', '$2b$12$YOUR_GENERATED_ACTAS_HASH_HERE', now(), now());
-```
-
-#### Step 4: Clean up
-
-```bash
-# Remove the generator script and credentials file
-rm generate_dev_credentials.py dev_credentials.json
-
-# Ensure .gitignore includes these patterns
-echo "dev_credentials.json" >> .gitignore
-echo "generate_dev_credentials.py" >> .gitignore
-```
+1. Mount a replacement `04-init-user_roles.sql` with real admin hashes via a host-side secret, or
+2. Bootstrap the first admin through a one-off `psql` session after first boot, then rotate immediately from the **Mi Perfil** (My Profile) page.
 
 ## 4. Running the Application
 
@@ -197,52 +67,56 @@ This command will:
 
 - Build the necessary Docker images if they don't exist.
 
-- Start the **db**, **server**, and **nicegui-app** services in the background (-d). exposing DB/Frontend ports.
+- Start the **db**, **server**, and **nicegui-app** services in the background (`-d`), exposing DB/PostgREST/Frontend ports as described in Section 2.
 
-- The db service will automatically run the script specified by `INIT_SCRIPTS_PATH`, creating the schema and populating it with artificial data.
+- The `db` service will automatically run the scripts under `build/postgreSQL/init-scripts/` (with the `05` artificial-data stub overridden by `docker-compose-dev.yaml`), creating the schema and populating it with the seed users and artificial data.
 
 ## 5. Accessing the Application layers
 
 Once the containers are running, you can access the application directly in your web browser at:
 
-```bash
+```
 http://localhost:8081
 ```
 
 ### First-Time Login
 
-1. Use one of the generated usernames (e.g., `admin_dev`, `gestor_dev`, or `actas_dev`)
-2. Use the temporary password displayed when you ran `generate_dev_credentials.py`
-3. After successful login, immediately change your password via **Mi Perfil** (My Profile)
+1. Use one of the seed aliases (`sumate`, `gestor`, or `actas`) — see the table in Section 3.
+2. Use the corresponding password committed in `build/postgreSQL/init-scripts/04-init-user_roles.sql`. Because the bcrypt hashes are public, ask a teammate or inspect the SQL file for the current dev password.
+3. After successful login, change your password via **Mi Perfil** (My Profile) if you plan to share the instance.
 
-The api would be available on your local network at (example endpoint to table afiliadas):
+The PostgREST API is available on your local network at (example endpoint to the `afiliadas` table):
 
-```bash
-http://localhost:3000/afiliadas
+```
+http://localhost:3001/afiliadas
 ```
 
-And also locally available, you would be able to access the postgreSQL instance at:
+Note that the container internally listens on `3000`; `docker-compose-dev.yaml` remaps it to `3001` on the host so it does not collide with other local services.
 
-```bash
-postgresql://app_user:password@localhost:5432/mydb?search_path=sindicato_inq
+And also locally available, you can access the PostgreSQL instance at:
+
 ```
+postgresql://app_user:password@localhost:5432/mydb
+```
+
+The schema lives in the `sindicato_inq` schema. `search_path` is **not** a valid libpq query parameter, so set it after connecting with `SET search_path TO sindicato_inq, public;` (or pass `options=-c search_path=sindicato_inq` in your client's options field).
 
 ## 6. Available Roles and Permissions
 
-Three role-based access levels are available for testing:
+Three role-based access levels are available for testing, mapped to the seed users in Section 3:
 
-- **admin**: Full access to all tables and functions, user management, system administration.
-- **gestor**: Access to conflicts management, afiliadas importer, and read-only views module.
-- **actas**: Access limited to the conflicts module only.
+- **admin** (seed: `sumate`): Full access to all tables and functions, user management, system administration.
+- **gestor** (seed: `gestor`): Access to conflicts management, afiliadas importer, and read-only views module.
+- **actas** (seed: `actas`): Access limited to the conflicts module only.
 
-Each role has Row-Level Security (RLS) policies enforced at the database level to ensure data segregation.
+Each role has Row-Level Security (RLS) policies enforced at the database level (see `build/postgreSQL/init-scripts/06-init-rls.sql`) to ensure data segregation.
 
 ## 7. Session Management and Security
 
-- **Session Duration**: Authenticated sessions expire after **3 hours** (server-side enforcement).
-- **Rate Limiting**: Login attempts are limited to 10 per minute per IP. After 5 failures, an account is locked for 15 minutes.
-- **Password Hashing**: All passwords are hashed using bcrypt (14-round salt by default).
-- **JWT Tokens**: Authentication uses JWT tokens with 3-hour expiration time.
+- **Session Duration:** Authenticated sessions expire after **3 hours**, enforced both client-side (`app.storage.user.lifetime`) and server-side via `AuthMiddleware` in `build/niceGUI/main.py`.
+- **Brute-Force Guard:** `build/niceGUI/auth/login.py` keeps an in-process counter per username. After **5 consecutive failed attempts** the account is locked for **15 minutes**. There is **no per-IP rate limit** — the guard is keyed on the submitted username only and resets on process restart, so it is a defense against casual guessing, not distributed attacks. For multi-worker / multi-container deployments, move this state into a shared store (Redis or a `login_attempts` table).
+- **Password Hashing:** All credentials are stored as bcrypt hashes via `passlib` (`CryptContext(schemes=["bcrypt"])`). `passlib`'s bcrypt default is **12 rounds** (the `$2b$12$…` prefixes in `04-init-user_roles.sql` confirm this). The code does not override the round count.
+- **JWT Tokens:** Authentication uses HS256 JWTs minted by `auth/token_utils.py` with a 3-hour expiration, mirroring the session lifetime. The same `PGRST_JWT_SECRET` must be set on both the NiceGUI container and the PostgREST container.
 
 ## 8. Forcing stop and cleaning
 
@@ -252,15 +126,25 @@ From your project's root run the following to stop & remove all the containers a
 docker compose --profile Frontend down -v && docker system prune -a --volumes -f
 ```
 
+Caveat: the `db` service uses a **bind mount** to `./storage` (not a named Docker volume), so `down -v` will **not** delete the PostgreSQL data directory. To force a full re-initialization of the schema and seed scripts on next `up`, also remove the bind-mounted folder:
+
+```bash
+docker compose --profile Frontend down
+Remove-Item -Recurse -Force ./storage   # PowerShell
+# or: rm -rf ./storage                   # bash / WSL
+```
+
+Without this step, the `docker-entrypoint-initdb.d` scripts will **not** re-run on the next `up`, because PostgreSQL only executes them when the data directory is empty.
+
 ---
 
 ## 🔒 Security Best Practices for Development
 
-- ✅ Always generate credentials locally using the provided script
-- ✅ Never commit hashed passwords or plaintext credentials to the repository
-- ✅ Update temporary passwords immediately after first login
-- ✅ Use `.gitignore` to exclude credential files
-- ✅ Rotate credentials regularly for production deployments
-- ✅ Use strong, unique passwords (minimum 12 characters with mixed case, numbers, and symbols)
-- ❌ Never share generated hashes or passwords publicly
-- ❌ Don't use development credentials in production
+- ✅ Treat the credentials in `04-init-user_roles.sql` as throwaway — they are public by design.
+- ✅ Never commit real production password hashes to the repository.
+- ✅ Rotate the dev credentials (see Section 3) before sharing a demo instance with external collaborators.
+- ✅ Use `.gitignore` to exclude any local credential files you generate (e.g. `dev_credentials.json`).
+- ✅ Rotate credentials regularly for production deployments.
+- ✅ Use strong, unique passwords (minimum 12 characters with mixed case, numbers, and symbols).
+- ❌ Never reuse the committed dev hashes in production.
+- ❌ Don't expose the dev stack (port `8081` / `3001` / `5432`) to the public internet — it lacks the Nginx + Certbot + UFW hardening that the `Secured` profile provides.
