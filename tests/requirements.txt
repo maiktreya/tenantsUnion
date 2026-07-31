@@ -1,0 +1,46 @@
+# Enhanced requirements.txt for robust UI testing
+# Install with: pip install -r tests/requirements_robust.txt
+
+# Core testing framework
+pytest
+pytest-asyncio
+pytest-cov
+
+# For mocking HTTP requests
+respx
+
+# For managing Docker containers within integration tests
+pytest-docker
+
+# Required for NiceGUI's basic functionality
+nicegui
+
+# For testing NiceGUI interface for live edition of preview records
+pandas
+
+# Selenium for robust browser automation
+selenium>=4.0.0
+
+# HTTP client for server health checks
+requests
+
+# WebDriver manager to automatically handle driver downloads
+webdriver-manager
+
+# For process management
+psutil
+
+# Optional: For more advanced wait conditions
+selenium-wire
+
+# Optional: For taking better screenshots and debugging
+pillow
+
+# Libs needed fort security
+passlib
+pyjwt
+bcrypt
+
+# Direct Postgres connection for tests/test_rls_privilege_escalation.py
+# (bypasses PostgREST entirely to exercise RLS policies at the SQL level)
+psycopg[binary]

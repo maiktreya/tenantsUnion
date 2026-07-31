@@ -1,0 +1,227 @@
+# build/niceGUI/state/base.py (Corrected)
+
+from typing import Any, Dict, List, Callable, Tuple
+from dataclasses import dataclass, field
+import unicodedata
+import re
+from datetime import datetime
+# Add this new utility function near _normalize_for_sorting:
+
+def _normalize_for_filtering(value: Any) -> str:
+    """
+    Normalizes a value specifically for text filtering (substring matches).
+    Converts to lowercase and cleanly strips accents/tildes without 
+    distorting numerical queries into fixed-width floats.
+    """
+    if value is None:
+        return ""
+    normalized = unicodedata.normalize("NFD", str(value).strip().lower())
+    return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+
+def _normalize_for_sorting(value: Any) -> str:
+    """
+    Normalizes a value for robust sorting. Handles:
+    - Pure numbers (including negatives and decimals)
+    - Natural alphanumeric sorting (so "A2" < "A10")
+    - Case insensitivity and accent removal
+    """
+    if value is None:
+        return ""
+
+    str_value = str(value).strip()
+
+    # 1. Pure numbers: Add an offset so negatives sort correctly via string comparison
+    if re.match(r"^-?(?:\d+\.?\d*|\.\d+)$", str_value):
+        try:
+            numeric_value = float(str_value) + 1_000_000_000_000
+            return f"1_NUM_{numeric_value:025.6f}"
+        except (ValueError, TypeError):
+            pass
+
+    # 2. Text (Natural sorting): Lowercase and remove accents
+    normalized = unicodedata.normalize("NFD", str_value.lower())
+    without_accents = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+    
+    # Zero-pad any sequences of digits to 20 characters so they string-sort numerically
+    def pad_numbers(match):
+        return match.group(0).zfill(20)
+        
+    natural_sorted_string = re.sub(r'\d+', pad_numbers, without_accents)
+    
+    # Prefix with 2_TXT_ so pure strings safely sort after pure numbers
+    return f"2_TXT_{natural_sorted_string}"
+
+
+@dataclass
+class ReactiveValue:
+    """Wrapper for reactive values"""
+
+    value: Any = None
+    _observers: List[Callable] = field(default_factory=list)
+
+    def set(self, value: Any):
+        self.value = value
+        for observer in self._observers:
+            observer(value)
+
+    def subscribe(self, callback: Callable):
+        self._observers.append(callback)
+
+    def unsubscribe(self, callback: Callable):
+        if callback in self._observers:
+            self._observers.remove(callback)
+
+
+class BaseTableState:
+    """Base state for table-based views with client-side filtering and sorting."""
+
+    def __init__(self):
+        self.selected_item = ReactiveValue()
+        self.records: List[Dict] = []
+        self.filtered_records: List[Dict] = []
+        self.filters: Dict[str, Any] = {}
+        self.sort_criteria: List[Tuple[str, bool]] = []
+        self.current_page = ReactiveValue(1)
+        self.page_size = ReactiveValue(5)
+        self.table_config: Dict = {}  # To hold metadata for the current table/view
+
+    def set_records(self, records: List[Dict], table_config: Dict = None):
+        """Set the base records and initialize the filtered view."""
+        self.records = records
+        self.table_config = table_config or {}
+        self.apply_filters_and_sort()
+
+    def apply_filters_and_sort(self):
+        """
+        Apply all current filters and sorting criteria to the base records.
+        """
+        filtered = self.records.copy()
+
+        field_to_display_map = {
+            v.get("display_field", k): k
+            for k, v in self.table_config.get("relations", {}).items()
+        }
+
+        for column, filter_value in self.filters.items():
+            if not filter_value and filter_value != 0:
+                continue
+
+            actual_column_key = field_to_display_map.get(column, column)
+
+            if column.startswith("date_range_"):
+                actual_column = column.replace("date_range_", "")
+                start_date_str = filter_value.get("start")
+                end_date_str = filter_value.get("end")
+
+                if not start_date_str and not end_date_str:
+                    continue
+
+                start_date = (
+                    datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                    if start_date_str
+                    else None
+                )
+                end_date = (
+                    datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                    if end_date_str
+                    else None
+                )
+
+                def date_matches(record):
+                    record_date_str = record.get(actual_column)
+                    if not record_date_str:
+                        return False
+                    try:
+                        date_part = str(record_date_str).split("T")[0]
+                        record_date = datetime.strptime(date_part, "%Y-%m-%d").date()
+
+                        if start_date and record_date < start_date:
+                            return False
+                        if end_date and record_date > end_date:
+                            return False
+                        return True
+                    except (ValueError, TypeError):
+                        return False
+
+                filtered = [r for r in filtered if date_matches(r)]
+
+            elif isinstance(filter_value, list) and str(column).lower() == "cuota":
+                has_gt_zero_filter = "__GT_ZERO__" in filter_value
+                numeric_values = [v for v in filter_value if v != "__GT_ZERO__"]
+                filtered = [
+                    r
+                    for r in filtered
+                    if (
+                        (numeric_values and r.get(actual_column_key) in numeric_values)
+                        or (
+                            has_gt_zero_filter
+                            and r.get(actual_column_key) is not None
+                            and float(r.get(actual_column_key, 0)) > 0
+                        )
+                    )
+                ]
+
+            elif column == "global_search":
+                raw_search = str(filter_value).strip()
+                if raw_search:
+                    normalized_term = _normalize_for_filtering(raw_search)
+                    # Split the search query into individual words (tokens)
+                    search_tokens = normalized_term.split()
+
+                    def get_all_record_text(record):
+                        """Combines all field values into a single searchable string."""
+                        texts = []
+                        for v in record.values():
+                            if v is not None and not isinstance(v, (dict, list, tuple, set)):
+                                texts.append(_normalize_for_filtering(v))
+                        return " ".join(texts)
+
+                    # A record matches if ALL search tokens are found ANYWHERE in the combined text
+                    filtered = [
+                        r for r in filtered 
+                        if all(token in get_all_record_text(r) for token in search_tokens)
+                    ]
+                    
+            elif isinstance(filter_value, list):
+                if filter_value:
+                    filtered = [
+                        r for r in filtered if r.get(actual_column_key) in filter_value
+                    ]
+            else:
+                filtered = [
+                    r
+                    for r in filtered
+                    if str(filter_value).lower()
+                    in str(r.get(actual_column_key, "")).lower()
+                ]
+
+        self.filtered_records = filtered
+
+        if self.sort_criteria:
+            for column, ascending in reversed(self.sort_criteria):
+                actual_sort_key = field_to_display_map.get(column, column)
+                if self.records and column in self.records[0]:
+                    actual_sort_key = column
+                else:
+                    actual_sort_key = field_to_display_map.get(column, column)
+                self.filtered_records.sort(
+                    key=lambda x: (
+                        x.get(actual_sort_key) is None,
+                        _normalize_for_sorting(x.get(actual_sort_key)),
+                    ),
+                    reverse=not ascending,
+                )
+
+        self.current_page.set(1)
+
+    def get_paginated_records(self) -> List[Dict]:
+        """Get records for the current page."""
+        start = (self.current_page.value - 1) * self.page_size.value
+        end = start + self.page_size.value
+        return self.filtered_records[start:end]
+
+    def get_total_pages(self) -> int:
+        """Calculate total pages."""
+        if not self.filtered_records:
+            return 1
+        return max(1, (len(self.filtered_records) - 1) // self.page_size.value + 1)

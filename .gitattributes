@@ -1,0 +1,18 @@
+*.sql linguist-detectable=true
+*.sql linguist-language=sql
+
+# --- Shell scripts ---
+*.sh linguist-language=Shell
+*.bash linguist-language=Shell
+
+# --- Dockerfiles ---
+Dockerfile  linguist-detectable=true
+*/Dockerfile  linguist-detectable=true
+Dockerfile linguist-language=Dockerfile
+*/Dockerfile linguist-language=Dockerfile
+
+# --- Docker Compose (YAML) ---
+*.yml linguist-detectable=true
+*.yaml linguist-detectable=true
+ci.yml linguist-language=YAML
+ci.yaml linguist-language=YAML

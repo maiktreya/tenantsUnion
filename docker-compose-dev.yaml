@@ -1,0 +1,16 @@
+# to override default to allow port external access for development:
+# docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up --profile Frontend
+services:
+  db:
+    ports:
+      - "5432:5432"
+    volumes:
+      - /var/lib/postgresql/data # Explicit anonymous volume for --renew-anon-volumes
+      # Mount the artificial data script directly into the common folder sequence
+      - ./build/postgreSQL/init-scripts-dev/05-init-artificial_data.sql:/docker-entrypoint-initdb.d/05-init-artificial_data.sql
+  server:
+    ports:
+      - "3001:3000"
+  nicegui-app:
+    ports:
+      - "8081:8081"

@@ -1,0 +1,84 @@
+services:
+  db:
+    build:
+      context: ./build/postgreSQL
+    expose:
+      - "5432" # Internal only - no external access
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./storage:/var/lib/postgresql/data # Bind mount to project root storage folder
+      - ./build/postgreSQL/init-scripts:/docker-entrypoint-initdb.d
+      - ./ETL/tmp:/csv-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  server:
+    image: postgrest/postgrest:v12.2.8
+    expose:
+      - "3000" # Internal only - no external access
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PGRST_OPENAPI_MODE: disabled
+      PGRST_DB_ANON_ROLE: web_anon
+      PGRST_DB_SCHEMA: ${POSTGRES_DB_SCHEMA}
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET} # for RBAC
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nicegui-app:
+    build:
+      context: ./build/niceGUI
+    profiles: ["Frontend", "Secured"]
+    expose:
+      - "8081" # Internal only - no external access
+    environment:
+      PYTHONUNBUFFERED: 1
+      POSTGREST_API_URL: ${POSTGREST_API_URL}
+      NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET}
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET} 
+      INSTANCE_NAME: ${INSTANCE_NAME}
+      INSTANCE_LOGO_PATH: ${INSTANCE_LOGO_PATH}
+    volumes:
+      - ./build/niceGUI:/app${DEV_MODE:+:rw}${DEV_MODE:-:ro}
+    working_dir: /app
+    depends_on:
+      - server
+      - db
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:latest
+    profiles: ["Secured"]
+    environment:
+      HOSTNAME: ${HOSTNAME}
+    ports:
+      - "80:80" # HTTP EntryPoint
+      - "443:443" # HTTPs EntryPoint
+    volumes:
+      - ./build/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
+      - ./build/nginx/certbot:/etc/letsencrypt
+      - ./build/nginx/certbot/www:/var/www/certbot
+    command: >
+      sh -c "envsubst '$$HOSTNAME' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
+             nginx -g 'daemon off;'"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  certbot:
+    build:
+      context: ./build/certbot # custom image with duckdns integration
+    profiles: ["Secured"]
+    volumes:
+      - ./build/nginx/certbot:/etc/letsencrypt
+      - ./build/nginx/certbot/www:/var/www/certbot
+    restart: no

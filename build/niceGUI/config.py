@@ -1,0 +1,510 @@
+# build/niceGUI/config.py
+
+from dataclasses import dataclass
+import os
+
+
+@dataclass
+class Config:
+    """Application configuration settings."""
+
+    API_BASE_URL: str = os.environ.get("POSTGREST_API_URL")
+    APP_HOST: str = "0.0.0.0"
+    APP_PORT: int = 8081
+    INSTANCE_NAME: str = os.environ.get("INSTANCE_NAME")
+    APP_TITLE: str = (
+        f"Gestión Sindicato de Inquilinas {os.environ.get('INSTANCE_NAME')}"
+    )
+    PAGE_SIZE_OPTIONS: list = None
+
+    def __post_init__(self):
+        if self.PAGE_SIZE_OPTIONS is None:
+            self.PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100]
+
+
+# =====================================================================
+#  TABLE & RELATIONSHIP METADATA (ENHANCED FOR MULTI-LEVEL EXPLORATION)
+# =====================================================================
+
+# This configuration object is the single source of truth for the application's
+# understanding of the database schema. It drives UI generation, validation,
+# and relationship exploration.
+
+TABLE_INFO = {
+    "entramado_empresas": {
+        "display_name": "Entramado de Empresas",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": ["nombre", "descripcion"],
+        "child_relations": [
+            {"table": "empresas", "foreign_key": "entramado_id"},
+        ],
+    },
+    "empresas": {
+        "display_name": "Empresas",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": [
+            "nombre",
+            "cif_nif_nie",
+            "directivos",
+            "direccion_fiscal",
+            "entramado_id",
+            "url_notas",
+        ],
+        "relations": {
+            "entramado_id": {"view": "entramado_empresas", "display_field": "nombre"}
+        },
+        "child_relations": [
+            {"table": "bloques", "foreign_key": "empresa_id"},
+        ],
+    },
+    "agrupacion_bloques": {
+        "display_name": "Agrupación de bloques",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": ["nombre", "descripcion"],
+        "child_relations": [
+            {"table": "bloques", "foreign_key": "agrupacion_bloque_id"},
+        ],
+    },
+    "bloques": {
+        "display_name": "Bloques",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": [
+            "direccion",
+            "empresa_id",
+            "agrupacion_bloque_id",
+            "fecha_alta",
+            "updated_at",
+        ],
+        "relations": {
+            "empresa_id": {"view": "empresas", "display_field": "nombre"},
+            "agrupacion_bloque_id": {
+                "view": "agrupacion_bloques",
+                "display_field": "nombre",
+            },
+        },
+        "child_relations": [
+            {
+                "table": "pisos",
+                "foreign_key": "bloque_id",
+                "child_relations": [{"table": "afiliadas", "foreign_key": "piso_id"}],
+            },
+        ],
+    },
+    "pisos": {
+        "display_name": "Pisos",
+        "id_field": "id",
+        "hidden_fields": [
+            "id",
+            "por_habitaciones",
+            "inmobiliaria",
+            "bloque_id",
+            "vpo",
+            "vpo_date",
+            "propiedad",
+            "prop_vertical",
+            "n_personas",
+            "fecha_firma",
+            "provincia_id",
+        ],
+        "fields": [
+            "direccion",
+            "municipio",
+            "cp",
+            "fecha_alta",
+            "updated_at",
+            "coordenadas",
+            "ref_catastral",
+        ],
+        "relations": {
+            "bloque_id": {
+                "view": "bloques",
+                "display_field": "direccion",
+                "relations": {
+                    "empresa_id": {"view": "empresas", "display_field": "nombre"}
+                },
+            },
+            "provincia_id": {"view": "provincias", "display_field": "nombre"},
+        },
+        "child_relations": [
+            {"table": "afiliadas", "foreign_key": "piso_id"},
+        ],
+    },
+    "afiliadas": {
+        "display_name": "Afiliadas",
+        "id_field": "id",
+        "hidden_fields": ["id", "nivel_participacion"],
+        "fields": [
+            "piso_id",
+            "num_afiliada",
+            "nombre",
+            "apellidos",
+            "cif",
+            "fecha_nac",
+            "genero",
+            "email",
+            "telefono",
+            "estado",
+            "regimen",
+            "afiliacion",
+            "fecha_alta",
+            "fecha_baja",
+            "updated_at",
+        ],
+        "field_options": {
+            "estado": sorted(["Alta", "Baja", "Bienvenida"]),
+        },
+        "relations": {
+            "piso_id": {
+                "view": "pisos",
+                "display_field": "direccion",
+                "label_template": "[{id}] {direccion}",
+                "search_fields": ["direccion", "municipio", "cp", "id"],
+                "options_limit": 20000,
+                "order_by": "direccion",
+                "value_field": "id",
+            }
+        },
+        "child_relations": [
+            {"table": "facturacion", "foreign_key": "afiliada_id"},
+            {"table": "asesorias", "foreign_key": "afiliada_id"},
+            {"table": "conflictos", "foreign_key": "afiliada_id"},
+        ],
+    },
+    "nodos": {
+        "display_name": "Nodos Territoriales",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": ["nombre", "descripcion"],
+        "child_relations": [
+            {"table": "nodos_cp_mapping", "foreign_key": "nodo_id"},
+        ],
+    },
+    "roles": {
+        "display_name": "Roles de Usuario",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": ["nombre", "descripcion"],
+        "child_relations": [
+            {"table": "usuario_roles", "foreign_key": "role_id"},
+        ],
+    },
+    "usuarios": {
+        "display_name": "Usuarios",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": ["alias", "nombre", "apellidos", "email", "is_active", "created_at"],
+        "child_relations": [
+            {"table": "usuario_credenciales", "foreign_key": "usuario_id"},
+            {"table": "usuario_roles", "foreign_key": "usuario_id"},
+            {"table": "asesorias", "foreign_key": "tecnica_id"},
+            {"table": "diario_conflictos", "foreign_key": "usuario_id"},
+        ],
+    },
+    "nodos_cp_mapping": {
+        "display_name": "Mapeo CP-Nodos",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": ["cp", "nodo_id"],
+        "relations": {"nodo_id": {"view": "nodos", "display_field": "nombre"}},
+    },
+    "usuario_credenciales": {
+        "display_name": "Credenciales de Usuario",
+        "id_field": "usuario_id",
+        "hidden_fields": ["password_hash"],
+        "fields": ["usuario_id", "password_hash"],
+        "relations": {"usuario_id": {"view": "usuarios", "display_field": "alias"}},
+    },
+    "usuario_roles": {
+        "display_name": "Rol Asignado",
+        "id_field": "usuario_id",
+        "hidden_fields": [],
+        "fields": ["usuario_id", "role_id"],
+        "relations": {
+            "usuario_id": {"view": "usuarios", "display_field": "alias"},
+            "role_id": {"view": "roles", "display_field": "nombre"},
+        },
+    },
+    "asesorias": {
+        "display_name": "Asesorías",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": [
+            "estado",
+            "fecha_asesoria",
+            "tipo_beneficiaria",
+            "tipo",
+            "resultado",
+            "afiliada_id",
+            "tecnica_id",
+        ],
+        "relations": {
+            "afiliada_id": {
+                "view": "afiliadas",
+                "display_field": "nombre,apellidos",
+                "label_template": "[{id}] {nombre} {apellidos}",
+                "options_limit": 20000,
+            },
+            "tecnica_id": {"view": "usuarios", "display_field": "alias"},
+        },
+    },
+    "conflictos": {
+        "display_name": "Conflictos",
+        "id_field": "id",
+        "hidden_fields": ["id", "fecha_cierre", "estado", "tarea_actual", "resolucion"],
+        "fields": ["ambito", "afiliada_id", "causa", "fecha_apertura", "descripcion"],
+        "field_options": {
+            "estado": sorted(["Abierto", "Victoria", "Cerrado"]),
+            "ambito": ["Afiliada", "Bloque", "Entramado", "Agrupación de Bloques"],
+            "causa": sorted(
+                [
+                    "No renovación",
+                    "Fianza",
+                    "Acoso inmobiliario",
+                    "Renta Antigua",
+                    "Subida de alquiler",
+                    "Individualización Calefacción",
+                    "Reparaciones / Habitabilidad",
+                    "Venta de la vivienda",
+                    "Honorarios",
+                    "Requerimiento de la casa para uso propio",
+                    "Impago",
+                    "Actualización del precio (IPC)",
+                    "Negociación del contrato",
+                    "Otros",
+                ]
+            ),
+            "tipo": sorted([]),
+        },
+        "relations": {
+            "afiliada_id": {
+                "view": "afiliadas",
+                "display_field": "nombre,apellidos",
+                "label_template": "[{id}] {nombre} {apellidos}",
+                "options_limit": 20000,
+            }
+        },
+        "child_relations": [
+            {"table": "diario_conflictos", "foreign_key": "conflicto_id"},
+        ],
+    },
+    "diario_conflictos": {
+        "display_name": "Diario de Conflictos",
+        "id_field": "id",
+        "hidden_fields": ["id", "created_at"],
+        "fields": [
+            "notas",
+            "tarea_actual",
+            "accion",
+            "estado",
+            "conflicto_id",
+            "usuario_id",
+        ],
+        "field_options": {
+            "estado": sorted(["Abierto", "Victoria", "Cerrado"]),
+            "accion": sorted(
+                [
+                    "Inicio del conflicto",
+                    "nota simple",
+                    "nota localización propiedades",
+                    "deposito fianza",
+                    "puerta a puerta",
+                    "comunicación enviada",
+                    "llamada",
+                    "reunión de negociación",
+                    "informe vulnerabilidad",
+                    "MASC",
+                    "justicia gratuita",
+                    "demanda",
+                    "sentencia",
+                    "protocolo institutos",
+                    "taller de portavocías",
+                    "taller de pancartas",
+                    "acción directa",
+                ]
+            ),
+        },
+        "relations": {
+            "conflicto_id": {"view": "conflictos", "display_field": "id"},
+            "usuario_id": {"view": "usuarios", "display_field": "alias"},
+        },
+    },
+    "facturacion": {
+        "display_name": "Facturación",
+        "id_field": "id",
+        "hidden_fields": ["id"],
+        "fields": [
+            "cuota",
+            "periodicidad",
+            "forma_pago",
+            "iban",
+            "afiliada_id",
+            "fecha_alta",
+            "updated_at",
+        ],
+        "relations": {
+            "afiliada_id": {
+                "view": "afiliadas",
+                "display_field": "nombre,apellidos",
+                "label_template": "[{id}] {nombre} {apellidos}",
+                "options_limit": 20000,
+            }
+        },
+        "field_patterns": {
+            "iban": {
+                "regex": "^ES[0-9]{22}$",
+                "error_message": "El IBAN debe tener el formato español (ej: ES0012345678901234567890).",
+            }
+        },
+    },
+}
+
+# =====================================================================
+#  VIEWS METADATA
+# =====================================================================
+VIEW_INFO = {
+    "v_afiliadas_detalle": {
+        "display_name": "Detalle de Afiliadas",
+        "base_table": "afiliadas",
+        "hidden_fields": ["id", "piso_id", "entramado_id", "empresa_id", "nodo_id"],
+    },
+    "v_conflictos_detalle": {
+        "display_name": "Detalle de Conflictos",
+        "base_table": "conflictos",
+        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
+    },
+    "v_facturacion": {
+        "display_name": "Vista extendida de facturación",
+        "base_table": "afiliadas",
+        "hidden_fields": ["id"],
+        "excluded_roles": ["gestor"],
+    },
+    "v_resumen_nodos": {
+        "display_name": "Resumen de Nodos",
+        "base_table": "nodos",
+        "hidden_fields": ["id", "nodo_id"],
+    },
+    "v_resumen_bloques": {
+        "display_name": "Resumen de Bloques",
+        "base_table": "bloques",
+        "hidden_fields": ["id", "empresa_id", "nodo_id"],
+    },
+    "v_resumen_entramados_empresas": {
+        "display_name": "Resumen de Entramados",
+        "base_table": "entramado_empresas",
+        "hidden_fields": ["id", "entramado_id", "empresa_id", "nodo_id"],
+    },
+    "v_sugerencias_pisos_huerfanos": {
+        "display_name": "Sugerencias pisos",
+        "base_table": "pisos",
+        "hidden_fields": ["id"],
+    },
+    "v_consolidar_pisos_bloques": {
+        "display_name": "Vista consolidada de Pisos-Bloques",
+        "base_table": "pisos",
+        "hidden_fields": ["id"],
+    },
+}
+
+VIEW_ORDER = [
+    "v_afiliadas_detalle",
+    "v_conflictos_detalle",
+    "v_facturacion",
+    "v_resumen_nodos",
+    "v_resumen_bloques",
+    "v_resumen_entramados_empresas",
+    "v_sugerencias_pisos_huerfanos",
+    "v_consolidar_pisos_bloques",
+]
+
+# =====================================================================
+#  GENERIC IMPORTER METADATA
+# =====================================================================
+
+HOUSING_UNION_IMPORT_CONFIG = {
+    "name": "Estructura de Ingesta de Afiliadas",
+    "execution_order": ["bloques", "pisos", "afiliadas", "facturacion"],
+    "mappings": {
+        "bloques": {"direccion": "direccion_bloque"},
+        "pisos": {
+            "direccion": "direccion_vivienda_completa",
+            "municipio": "localidad",
+            "cp": "codigo_postal",
+            "propiedad": "empresa_propietaria",
+            "prop_vertical": "propiedad_vertical",  # Obligatorio (Coercitivo si viene vacío)
+            "inmobiliaria": "agencia_inmobiliaria",
+            "por_habitaciones": "alquiler_por_habitaciones",
+            "n_personas": "numero_de_inquilinos",
+            "fecha_firma": "fecha_firma_contrato",
+            "vpo": "es_vpo",
+            "vpo_date": "fecha_vencimiento_vpo",
+            "ref_catastral": "referencia_catastral",
+            "bloque_id": "__fk__bloques.id",
+        },
+        "afiliadas": {
+            "num_afiliada": "numero_afiliada",
+            "nombre": "nombre_afiliada",
+            "apellidos": "apellidos_afiliada",
+            "cif": "dni_nie",
+            "fecha_nac": "fecha_nacimiento",
+            "genero": "genero",
+            "email": "email",
+            "telefono": "telefono",
+            "estado": "estado_afiliada",
+            "regimen": "regimen_arrendamiento",
+            "piso_id": "__fk__pisos.id",
+        },
+        "facturacion": {
+            "cuota": "cuota",
+            "periodicidad": "periodicidad",  # Obligatorio (1 o 12)
+            "forma_pago": "forma_pago",
+            "iban": "cuenta_bancaria_iban",
+            "afiliada_id": "__fk__afiliadas.id",
+        },
+    },
+}
+
+IMPORT_FIELD_DESCRIPTIONS = {
+    "direccion_bloque": "Dirección general de la finca (Opcional. Dejar vacío si se alquila a un particular sin bloque corporativo).",
+    "empresa_propietaria": "Nombre de la empresa rentista dueña del inmueble (Opcional. Volca en texto libre a pisos.propiedad).",
+    "direccion_vivienda_completa": "Dirección exacta del piso incluyendo puerta, planta, escalera y letra.",
+    "localidad": "Municipio o ciudad donde se ubica la vivienda (Opcional).",
+    "codigo_postal": "Código postal numérico oficial de 5 dígitos (Opcional).",
+    "propiedad_vertical": "Indica si el edificio entero pertenece a un único dueño. Si se deja vacío, el sistema asignará 'No' automáticamente.",
+    "agencia_inmobiliaria": "Nombre de la agencia intermediaria del alquiler (Opcional).",
+    "alquiler_por_habitaciones": "Especificar TRUE o FALSE si el contrato es por habitaciones sueltas (Opcional).",
+    "numero_de_inquilinos": "Número entero de personas que habitan el piso habitualmente (Opcional).",
+    "fecha_firma_contrato": "Fecha de formalización del contrato actual (Formato AAAA-MM-DD) (Opcional).",
+    "es_vpo": "TRUE o FALSE si la vivienda cuenta con protección oficial (Opcional).",
+    "fecha_vencimiento_vpo": "Fecha límite de la calificación VPO (Formato AAAA-MM-DD) (Opcional).",
+    "referencia_catastral": "Código oficial del catastro español de 20 caracteres (Opcional).",
+    "numero_afiliada": "Código interno del sindicato identificativo de la ficha (Opcional).",
+    "nombre_afiliada": "Nombre de pila de la afiliada inscrita.",
+    "apellidos_afiliada": "Apellidos completos de la afiliada inscrita.",
+    "dni_nie": "Documento oficial de identidad (NIF / NIE / Pasaporte) sin guiones ni espacios.",
+    "fecha_nacimiento": "Fecha de nacimiento de la afiliada (Formato AAAA-MM-DD) (Opcional).",
+    "genero": "Identidad de género declarada por la afiliada (Opcional).",
+    "email": "Correo electrónico de contacto (Opcional).",
+    "telefono": "Teléfono móvil o fijo de contacto directo (Opcional).",
+    "estado_afiliada": "Estado de la ficha dentro de la organización (Alta, Baja, Bienvenida) (Opcional).",
+    "regimen_arrendamiento": "Régimen legal del uso de la vivienda (Alquiler, LAU, etc.) (Opcional).",
+    "cuota": "Importe numérico de la cuota asignada (ejemplo: 15.00).",
+    "periodicidad": "Frecuencia de cobro obligatoria. Valores admitidos estrictamente: 1 (Mensual) o 12 (Anual).",
+    "forma_pago": "Método de abono seleccionado (ejemplo: Transferencia, Efectivo) (Opcional).",
+    "cuenta_bancaria_iban": "Código de cuenta bancaria internacional completo de la afiliada (formato IBAN) (Opcional).",
+}
+
+IMPORT_MANDATORY_FIELDS = {
+    "direccion_vivienda_completa",
+    "nombre_afiliada",
+    "apellidos_afiliada",
+    "dni_nie",
+    "cuota",
+    "periodicidad",
+    "propiedad_vertical",
+}
+
+config = Config()

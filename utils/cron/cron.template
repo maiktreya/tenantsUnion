@@ -1,0 +1,27 @@
+# cron.template
+#
+# Template crontab for the tenantsUnion project.
+# Safe to commit to the repo: contains no usernames, hosts, or
+# absolute home-directory paths. All paths are resolved at runtime
+# via $HOME, which cron sets from /etc/passwd for whichever user
+# the crontab belongs to.
+#
+# Usage:
+#   1. Copy the lines below into `crontab -e` for the deploy user
+#      on the target server (do NOT just copy this file in place of
+#      the real crontab — paste only the job lines).
+#   2. Adjust the schedule fields if your deployment needs a
+#      different timing.
+#   3. Confirm the referenced scripts are executable:
+#        chmod +x $HOME/github/prod/tenantsUnion/utils/cron/*.sh
+#
+# m h  dom mon dow   command
+
+# Daily backup at 2 AM
+0 2 * * * $HOME/github/prod/tenantsUnion/utils/cron/backup_storage.sh
+
+# Daily certbot SSL renewal attempt at 1:00 AM
+0 1 * * * cd $HOME/github/prod/tenantsUnion && /bin/bash utils/cron/renew_certificates.sh >> logs/certbot-renewal.log 2>&1
+
+# Sindicato de Inquilinas: Daily ETL sync from MariaDB to PostgreSQL
+0 2 * * * $HOME/github/prod/tenantsUnion/utils/cron/daily_sync.sh >> $HOME/github/prod/tenantsUnion/utils/cron/cron_errors.log 2>&1
